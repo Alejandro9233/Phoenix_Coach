@@ -19,12 +19,7 @@ class NetworkManager: ObservableObject {
     private let decoder: JSONDecoder
     
     init() {
-        let defaultURL: String
-        #if targetEnvironment(simulator)
-        defaultURL = "http://127.0.0.1:8001"
-        #else
-        defaultURL = "http://10.22.181.143:8001"
-        #endif
+        let defaultURL = "https://phoenix-coach.onrender.com"
         
         let lastDefault = UserDefaults.standard.string(forKey: "last_default_url")
         if lastDefault != defaultURL {
@@ -48,12 +43,7 @@ class NetworkManager: ObservableObject {
     
     /// Reset the base URL to its environment-appropriate default.
     func resetToDefaultURL() {
-        let defaultURL: String
-        #if targetEnvironment(simulator)
-        defaultURL = "http://127.0.0.1:8001"
-        #else
-        defaultURL = "http://10.22.181.143:8001"
-        #endif
+        let defaultURL = "https://phoenix-coach.onrender.com"
         self.baseURL = defaultURL
         Task {
             await checkConnection()
@@ -68,10 +58,11 @@ class NetworkManager: ObservableObject {
             let (data, response) = try await session.data(from: url)
             if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let ollamaStatus = json["ollama"] as? String
+                    let llmObj = json["llm"] as? [String: Any]
+                    let llmStatus = llmObj?["status"] as? String
                     await MainActor.run {
                         isConnected = true
-                        isOllamaConnected = ollamaStatus == "connected"
+                        isOllamaConnected = llmStatus == "connected"
                     }
                     return
                 }
@@ -81,23 +72,19 @@ class NetworkManager: ObservableObject {
                 isOllamaConnected = false
             }
         } catch {
-            let defaultURL: String
-            #if targetEnvironment(simulator)
-            defaultURL = "http://127.0.0.1:8001"
-            #else
-            defaultURL = "http://10.22.181.143:8001"
-            #endif
+            let defaultURL = "https://phoenix-coach.onrender.com"
             
             if baseURL != defaultURL, let fallbackUrl = URL(string: "\(defaultURL)/health") {
                 do {
                     let (data, response) = try await session.data(from: fallbackUrl)
                     if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            let ollamaStatus = json["ollama"] as? String
+                            let llmObj = json["llm"] as? [String: Any]
+                            let llmStatus = llmObj?["status"] as? String
                             await MainActor.run {
                                 self.baseURL = defaultURL
                                 isConnected = true
-                                isOllamaConnected = ollamaStatus == "connected"
+                                isOllamaConnected = llmStatus == "connected"
                             }
                             return
                         }

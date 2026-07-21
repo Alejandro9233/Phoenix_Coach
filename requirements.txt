@@ -8,3 +8,5 @@ chromadb
 openai
 pydantic
 pydantic-settings
+garmin-fit-sdk
+playwright

@@ -871,7 +871,7 @@ struct ConnectionSettingsSheet: View {
                         
                         bulletPoint("Make sure your Mac backend is running via the command `PYTHONPATH=. python3 backend/main.py` in the workspace.")
                         bulletPoint("Ensure both your iPhone/device and Mac are connected to the exact same Wi-Fi network.")
-                        bulletPoint("Check that the port number (`8001`) matches. You can test in your Mac browser at `http://localhost:8001/health`.")
+                        bulletPoint("Check that the app has internet access. You can test in your Mac browser at `https://phoenix-coach.onrender.com/health`.")
                     }
                     .padding(.horizontal, 4)
                 }
