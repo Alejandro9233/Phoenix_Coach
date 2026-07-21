@@ -1,0 +1,5138 @@
+[
+  {
+    "filename": "477141033801515014.fit",
+    "filesize_bytes": 64514,
+    "sport": "cycling",
+    "sub_sport": "indoor_cycling",
+    "start_time": "2026-04-29T17:32:00",
+    "total_elapsed_time": 4911.32,
+    "total_distance": null,
+    "avg_heart_rate": 156,
+    "max_heart_rate": 177,
+    "total_calories": 954,
+    "avg_speed": 0.0,
+    "avg_cadence": 0,
+    "total_ascent": 0,
+    "total_descent": 0,
+    "errors": [],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-29T18:54:49"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-29T18:54:49"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-29T17:32:00"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "4911.32"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-29T11:32:00"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "manual"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-04-29T17:32:00",
+              "2026-04-29T18:53:51"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 4912,
+        "fields": {
+          "activity_type": {
+            "count": 4912,
+            "sample_values": [
+              "cycling",
+              "cycling",
+              "cycling"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 4912,
+            "sample_values": [
+              "2026-04-29T17:32:00",
+              "2026-04-29T17:32:01",
+              "2026-04-29T17:32:02"
+            ],
+            "units": null
+          },
+          "heart_rate": {
+            "count": 4911,
+            "sample_values": [
+              "91",
+              "91",
+              "90"
+            ],
+            "units": "bpm"
+          },
+          "enhanced_speed": {
+            "count": 4911,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "speed": {
+            "count": 4911,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "distance": {
+            "count": 4909,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m"
+          }
+        }
+      },
+      "lap": {
+        "count": 5,
+        "fields": {
+          "message_index": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "1",
+              "2"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 5,
+            "sample_values": [
+              "2026-04-29T17:47:00",
+              "2026-04-29T18:17:00",
+              "2026-04-29T18:22:00"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 5,
+            "sample_values": [
+              "2026-04-29T17:32:00",
+              "2026-04-29T17:47:00",
+              "2026-04-29T18:17:00"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 5,
+            "sample_values": [
+              "900.0",
+              "1800.0",
+              "300.0"
+            ],
+            "units": "s"
+          },
+          "total_elapsed_time": {
+            "count": 5,
+            "sample_values": [
+              "900.0",
+              "1800.0",
+              "300.0"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 5,
+            "sample_values": [
+              "127",
+              "377",
+              "55"
+            ],
+            "units": "kcal"
+          },
+          "sport": {
+            "count": 5,
+            "sample_values": [
+              "cycling",
+              "cycling",
+              "cycling"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 5,
+            "sample_values": [
+              "indoor_cycling",
+              "indoor_cycling",
+              "indoor_cycling"
+            ],
+            "units": null
+          },
+          "max_heart_rate": {
+            "count": 5,
+            "sample_values": [
+              "159",
+              "174",
+              "171"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 5,
+            "sample_values": [
+              "83",
+              "148",
+              "131"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 5,
+            "sample_values": [
+              "126",
+              "165",
+              "150"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 5,
+            "sample_values": [
+              "29",
+              "31",
+              "32"
+            ],
+            "units": "C"
+          },
+          "enhanced_max_speed": {
+            "count": 5,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 5,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 5,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 5,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "avg_cadence": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "max_power": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_power": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "watts"
+          },
+          "total_descent": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_ascent": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_work": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "J"
+          },
+          "normalized_power": {
+            "count": 5,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "watts"
+          }
+        }
+      },
+      "session": {
+        "count": 1,
+        "fields": {
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "cycling"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "indoor_cycling"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-29T17:32:00"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-29T18:53:51"
+            ],
+            "units": null
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "4911.32"
+            ],
+            "units": "s"
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "4911.31"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "954"
+            ],
+            "units": "kcal"
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "177"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "83"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "156"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "31"
+            ],
+            "units": "C"
+          },
+          "total_ascent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_descent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "max_cadence": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "avg_cadence": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "enhanced_max_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "max_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "total_work": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "J"
+          },
+          "normalized_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477165763686334466.fit",
+    "filesize_bytes": 59619,
+    "sport": null,
+    "sub_sport": null,
+    "start_time": null,
+    "total_elapsed_time": null,
+    "total_distance": null,
+    "avg_heart_rate": null,
+    "max_heart_rate": null,
+    "total_calories": null,
+    "avg_speed": null,
+    "avg_cadence": null,
+    "total_ascent": null,
+    "total_descent": null,
+    "errors": [
+      "Invalid field size 1 for type 'uint32' (expected a multiple of 4)"
+    ],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T20:30:12"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T20:30:12"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T16:06:08"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "3710.67"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T10:06:08"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "manual"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-04-30T16:06:08",
+              "2026-04-30T16:16:33"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 625,
+        "fields": {
+          "activity_type": {
+            "count": 625,
+            "sample_values": [
+              "swimming",
+              "swimming",
+              "swimming"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 625,
+            "sample_values": [
+              "2026-04-30T16:06:08",
+              "2026-04-30T16:06:09",
+              "2026-04-30T16:06:10"
+            ],
+            "units": null
+          },
+          "heart_rate": {
+            "count": 625,
+            "sample_values": [
+              "95",
+              "95",
+              "95"
+            ],
+            "units": "bpm"
+          },
+          "enhanced_speed": {
+            "count": 625,
+            "sample_values": [
+              "0.689",
+              "0.689",
+              "0.689"
+            ],
+            "units": "m/s"
+          },
+          "speed": {
+            "count": 625,
+            "sample_values": [
+              "0.689",
+              "0.689",
+              "0.689"
+            ],
+            "units": "m/s"
+          },
+          "cadence": {
+            "count": 625,
+            "sample_values": [
+              "18",
+              "18",
+              "18"
+            ],
+            "units": "rpm"
+          },
+          "temperature": {
+            "count": 625,
+            "sample_values": [
+              "29",
+              "29",
+              "29"
+            ],
+            "units": "C"
+          },
+          "distance": {
+            "count": 545,
+            "sample_values": [
+              "25.0",
+              "25.0",
+              "25.0"
+            ],
+            "units": "m"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477165763686334467.fit",
+    "filesize_bytes": 39743,
+    "sport": "training",
+    "sub_sport": "strength_training",
+    "start_time": "2026-04-30T18:57:39",
+    "total_elapsed_time": 5503.59,
+    "total_distance": null,
+    "avg_heart_rate": 99,
+    "max_heart_rate": 129,
+    "total_calories": 315,
+    "avg_speed": null,
+    "avg_cadence": null,
+    "total_ascent": null,
+    "total_descent": null,
+    "errors": [],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T20:30:12"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T20:30:12"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T18:57:39"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "5503.59"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T12:57:39"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "auto_multi_sport"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-04-30T18:57:39",
+              "2026-04-30T20:29:23"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 5505,
+        "fields": {
+          "activity_type": {
+            "count": 5505,
+            "sample_values": [
+              "10",
+              "10",
+              "10"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 5505,
+            "sample_values": [
+              "2026-04-30T18:57:39",
+              "2026-04-30T18:57:40",
+              "2026-04-30T18:57:41"
+            ],
+            "units": null
+          },
+          "heart_rate": {
+            "count": 5504,
+            "sample_values": [
+              "108",
+              "108",
+              "107"
+            ],
+            "units": "bpm"
+          }
+        }
+      },
+      "lap": {
+        "count": 26,
+        "fields": {
+          "message_index": {
+            "count": 26,
+            "sample_values": [
+              "0",
+              "1",
+              "2"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 26,
+            "sample_values": [
+              "2026-04-30T18:58:30",
+              "2026-04-30T19:00:46",
+              "2026-04-30T19:01:42"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 26,
+            "sample_values": [
+              "2026-04-30T18:57:39",
+              "2026-04-30T18:58:30",
+              "2026-04-30T19:00:46"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 26,
+            "sample_values": [
+              "50.88",
+              "136.29",
+              "55.37"
+            ],
+            "units": "s"
+          },
+          "total_elapsed_time": {
+            "count": 26,
+            "sample_values": [
+              "50.89",
+              "136.29",
+              "55.37"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 26,
+            "sample_values": [
+              "12",
+              "13",
+              "11"
+            ],
+            "units": "kcal"
+          },
+          "sport": {
+            "count": 26,
+            "sample_values": [
+              "training",
+              "training",
+              "training"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 26,
+            "sample_values": [
+              "strength_training",
+              "strength_training",
+              "strength_training"
+            ],
+            "units": null
+          },
+          "max_heart_rate": {
+            "count": 26,
+            "sample_values": [
+              "108",
+              "102",
+              "103"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 26,
+            "sample_values": [
+              "86",
+              "86",
+              "94"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 26,
+            "sample_values": [
+              "96",
+              "94",
+              "99"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 26,
+            "sample_values": [
+              "30",
+              "30",
+              "29"
+            ],
+            "units": "C"
+          },
+          "total_cycles": {
+            "count": 26,
+            "sample_values": [
+              "15",
+              "11",
+              "8"
+            ],
+            "units": "cycles"
+          },
+          "avg_cadence": {
+            "count": 26,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "max_cadence": {
+            "count": 26,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "rpm"
+          }
+        }
+      },
+      "session": {
+        "count": 1,
+        "fields": {
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "training"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "strength_training"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T18:57:39"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T20:29:23"
+            ],
+            "units": null
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "5503.59"
+            ],
+            "units": "s"
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "5503.59"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "315"
+            ],
+            "units": "kcal"
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "129"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "72"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "99"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "29"
+            ],
+            "units": "C"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477169737067954178.fit",
+    "filesize_bytes": 162086,
+    "sport": null,
+    "sub_sport": null,
+    "start_time": null,
+    "total_elapsed_time": null,
+    "total_distance": null,
+    "avg_heart_rate": null,
+    "max_heart_rate": null,
+    "total_calories": null,
+    "avg_speed": null,
+    "avg_cadence": null,
+    "total_ascent": null,
+    "total_descent": null,
+    "errors": [
+      "Invalid field size 1 for type 'uint32' (expected a multiple of 4)"
+    ],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T00:36:59"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T00:36:59"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T23:31:36"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "3866.35"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-04-30T17:31:36"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "manual"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-04-30T23:31:36",
+              "2026-05-01T00:33:24"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 3709,
+        "fields": {
+          "activity_type": {
+            "count": 3709,
+            "sample_values": [
+              "running",
+              "running",
+              "running"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 3709,
+            "sample_values": [
+              "2026-04-30T23:31:36",
+              "2026-04-30T23:31:37",
+              "2026-04-30T23:31:38"
+            ],
+            "units": null
+          },
+          "distance": {
+            "count": 3709,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m"
+          },
+          "heart_rate": {
+            "count": 3708,
+            "sample_values": [
+              "81",
+              "81",
+              "81"
+            ],
+            "units": "bpm"
+          },
+          "position_lat": {
+            "count": 3706,
+            "sample_values": [
+              "306079724",
+              "306079680",
+              "306079636"
+            ],
+            "units": "semicircles"
+          },
+          "position_long": {
+            "count": 3706,
+            "sample_values": [
+              "-1196575383",
+              "-1196575344",
+              "-1196575306"
+            ],
+            "units": "semicircles"
+          },
+          "enhanced_speed": {
+            "count": 3706,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "speed": {
+            "count": 3706,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "stance_time": {
+            "count": 3706,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "ms"
+          },
+          "vertical_oscillation": {
+            "count": 3706,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "mm"
+          },
+          "vertical_ratio": {
+            "count": 3706,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "percent"
+          },
+          "Effort Pace": {
+            "count": 3706,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_altitude": {
+            "count": 3703,
+            "sample_values": [
+              "541.0",
+              "541.0",
+              "541.0"
+            ],
+            "units": "m"
+          },
+          "altitude": {
+            "count": 3703,
+            "sample_values": [
+              "541.0",
+              "541.0",
+              "541.0"
+            ],
+            "units": "m"
+          },
+          "step_length": {
+            "count": 3700,
+            "sample_values": [
+              "290.0",
+              "590.0",
+              "700.0"
+            ],
+            "units": "mm"
+          },
+          "cadence": {
+            "count": 3698,
+            "sample_values": [
+              "79",
+              "79",
+              "79"
+            ],
+            "units": "rpm"
+          },
+          "power": {
+            "count": 3696,
+            "sample_values": [
+              "142",
+              "165",
+              "176"
+            ],
+            "units": "watts"
+          },
+          "accumulated_power": {
+            "count": 3696,
+            "sample_values": [
+              "142",
+              "307",
+              "483"
+            ],
+            "units": "watts"
+          }
+        }
+      },
+      "field_description": {
+        "count": 1,
+        "fields": {
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "field_definition_number": {
+            "count": 1,
+            "sample_values": [
+              "16"
+            ],
+            "units": null
+          },
+          "fit_base_type_id": {
+            "count": 1,
+            "sample_values": [
+              "float32"
+            ],
+            "units": null
+          },
+          "field_name": {
+            "count": 1,
+            "sample_values": [
+              "Effort Pace"
+            ],
+            "units": null
+          },
+          "units": {
+            "count": 1,
+            "sample_values": [
+              "m/s"
+            ],
+            "units": null
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477187848150220802.fit",
+    "filesize_bytes": 34548,
+    "sport": "running",
+    "sub_sport": "indoor_running",
+    "start_time": "2026-05-01T18:40:06",
+    "total_elapsed_time": 2406.87,
+    "total_distance": 6110.0,
+    "avg_heart_rate": 147,
+    "max_heart_rate": 162,
+    "total_calories": 430,
+    "avg_speed": 2.539,
+    "avg_cadence": 77,
+    "total_ascent": 0,
+    "total_descent": 0,
+    "errors": [],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T19:21:15"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T19:21:15"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T18:40:06"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "2406.87"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T12:40:06"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "manual"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-01T18:40:06",
+              "2026-05-01T19:20:13"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 2408,
+        "fields": {
+          "activity_type": {
+            "count": 2408,
+            "sample_values": [
+              "running",
+              "running",
+              "running"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 2408,
+            "sample_values": [
+              "2026-05-01T18:40:06",
+              "2026-05-01T18:40:07",
+              "2026-05-01T18:40:08"
+            ],
+            "units": null
+          },
+          "distance": {
+            "count": 2408,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m"
+          },
+          "heart_rate": {
+            "count": 2407,
+            "sample_values": [
+              "104",
+              "105",
+              "106"
+            ],
+            "units": "bpm"
+          },
+          "enhanced_speed": {
+            "count": 2405,
+            "sample_values": [
+              "1.35",
+              "1.35",
+              "1.35"
+            ],
+            "units": "m/s"
+          },
+          "speed": {
+            "count": 2405,
+            "sample_values": [
+              "1.35",
+              "1.35",
+              "1.35"
+            ],
+            "units": "m/s"
+          },
+          "cadence": {
+            "count": 2403,
+            "sample_values": [
+              "57",
+              "57",
+              "57"
+            ],
+            "units": "rpm"
+          }
+        }
+      },
+      "lap": {
+        "count": 7,
+        "fields": {
+          "message_index": {
+            "count": 7,
+            "sample_values": [
+              "0",
+              "1",
+              "2"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 7,
+            "sample_values": [
+              "2026-05-01T18:47:01",
+              "2026-05-01T18:53:38",
+              "2026-05-01T19:00:17"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 7,
+            "sample_values": [
+              "2026-05-01T18:40:06",
+              "2026-05-01T18:47:01",
+              "2026-05-01T18:53:38"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 7,
+            "sample_values": [
+              "415.43",
+              "396.28",
+              "399.21"
+            ],
+            "units": "s"
+          },
+          "total_elapsed_time": {
+            "count": 7,
+            "sample_values": [
+              "415.43",
+              "396.28",
+              "399.21"
+            ],
+            "units": "s"
+          },
+          "total_distance": {
+            "count": 7,
+            "sample_values": [
+              "1000.0",
+              "1000.0",
+              "1000.0"
+            ],
+            "units": "m"
+          },
+          "sport": {
+            "count": 7,
+            "sample_values": [
+              "running",
+              "running",
+              "running"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 7,
+            "sample_values": [
+              "indoor_running",
+              "indoor_running",
+              "indoor_running"
+            ],
+            "units": null
+          },
+          "max_heart_rate": {
+            "count": 7,
+            "sample_values": [
+              "140",
+              "153",
+              "157"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 7,
+            "sample_values": [
+              "102",
+              "137",
+              "142"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 7,
+            "sample_values": [
+              "126",
+              "143",
+              "147"
+            ],
+            "units": "bpm"
+          },
+          "enhanced_max_speed": {
+            "count": 7,
+            "sample_values": [
+              "2.688",
+              "2.625",
+              "2.625"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 7,
+            "sample_values": [
+              "2.688",
+              "2.625",
+              "2.625"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 7,
+            "sample_values": [
+              "2.407",
+              "2.523",
+              "2.505"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 7,
+            "sample_values": [
+              "2.407",
+              "2.523",
+              "2.505"
+            ],
+            "units": "m/s"
+          },
+          "avg_running_cadence": {
+            "count": 7,
+            "sample_values": [
+              "75",
+              "76",
+              "76"
+            ],
+            "units": "strides/min"
+          },
+          "avg_step_length": {
+            "count": 7,
+            "sample_values": [
+              "960.0",
+              "980.0",
+              "980.0"
+            ],
+            "units": "mm"
+          },
+          "max_running_cadence": {
+            "count": 7,
+            "sample_values": [
+              "79",
+              "78",
+              "79"
+            ],
+            "units": "strides/min"
+          },
+          "total_descent": {
+            "count": 7,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_ascent": {
+            "count": 7,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "m"
+          },
+          "avg_power": {
+            "count": 7,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_stance_time": {
+            "count": 7,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "ms"
+          },
+          "avg_stance_time_percent": {
+            "count": 7,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "percent"
+          },
+          "avg_vertical_oscillation": {
+            "count": 7,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "mm"
+          },
+          "avg_vertical_ratio": {
+            "count": 7,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "percent"
+          }
+        }
+      },
+      "session": {
+        "count": 1,
+        "fields": {
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "running"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "indoor_running"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T18:40:06"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-01T19:20:13"
+            ],
+            "units": null
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "2406.87"
+            ],
+            "units": "s"
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "2406.86"
+            ],
+            "units": "s"
+          },
+          "total_distance": {
+            "count": 1,
+            "sample_values": [
+              "6110.0"
+            ],
+            "units": "m"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "430"
+            ],
+            "units": "kcal"
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "162"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "102"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "147"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "32"
+            ],
+            "units": "C"
+          },
+          "total_ascent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_descent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_strides": {
+            "count": 1,
+            "sample_values": [
+              "3120"
+            ],
+            "units": "strides"
+          },
+          "max_running_cadence": {
+            "count": 1,
+            "sample_values": [
+              "83"
+            ],
+            "units": "strides/min"
+          },
+          "avg_running_cadence": {
+            "count": 1,
+            "sample_values": [
+              "77"
+            ],
+            "units": "strides/min"
+          },
+          "avg_step_length": {
+            "count": 1,
+            "sample_values": [
+              "980.0"
+            ],
+            "units": "mm"
+          },
+          "enhanced_max_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.915"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.915"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.539"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.539"
+            ],
+            "units": "m/s"
+          },
+          "avg_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_stance_time": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "ms"
+          },
+          "avg_stance_time_balance": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "percent"
+          },
+          "avg_vertical_oscillation": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "mm"
+          },
+          "avg_vertical_ratio": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "percent"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477257704975401160.fit",
+    "filesize_bytes": 22003,
+    "sport": "training",
+    "sub_sport": "strength_training",
+    "start_time": "2026-05-04T18:48:02",
+    "total_elapsed_time": 2997.52,
+    "total_distance": null,
+    "avg_heart_rate": 94,
+    "max_heart_rate": 142,
+    "total_calories": 189,
+    "avg_speed": null,
+    "avg_cadence": null,
+    "total_ascent": null,
+    "total_descent": null,
+    "errors": [],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T19:38:31"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T19:38:31"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T18:48:02"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "2997.52"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T12:48:02"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "auto_multi_sport"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-04T18:48:02",
+              "2026-05-04T19:38:00"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 2999,
+        "fields": {
+          "activity_type": {
+            "count": 2999,
+            "sample_values": [
+              "10",
+              "10",
+              "10"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 2999,
+            "sample_values": [
+              "2026-05-04T18:48:02",
+              "2026-05-04T18:48:03",
+              "2026-05-04T18:48:04"
+            ],
+            "units": null
+          },
+          "heart_rate": {
+            "count": 2998,
+            "sample_values": [
+              "98",
+              "98",
+              "97"
+            ],
+            "units": "bpm"
+          }
+        }
+      },
+      "lap": {
+        "count": 20,
+        "fields": {
+          "message_index": {
+            "count": 20,
+            "sample_values": [
+              "0",
+              "1",
+              "2"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 20,
+            "sample_values": [
+              "2026-05-04T18:51:49",
+              "2026-05-04T18:54:36",
+              "2026-05-04T18:56:20"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 20,
+            "sample_values": [
+              "2026-05-04T18:48:02",
+              "2026-05-04T18:51:49",
+              "2026-05-04T18:54:36"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 20,
+            "sample_values": [
+              "226.4",
+              "167.04",
+              "103.87"
+            ],
+            "units": "s"
+          },
+          "total_elapsed_time": {
+            "count": 20,
+            "sample_values": [
+              "226.4",
+              "167.04",
+              "103.87"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 20,
+            "sample_values": [
+              "37",
+              "21",
+              "20"
+            ],
+            "units": "kcal"
+          },
+          "sport": {
+            "count": 20,
+            "sample_values": [
+              "training",
+              "training",
+              "training"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 20,
+            "sample_values": [
+              "strength_training",
+              "strength_training",
+              "strength_training"
+            ],
+            "units": null
+          },
+          "max_heart_rate": {
+            "count": 20,
+            "sample_values": [
+              "142",
+              "110",
+              "99"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 20,
+            "sample_values": [
+              "88",
+              "97",
+              "86"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 20,
+            "sample_values": [
+              "113",
+              "102",
+              "93"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 20,
+            "sample_values": [
+              "28",
+              "28",
+              "27"
+            ],
+            "units": "C"
+          },
+          "total_cycles": {
+            "count": 20,
+            "sample_values": [
+              "27",
+              "17",
+              "5"
+            ],
+            "units": "cycles"
+          },
+          "avg_cadence": {
+            "count": 20,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "max_cadence": {
+            "count": 20,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "rpm"
+          }
+        }
+      },
+      "session": {
+        "count": 1,
+        "fields": {
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "training"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "strength_training"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T18:48:02"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T19:38:00"
+            ],
+            "units": null
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "2997.52"
+            ],
+            "units": "s"
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "2997.52"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "189"
+            ],
+            "units": "kcal"
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "142"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "75"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "94"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "28"
+            ],
+            "units": "C"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477258147090694147.fit",
+    "filesize_bytes": 20195,
+    "sport": "cycling",
+    "sub_sport": "indoor_cycling",
+    "start_time": "2026-05-04T19:40:17",
+    "total_elapsed_time": 1515.81,
+    "total_distance": null,
+    "avg_heart_rate": 141,
+    "max_heart_rate": 162,
+    "total_calories": 255,
+    "avg_speed": 0.0,
+    "avg_cadence": 0,
+    "total_ascent": 0,
+    "total_descent": 0,
+    "errors": [],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T20:06:00"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T20:06:00"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T19:40:17"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "1515.81"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T13:40:17"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "manual"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-04T19:40:17",
+              "2026-05-04T20:05:33"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 1517,
+        "fields": {
+          "activity_type": {
+            "count": 1517,
+            "sample_values": [
+              "cycling",
+              "cycling",
+              "cycling"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1517,
+            "sample_values": [
+              "2026-05-04T19:40:17",
+              "2026-05-04T19:40:18",
+              "2026-05-04T19:40:19"
+            ],
+            "units": null
+          },
+          "heart_rate": {
+            "count": 1516,
+            "sample_values": [
+              "95",
+              "95",
+              "95"
+            ],
+            "units": "bpm"
+          },
+          "enhanced_speed": {
+            "count": 1516,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "speed": {
+            "count": 1516,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "distance": {
+            "count": 1514,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m"
+          }
+        }
+      },
+      "lap": {
+        "count": 1,
+        "fields": {
+          "message_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T20:05:33"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T19:40:17"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "1515.81"
+            ],
+            "units": "s"
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "1515.81"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "255"
+            ],
+            "units": "kcal"
+          },
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "cycling"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "indoor_cycling"
+            ],
+            "units": null
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "162"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "94"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "141"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "29"
+            ],
+            "units": "C"
+          },
+          "enhanced_max_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "avg_cadence": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "max_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "total_descent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_ascent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_work": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "J"
+          },
+          "normalized_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          }
+        }
+      },
+      "session": {
+        "count": 1,
+        "fields": {
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "cycling"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "indoor_cycling"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T19:40:17"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T20:05:33"
+            ],
+            "units": null
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "1515.81"
+            ],
+            "units": "s"
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "1515.81"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "255"
+            ],
+            "units": "kcal"
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "162"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "94"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "141"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "29"
+            ],
+            "units": "C"
+          },
+          "total_ascent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_descent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "max_cadence": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "avg_cadence": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "enhanced_max_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "m/s"
+          },
+          "max_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "total_work": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "J"
+          },
+          "normalized_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477258460621209600.fit",
+    "filesize_bytes": 9520,
+    "sport": null,
+    "sub_sport": null,
+    "start_time": null,
+    "total_elapsed_time": null,
+    "total_distance": null,
+    "avg_heart_rate": null,
+    "max_heart_rate": null,
+    "total_calories": null,
+    "avg_speed": null,
+    "avg_cadence": null,
+    "total_ascent": null,
+    "total_descent": null,
+    "errors": [
+      "Invalid field size 1 for type 'uint32' (expected a multiple of 4)"
+    ],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T20:25:33"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T20:25:33"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T20:06:56"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "1087.31"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-04T14:06:56"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "auto_multi_sport"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-04T20:06:56",
+              "2026-05-04T20:13:06"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 371,
+        "fields": {
+          "activity_type": {
+            "count": 371,
+            "sample_values": [
+              "generic",
+              "generic",
+              "generic"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 371,
+            "sample_values": [
+              "2026-05-04T20:06:56",
+              "2026-05-04T20:06:57",
+              "2026-05-04T20:06:58"
+            ],
+            "units": null
+          },
+          "distance": {
+            "count": 371,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m"
+          },
+          "heart_rate": {
+            "count": 370,
+            "sample_values": [
+              "105",
+              "108",
+              "109"
+            ],
+            "units": "bpm"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477287377562271845.fit",
+    "filesize_bytes": 30431,
+    "sport": null,
+    "sub_sport": null,
+    "start_time": null,
+    "total_elapsed_time": null,
+    "total_distance": null,
+    "avg_heart_rate": null,
+    "max_heart_rate": null,
+    "total_calories": null,
+    "avg_speed": null,
+    "avg_cadence": null,
+    "total_ascent": null,
+    "total_descent": null,
+    "errors": [
+      "Invalid field size 1 for type 'uint32' (expected a multiple of 4)"
+    ],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T02:21:02"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T02:21:02"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T01:11:05"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "4160.66"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-05T19:11:05"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "auto_multi_sport"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-06T01:11:05",
+              "2026-05-06T01:43:29"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 1945,
+        "fields": {
+          "activity_type": {
+            "count": 1945,
+            "sample_values": [
+              "10",
+              "10",
+              "10"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1945,
+            "sample_values": [
+              "2026-05-06T01:11:05",
+              "2026-05-06T01:11:06",
+              "2026-05-06T01:11:07"
+            ],
+            "units": null
+          },
+          "heart_rate": {
+            "count": 1944,
+            "sample_values": [
+              "96",
+              "96",
+              "97"
+            ],
+            "units": "bpm"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477288822818766852.fit",
+    "filesize_bytes": 32040,
+    "sport": "running",
+    "sub_sport": "indoor_running",
+    "start_time": "2026-05-06T03:12:30",
+    "total_elapsed_time": 2246.13,
+    "total_distance": 6010.0,
+    "avg_heart_rate": 141,
+    "max_heart_rate": 164,
+    "total_calories": 376,
+    "avg_speed": 2.676,
+    "avg_cadence": 75,
+    "total_ascent": 0,
+    "total_descent": 0,
+    "errors": [],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T03:50:34"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T03:50:34"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T03:12:30"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "2246.13"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-05T21:12:30"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "manual"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-06T03:12:30",
+              "2026-05-06T03:49:56"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 2247,
+        "fields": {
+          "activity_type": {
+            "count": 2247,
+            "sample_values": [
+              "running",
+              "running",
+              "running"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 2247,
+            "sample_values": [
+              "2026-05-06T03:12:30",
+              "2026-05-06T03:12:31",
+              "2026-05-06T03:12:32"
+            ],
+            "units": null
+          },
+          "distance": {
+            "count": 2247,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "0.0"
+            ],
+            "units": "m"
+          },
+          "heart_rate": {
+            "count": 2246,
+            "sample_values": [
+              "88",
+              "88",
+              "88"
+            ],
+            "units": "bpm"
+          },
+          "enhanced_speed": {
+            "count": 2244,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "1.342"
+            ],
+            "units": "m/s"
+          },
+          "speed": {
+            "count": 2244,
+            "sample_values": [
+              "0.0",
+              "0.0",
+              "1.342"
+            ],
+            "units": "m/s"
+          },
+          "cadence": {
+            "count": 2238,
+            "sample_values": [
+              "74",
+              "74",
+              "74"
+            ],
+            "units": "rpm"
+          }
+        }
+      },
+      "lap": {
+        "count": 2,
+        "fields": {
+          "message_index": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "1"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-06T03:49:52",
+              "2026-05-06T03:49:56"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-06T03:12:30",
+              "2026-05-06T03:49:52"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 2,
+            "sample_values": [
+              "2242.39",
+              "3.73"
+            ],
+            "units": "s"
+          },
+          "total_elapsed_time": {
+            "count": 2,
+            "sample_values": [
+              "2242.39",
+              "3.74"
+            ],
+            "units": "s"
+          },
+          "total_distance": {
+            "count": 2,
+            "sample_values": [
+              "5997.93",
+              "11.25"
+            ],
+            "units": "m"
+          },
+          "sport": {
+            "count": 2,
+            "sample_values": [
+              "running",
+              "running"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 2,
+            "sample_values": [
+              "indoor_running",
+              "indoor_running"
+            ],
+            "units": null
+          },
+          "max_heart_rate": {
+            "count": 2,
+            "sample_values": [
+              "164",
+              "159"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 2,
+            "sample_values": [
+              "88",
+              "159"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 2,
+            "sample_values": [
+              "141",
+              "159"
+            ],
+            "units": "bpm"
+          },
+          "enhanced_max_speed": {
+            "count": 2,
+            "sample_values": [
+              "2.967",
+              "2.809"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 2,
+            "sample_values": [
+              "2.967",
+              "2.809"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 2,
+            "sample_values": [
+              "2.675",
+              "3.016"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 2,
+            "sample_values": [
+              "2.675",
+              "3.016"
+            ],
+            "units": "m/s"
+          },
+          "avg_running_cadence": {
+            "count": 2,
+            "sample_values": [
+              "75",
+              "77"
+            ],
+            "units": "strides/min"
+          },
+          "avg_step_length": {
+            "count": 2,
+            "sample_values": [
+              "1060.0",
+              "1170.0"
+            ],
+            "units": "mm"
+          },
+          "max_running_cadence": {
+            "count": 2,
+            "sample_values": [
+              "79",
+              "77"
+            ],
+            "units": "strides/min"
+          },
+          "total_descent": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_ascent": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": "m"
+          },
+          "avg_power": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_stance_time": {
+            "count": 2,
+            "sample_values": [
+              "0.0",
+              "0.0"
+            ],
+            "units": "ms"
+          },
+          "avg_stance_time_percent": {
+            "count": 2,
+            "sample_values": [
+              "0.0",
+              "0.0"
+            ],
+            "units": "percent"
+          },
+          "avg_vertical_oscillation": {
+            "count": 2,
+            "sample_values": [
+              "0.0",
+              "0.0"
+            ],
+            "units": "mm"
+          },
+          "avg_vertical_ratio": {
+            "count": 2,
+            "sample_values": [
+              "0.0",
+              "0.0"
+            ],
+            "units": "percent"
+          }
+        }
+      },
+      "session": {
+        "count": 1,
+        "fields": {
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "running"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "indoor_running"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T03:12:30"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T03:49:56"
+            ],
+            "units": null
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "2246.13"
+            ],
+            "units": "s"
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "2246.13"
+            ],
+            "units": "s"
+          },
+          "total_distance": {
+            "count": 1,
+            "sample_values": [
+              "6010.0"
+            ],
+            "units": "m"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "376"
+            ],
+            "units": "kcal"
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "164"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "88"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "141"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "31"
+            ],
+            "units": "C"
+          },
+          "total_ascent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_descent": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "m"
+          },
+          "total_strides": {
+            "count": 1,
+            "sample_values": [
+              "2869"
+            ],
+            "units": "strides"
+          },
+          "max_running_cadence": {
+            "count": 1,
+            "sample_values": [
+              "79"
+            ],
+            "units": "strides/min"
+          },
+          "avg_running_cadence": {
+            "count": 1,
+            "sample_values": [
+              "75"
+            ],
+            "units": "strides/min"
+          },
+          "avg_step_length": {
+            "count": 1,
+            "sample_values": [
+              "1060.0"
+            ],
+            "units": "mm"
+          },
+          "enhanced_max_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.976"
+            ],
+            "units": "m/s"
+          },
+          "max_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.976"
+            ],
+            "units": "m/s"
+          },
+          "enhanced_avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.676"
+            ],
+            "units": "m/s"
+          },
+          "avg_speed": {
+            "count": 1,
+            "sample_values": [
+              "2.676"
+            ],
+            "units": "m/s"
+          },
+          "avg_power": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": "watts"
+          },
+          "avg_stance_time": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "ms"
+          },
+          "avg_stance_time_balance": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "percent"
+          },
+          "avg_vertical_oscillation": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "mm"
+          },
+          "avg_vertical_ratio": {
+            "count": 1,
+            "sample_values": [
+              "0.0"
+            ],
+            "units": "percent"
+          }
+        }
+      }
+    }
+  },
+  {
+    "filename": "477303354840612964.fit",
+    "filesize_bytes": 38069,
+    "sport": "training",
+    "sub_sport": "strength_training",
+    "start_time": "2026-05-06T17:24:50",
+    "total_elapsed_time": 5246.04,
+    "total_distance": null,
+    "avg_heart_rate": 101,
+    "max_heart_rate": 149,
+    "total_calories": 335,
+    "avg_speed": null,
+    "avg_cadence": null,
+    "total_ascent": null,
+    "total_descent": null,
+    "errors": [],
+    "message_types": {
+      "file_id": {
+        "count": 1,
+        "fields": {
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "time_created": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T18:52:59"
+            ],
+            "units": null
+          },
+          "product": {
+            "count": 1,
+            "sample_values": [
+              "804"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "developer_data_id": {
+        "count": 1,
+        "fields": {
+          "manufacturer_id": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "developer_data_index": {
+            "count": 1,
+            "sample_values": [
+              "0"
+            ],
+            "units": null
+          },
+          "application_id": {
+            "count": 1,
+            "sample_values": [
+              "(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 71)"
+            ],
+            "units": null
+          }
+        }
+      },
+      "device_info": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T18:52:59"
+            ],
+            "units": null
+          },
+          "manufacturer": {
+            "count": 1,
+            "sample_values": [
+              "294"
+            ],
+            "units": null
+          },
+          "product_name": {
+            "count": 1,
+            "sample_values": [
+              "COROS PACE 3"
+            ],
+            "units": null
+          }
+        }
+      },
+      "activity": {
+        "count": 1,
+        "fields": {
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T17:24:50"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "5246.04"
+            ],
+            "units": "s"
+          },
+          "local_timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T11:24:50"
+            ],
+            "units": null
+          },
+          "num_sessions": {
+            "count": 1,
+            "sample_values": [
+              "1"
+            ],
+            "units": null
+          },
+          "type": {
+            "count": 1,
+            "sample_values": [
+              "auto_multi_sport"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 1,
+            "sample_values": [
+              "activity"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 1,
+            "sample_values": [
+              "stop"
+            ],
+            "units": null
+          }
+        }
+      },
+      "event": {
+        "count": 2,
+        "fields": {
+          "timestamp": {
+            "count": 2,
+            "sample_values": [
+              "2026-05-06T17:24:50",
+              "2026-05-06T18:52:16"
+            ],
+            "units": null
+          },
+          "event": {
+            "count": 2,
+            "sample_values": [
+              "timer",
+              "timer"
+            ],
+            "units": null
+          },
+          "event_type": {
+            "count": 2,
+            "sample_values": [
+              "start",
+              "stop_all"
+            ],
+            "units": null
+          },
+          "event_group": {
+            "count": 2,
+            "sample_values": [
+              "0",
+              "0"
+            ],
+            "units": null
+          }
+        }
+      },
+      "record": {
+        "count": 5247,
+        "fields": {
+          "activity_type": {
+            "count": 5247,
+            "sample_values": [
+              "10",
+              "10",
+              "10"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 5247,
+            "sample_values": [
+              "2026-05-06T17:24:50",
+              "2026-05-06T17:24:51",
+              "2026-05-06T17:24:52"
+            ],
+            "units": null
+          },
+          "heart_rate": {
+            "count": 5246,
+            "sample_values": [
+              "79",
+              "78",
+              "78"
+            ],
+            "units": "bpm"
+          }
+        }
+      },
+      "lap": {
+        "count": 30,
+        "fields": {
+          "message_index": {
+            "count": 30,
+            "sample_values": [
+              "0",
+              "1",
+              "2"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 30,
+            "sample_values": [
+              "2026-05-06T17:26:36",
+              "2026-05-06T17:28:52",
+              "2026-05-06T17:30:59"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 30,
+            "sample_values": [
+              "2026-05-06T17:24:50",
+              "2026-05-06T17:26:36",
+              "2026-05-06T17:28:52"
+            ],
+            "units": null
+          },
+          "total_timer_time": {
+            "count": 30,
+            "sample_values": [
+              "106.15",
+              "135.51",
+              "127.36"
+            ],
+            "units": "s"
+          },
+          "total_elapsed_time": {
+            "count": 30,
+            "sample_values": [
+              "106.16",
+              "135.51",
+              "127.36"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 30,
+            "sample_values": [
+              "24",
+              "28",
+              "30"
+            ],
+            "units": "kcal"
+          },
+          "sport": {
+            "count": 30,
+            "sample_values": [
+              "training",
+              "training",
+              "training"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 30,
+            "sample_values": [
+              "strength_training",
+              "strength_training",
+              "strength_training"
+            ],
+            "units": null
+          },
+          "max_heart_rate": {
+            "count": 30,
+            "sample_values": [
+              "110",
+              "103",
+              "126"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 30,
+            "sample_values": [
+              "74",
+              "81",
+              "83"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 30,
+            "sample_values": [
+              "93",
+              "92",
+              "110"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 30,
+            "sample_values": [
+              "29",
+              "29",
+              "29"
+            ],
+            "units": "C"
+          },
+          "total_cycles": {
+            "count": 30,
+            "sample_values": [
+              "5",
+              "20",
+              "20"
+            ],
+            "units": "cycles"
+          },
+          "avg_cadence": {
+            "count": 30,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "rpm"
+          },
+          "max_cadence": {
+            "count": 30,
+            "sample_values": [
+              "0",
+              "0",
+              "0"
+            ],
+            "units": "rpm"
+          }
+        }
+      },
+      "session": {
+        "count": 1,
+        "fields": {
+          "sport": {
+            "count": 1,
+            "sample_values": [
+              "training"
+            ],
+            "units": null
+          },
+          "sub_sport": {
+            "count": 1,
+            "sample_values": [
+              "strength_training"
+            ],
+            "units": null
+          },
+          "start_time": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T17:24:50"
+            ],
+            "units": null
+          },
+          "timestamp": {
+            "count": 1,
+            "sample_values": [
+              "2026-05-06T18:52:16"
+            ],
+            "units": null
+          },
+          "total_elapsed_time": {
+            "count": 1,
+            "sample_values": [
+              "5246.04"
+            ],
+            "units": "s"
+          },
+          "total_timer_time": {
+            "count": 1,
+            "sample_values": [
+              "5246.04"
+            ],
+            "units": "s"
+          },
+          "total_calories": {
+            "count": 1,
+            "sample_values": [
+              "335"
+            ],
+            "units": "kcal"
+          },
+          "max_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "149"
+            ],
+            "units": "bpm"
+          },
+          "min_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "74"
+            ],
+            "units": "bpm"
+          },
+          "avg_heart_rate": {
+            "count": 1,
+            "sample_values": [
+              "101"
+            ],
+            "units": "bpm"
+          },
+          "avg_temperature": {
+            "count": 1,
+            "sample_values": [
+              "29"
+            ],
+            "units": "C"
+          }
+        }
+      }
+    }
+  }
+]

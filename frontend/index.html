@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phoenix AI Coach — Thinking Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts: Outfit for UI, JetBrains Mono for the Prompt Auditor -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js for premium graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🔥</span>
+                <span class="highlight">PHOENIX</span>COACH
+            </div>
+            
+            <div class="nav-links">
+                <button class="nav-btn active" data-tab="coach-brain-tab">
+                    <i data-lucide="brain"></i>
+                    <span>Coach's Brain</span>
+                </button>
+                <button class="nav-btn" data-tab="weekly-plan-tab">
+                    <i data-lucide="calendar"></i>
+                    <span>Weekly Plan</span>
+                </button>
+                <button class="nav-btn" data-tab="ai-chat-tab">
+                    <i data-lucide="message-square"></i>
+                    <span>AI Sandbox</span>
+                </button>
+                <button class="nav-btn" data-tab="evolab-stats-tab">
+                    <i data-lucide="line-chart"></i>
+                    <span>EvoLab Stats</span>
+                </button>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="athlete-profile" id="athlete-profile">
+                    <div class="athlete-avatar">A</div>
+                    <div class="athlete-info">
+                        <span class="name">Alex</span>
+                        <span class="vo2">VO2max: --</span>
+                    </div>
+                </div>
+                <div class="connection-status">
+                    <span class="status-dot green" id="api-status-dot"></span>
+                    <span class="status-text" id="api-status-text">Ollama: checking...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- TAB 1: COACH'S BRAIN (DETERMINISTIC ENGINE) -->
+            <section id="coach-brain-tab" class="tab-content active">
+                <div class="tab-header">
+                    <h2>The Coach's Brain</h2>
+                    <p>Observe the mathematical boundaries, periodization rules, and allowed coaching tools.</p>
+                </div>
+
+                <!-- Phase Timeline Row -->
+                <div class="brain-card glass timeline-card">
+                    <div class="card-header">
+                        <i data-lucide="milestone" class="header-icon blue"></i>
+                        <h3>29-Week Periodization Roadmap</h3>
+                        <span class="badge blue-badge" id="current-phase-badge">Phase 1: Foundation</span>
+                    </div>
+                    <div class="timeline-visual">
+                        <div class="timeline-line"></div>
+                        <div class="timeline-progress" id="timeline-progress-bar"></div>
+                        <div class="timeline-steps" id="timeline-steps-container">
+                            <!-- Dynamically generated phase milestones -->
+                        </div>
+                    </div>
+                    <div class="phase-details-grid">
+                        <div class="phase-priority-box">
+                            <h4>Phase Focus & Priorities</h4>
+                            <p id="phase-priorities">Loading foundation rules...</p>
+                        </div>
+                        <div class="phase-stats-box">
+                            <div class="p-stat"><span class="lbl">Weeks to Race:</span> <span class="val" id="weeks-to-race-val">--</span></div>
+                            <div class="p-stat"><span class="lbl">Active Week:</span> <span class="val" id="active-week-val">--</span></div>
+                            <div class="p-stat"><span class="lbl">Total Phase Weeks:</span> <span class="val" id="total-phase-weeks-val">--</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3:1 Wave and Allowed/Forbidden Grid -->
+                <div class="brain-grid-two">
+                    <!-- 3:1 Cycle Animation Card -->
+                    <div class="brain-card glass cycle-card">
+                        <div class="card-header">
+                            <i data-lucide="activity" class="header-icon purple"></i>
+                            <h3>3:1 Build/Recovery Wave</h3>
+                            <span class="badge purple-badge" id="cycle-week-badge">Week --</span>
+                        </div>
+                        <div class="wave-container">
+                            <div class="wave-labels">
+                                <span>Build 1</span>
+                                <span>Build 2</span>
+                                <span>Build 3</span>
+                                <span>Recovery</span>
+                            </div>
+                            <div class="wave-graphic-wrapper">
+                                <!-- Modern custom CSS/SVG animated wave path -->
+                                <svg viewBox="0 0 400 100" class="wave-svg">
+                                    <!-- Background grid lines -->
+                                    <line x1="0" y1="20" x2="400" y2="20" stroke="rgba(255,255,255,0.05)" />
+                                    <line x1="0" y1="50" x2="400" y2="50" stroke="rgba(255,255,255,0.05)" />
+                                    <line x1="0" y1="80" x2="400" y2="80" stroke="rgba(255,255,255,0.05)" stroke-dasharray="3" />
+                                    
+                                    <!-- Wave Path -->
+                                    <path d="M 0 50 C 50 15, 50 15, 100 40 C 150 10, 150 10, 200 30 C 250 5, 250 5, 300 20 C 350 85, 350 85, 400 50" fill="none" stroke="rgba(129, 140, 248, 0.2)" stroke-width="4" />
+                                    <!-- Animated Glowing Path for Active Week -->
+                                    <path id="active-wave-path" d="M 0 50 C 50 15, 50 15, 100 40 C 150 10, 150 10, 200 30 C 250 5, 250 5, 300 20 C 350 85, 350 85, 400 50" fill="none" stroke="url(#wave-gradient)" stroke-width="4" class="animated-path" />
+                                    
+                                    <!-- Nodes -->
+                                    <circle cx="100" cy="40" r="5" class="wave-node" id="node-week-1" />
+                                    <circle cx="200" cy="30" r="5" class="wave-node" id="node-week-2" />
+                                    <circle cx="300" cy="20" r="5" class="wave-node" id="node-week-3" />
+                                    <circle cx="400" cy="50" r="5" class="wave-node" id="node-week-4" />
+                                    
+                                    <!-- Pulse indicator -->
+                                    <circle cx="0" cy="0" r="8" class="wave-pulse" id="wave-pulse-indicator" />
+                                    
+                                    <defs>
+                                        <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="#38bdf8" />
+                                            <stop offset="50%" stop-color="#818cf8" />
+                                            <stop offset="100%" stop-color="#22c55e" />
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="recovery-notes-box">
+                            <i data-lucide="info" class="note-icon"></i>
+                            <span id="cycle-recovery-note">Determining cycle wave...</span>
+                        </div>
+                    </div>
+
+                    <!-- Allowed/Forbidden Card -->
+                    <div class="brain-card glass toolbox-card">
+                        <div class="card-header">
+                            <i data-lucide="shield-alert" class="header-icon green"></i>
+                            <h3>Workout Menu Constraints</h3>
+                        </div>
+                        <div class="toolbox-split">
+                            <div class="tool-list">
+                                <h4 class="green-text">Allowed Workouts</h4>
+                                <ul id="allowed-workouts-list" class="styled-list list-allowed">
+                                    <!-- Dynamic -->
+                                </ul>
+                            </div>
+                            <div class="tool-list">
+                                <h4 class="red-text">Forbidden Workouts</h4>
+                                <ul id="forbidden-workouts-list" class="styled-list list-forbidden">
+                                    <!-- Dynamic -->
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="reasoning-block">
+                            <span class="label">COACH RATIONALE FOR LIMITS:</span>
+                            <p id="forbidden-workouts-reason">Loading constraints...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: WEEKLY PLAN & DYNAMIC ADAPTATION (EXECUTION ENGINE) -->
+            <section id="weekly-plan-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Weekly Training Plan</h2>
+                    <p>Review the active plan, analyze compliance, and run recovery adaptations.</p>
+                </div>
+
+                <!-- Plan Stats Row -->
+                <div class="plan-stats-bar">
+                    <div class="bar-stat-card glass">
+                        <span class="lbl">Sessions Done</span>
+                        <div class="val-group">
+                            <span class="val" id="plan-sessions-done">0</span>
+                            <span class="divider">/</span>
+                            <span class="sub" id="plan-sessions-planned">0</span>
+                        </div>
+                    </div>
+                    <div class="bar-stat-card glass">
+                        <span class="lbl">Training Hours</span>
+                        <div class="val-group">
+                            <span class="val" id="plan-hours-done">0.0</span>
+                            <span class="divider">/</span>
+                            <span class="sub" id="plan-hours-planned">0.0</span>
+                        </div>
+                    </div>
+                    <div class="bar-stat-card glass">
+                        <span class="lbl">Total Load</span>
+                        <span class="val green-text" id="plan-total-load">0</span>
+                    </div>
+                    <div class="bar-stat-card glass">
+                        <span class="lbl">Weekly Compliance</span>
+                        <span class="val" id="plan-compliance-pct">0%</span>
+                    </div>
+                </div>
+
+                <!-- Plan Summary Card -->
+                <div class="brain-card glass week-summary-card">
+                    <div class="card-header">
+                        <i data-lucide="book-open" class="header-icon blue"></i>
+                        <h3>Coach's Weekly Focus</h3>
+                    </div>
+                    <div class="week-focus-layout">
+                        <div class="focus-title" id="week-focus-text">Loading focus...</div>
+                        <div class="focus-details" id="week-focus-rationale">Loading rationale...</div>
+                    </div>
+                </div>
+
+                <!-- 7-Day Calendar Strip -->
+                <div class="calendar-strip" id="calendar-days-strip">
+                    <!-- Dynamically generated days Mon-Sun -->
+                </div>
+
+                <!-- Clicked Day Detail / Dynamic Adaptation Panel -->
+                <div class="day-detail-panel glass" id="day-thinking-panel">
+                    <div class="panel-placeholder" id="panel-placeholder-text">
+                        <i data-lucide="mouse-pointer-click"></i>
+                        <p>Click on any day in the schedule above to inspect the Coach's Thinking and simulate dynamic RAG adaptations!</p>
+                    </div>
+
+                    <div class="panel-content hidden" id="panel-real-content">
+                        <div class="panel-header-day">
+                            <div class="title-group">
+                                <h3 id="detail-day-name">Monday Workout</h3>
+                                <span class="badge" id="detail-day-status">Completed</span>
+                            </div>
+                            <span class="sport-badge" id="detail-day-sport">Running</span>
+                        </div>
+
+                        <div class="panel-columns-grid">
+                            <!-- Planned vs Actual Column -->
+                            <div class="panel-col">
+                                <h4 class="sub-hdr">Plan vs. Actual Performance</h4>
+                                <div class="comparison-card">
+                                    <div class="comp-row">
+                                        <span class="c-label">Workout Title</span>
+                                        <span class="c-val highlight" id="detail-plan-title">Easy Run</span>
+                                    </div>
+                                    <div class="comp-row">
+                                        <span class="c-label">Duration</span>
+                                        <span class="c-val" id="detail-compare-duration">-- planned / -- actual</span>
+                                    </div>
+                                    <div class="comp-row">
+                                        <span class="c-label">HR Zone Target</span>
+                                        <span class="c-val" id="detail-compare-hr">-- planned / -- actual</span>
+                                    </div>
+                                    <div class="comp-row" id="detail-compare-distance-row">
+                                        <span class="c-label">Distance (Actual)</span>
+                                        <span class="c-val" id="detail-compare-distance">-- km</span>
+                                    </div>
+                                    <div class="comp-row" id="detail-compare-load-row">
+                                        <span class="c-label">Training Load (Actual)</span>
+                                        <span class="c-val" id="detail-compare-load">-- TL</span>
+                                    </div>
+                                </div>
+
+                                <div class="workout-steps-box">
+                                    <h5>Planned Workout Steps</h5>
+                                    <ul class="steps-list" id="detail-workout-steps">
+                                        <!-- Dynamic step list -->
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Coach Evaluation Column -->
+                            <div class="panel-col">
+                                <div class="thinking-block-bubble">
+                                    <h4 class="sub-hdr">Coach Thinking & Rationale</h4>
+                                    <div class="coach-avatar-small">🔥</div>
+                                    <p class="rationale-quote" id="detail-coach-rationale">"Why the coach placed this here."</p>
+                                    <div class="coach-note-box" id="detail-coach-note-block">
+                                        <span class="label">COACH'S NOTE FOR TODAY:</span>
+                                        <p id="detail-coach-note">"Remember to keep it easy today."</p>
+                                    </div>
+                                </div>
+
+                                <div class="compliance-badge-box" id="detail-compliance-notes-block">
+                                    <h5>Compliance Insights</h5>
+                                    <p id="detail-compliance-notes">No matching activity tracked.</p>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Adaptation Simulator Column -->
+                            <div class="panel-col simulator-col" id="adaptation-simulator-panel">
+                                <h4 class="sub-hdr warning-text"><i data-lucide="wrench"></i> Dynamic Adaptation Simulator</h4>
+                                <p class="sim-intro">What happens if you woke up today with compromised recovery? Force the AI coach to adapt today's plan!</p>
+                                
+                                <div class="sim-controls">
+                                    <div class="sim-group">
+                                        <label for="sim-hrv">Simulate Overnight HRV</label>
+                                        <select id="sim-hrv">
+                                            <option value="normal" selected>Normal (Stable - 82ms)</option>
+                                            <option value="high">High (Fresh - 95ms)</option>
+                                            <option value="low">Low (Fatigued - 68ms)</option>
+                                            <option value="crushed">Crushed (Overtrained - 45ms)</option>
+                                        </select>
+                                    </div>
+                                    <div class="sim-group">
+                                        <label for="sim-rhr">Simulate Resting HR</label>
+                                        <select id="sim-rhr">
+                                            <option value="stable" selected>Stable (51 bpm)</option>
+                                            <option value="elevated">Elevated (+5 bpm average)</option>
+                                            <option value="spiked">Spiked (+10 bpm average)</option>
+                                        </select>
+                                    </div>
+                                    <div class="sim-group">
+                                        <label for="sim-soreness">Simulate Muscle Soreness</label>
+                                        <select id="sim-soreness">
+                                            <option value="none" selected>None</option>
+                                            <option value="mild">Mild (Calf stiffness)</option>
+                                            <option value="sore">Highly Sore (Quadriceps fatigue)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <button class="sim-btn" id="trigger-adaptation-btn">
+                                    <i data-lucide="refresh-cw"></i>
+                                    <span>Run Dynamic Adaptation</span>
+                                </button>
+                                
+                                <div class="loading-spinner hidden" id="sim-spinner">
+                                    <div class="spinner"></div>
+                                    <span>AI Coach is processing recovery metrics...</span>
+                                </div>
+
+                                <div class="adapted-output-box hidden" id="adapted-result-box">
+                                    <div class="alert-badge warning-badge">⚠️ AI ADAPTATION ACTIVE</div>
+                                    <h5 id="adapted-workout-title">Easy Recovery Spin</h5>
+                                    <div class="adapted-details">
+                                        <span class="detail-tag" id="adapted-workout-time">30 mins</span>
+                                        <span class="detail-tag" id="adapted-workout-hr">Zone 1</span>
+                                    </div>
+                                    <div class="adapted-rationale">
+                                        <span class="lbl">RE recovery feedback:</span>
+                                        <p id="adapted-workout-rationale">"Reducing training volume..."</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: AI COACH SANDBOX & PROMPT AUDITOR -->
+            <section id="ai-chat-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>AI Coach Chat & Prompt Auditor</h2>
+                    <p>Converse with Phoenix and inspect the exact prompts, RAG context, and database summaries injected.</p>
+                </div>
+
+                <div class="sandbox-container">
+                    <!-- Chat Interface -->
+                    <div class="chat-panel glass">
+                        <div class="chat-header">
+                            <div class="avatar">🔥</div>
+                            <div class="coach-meta">
+                                <h3>Coach Phoenix</h3>
+                                <span class="status">Online (Ollama: qwen3:8b)</span>
+                            </div>
+                        </div>
+                        <div class="chat-messages" id="chat-messages-container">
+                            <div class="msg message-coach">
+                                <p>Hey Alex. I'm ready to review your data. Ask me anything about your HR zones, periodization limits, or adaptation settings.</p>
+                            </div>
+                        </div>
+                        <div class="chat-input-wrapper">
+                            <input type="text" id="chat-input" placeholder="Ask your coach (e.g., 'Why is my volume capped today?' or 'What is my HR Zone 2?')..." />
+                            <button id="chat-send-btn">
+                                <i data-lucide="send"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Prompt Auditor -->
+                    <div class="auditor-panel glass">
+                        <div class="auditor-header">
+                            <i data-lucide="code" class="header-icon blue"></i>
+                            <h3>Live Prompt Auditor</h3>
+                            <button class="small-btn" id="refresh-auditor-btn"><i data-lucide="rotate-cw"></i></button>
+                        </div>
+                        <p class="auditor-intro">Exposes the exact context layers merged into the LLM prompt in real time.</p>
+                        
+                        <div class="auditor-tabs">
+                            <button class="auditor-tab active" data-audit="system-prompt-audit">System Instructions</button>
+                            <button class="auditor-tab" data-audit="context-snapshot-audit">Athlete Context</button>
+                            <button class="auditor-tab" data-audit="rag-audit">RAG Knowledge</button>
+                        </div>
+
+                        <div class="auditor-code-container">
+                            <pre class="audit-code active" id="system-prompt-audit"><code>Loading prompt instructions...</code></pre>
+                            <pre class="audit-code" id="context-snapshot-audit"><code>Loading active athlete snapshot...</code></pre>
+                            <pre class="audit-code" id="rag-audit"><code>Loading retrieved ChromaDB chunks...</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: EVOLAB STATS (HISTORICAL DATA) -->
+            <section id="evolab-stats-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>EvoLab Analytics</h2>
+                    <p>Track metrics directly scraped from your COROS watch, including ATI, CTI, and overnight HRV trends.</p>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card glass">
+                        <label>Fitness (CTI)</label>
+                        <div class="value" id="cti-val">--</div>
+                        <div class="trend" id="cti-trend"><i data-lucide="trending-up"></i> 7-day average baseline</div>
+                    </div>
+                    <div class="stat-card glass">
+                        <label>Fatigue (ATI)</label>
+                        <div class="value" id="ati-val">--</div>
+                        <div class="trend" id="ati-trend"><i data-lucide="activity"></i> Current daily fatigue load</div>
+                    </div>
+                    <div class="stat-card glass">
+                        <label>Form (TIB)</label>
+                        <div class="value" id="tib-val">--</div>
+                        <div class="trend" id="tib-status">--</div>
+                    </div>
+                    <div class="stat-card glass highlight-card">
+                        <label>Load Ratio</label>
+                        <div class="value" id="ratio-val">--</div>
+                        <div class="status-badge" id="ratio-status">--</div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="charts-row">
+                    <div class="chart-container glass">
+                        <h3>Training Load & Recovery</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="loadChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container glass">
+                        <h3>Overnight HRV Trend</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="hrvChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Lists Row -->
+                <div class="bottom-row">
+                    <div class="activities-list glass">
+                        <h3>Recent Scraped Activities</h3>
+                        <div class="list-header">
+                            <span>Date</span>
+                            <span>Activity</span>
+                            <span>Distance</span>
+                            <span>Load</span>
+                        </div>
+                        <div id="activities-container" class="scroll-list"></div>
+                    </div>
+                    <div class="recovery-table-container glass">
+                        <h3>Daily Recovery History</h3>
+                        <div class="table-wrapper scroll-list">
+                            <table id="recovery-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>RHR</th>
+                                        <th>HRV</th>
+                                        <th>VO2</th>
+                                        <th>ATI</th>
+                                        <th>CTI</th>
+                                        <th>Ratio</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recovery-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

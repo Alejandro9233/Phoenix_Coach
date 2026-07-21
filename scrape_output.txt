@@ -1,0 +1,49 @@
+Starting full scrape... this may take 30-60 seconds.
+Logging into COROS as a.barrera9233@gmail.com...
+  Checking 'Remember me'...
+  Checking 'Privacy Policy'...
+  Clicking Login button...
+  Waiting for dashboard to appear...
+  [Network] 200 https://teamapi.coros.com/account/login (application/json;charset=UTF-8)
+  Dashboard detected.
+  Login successful.
+  [Network] 200 https://teamapi.coros.com/team/user/teamlist (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/profile/private/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/account/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/dashboard/detail/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/dashboard/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/account/update (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/dashboard/queryCycleRecord (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/genericmessage/countAll (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/activity/fit/getImportSportList (application/json;charset=UTF-8)
+    -> Potential Health/Evolab Data found at https://teamapi.coros.com/activity/fit/getImportSportList
+Navigating to EvoLab metrics...
+  Clicking 'EvoLab Metrics' tab...
+  Waiting for EvoLab content...
+  [Network] 200 https://teamapi.coros.com/analyse/query (application/json;charset=UTF-8)
+Navigating to EvoLab metrics...
+  [Network] 200 https://teamapi.coros.com/team/user/teamlist (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/profile/private/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/account/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/analyse/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/account/update (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/genericmessage/countAll (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/activity/fit/getImportSportList (application/json;charset=UTF-8)
+    -> Potential Health/Evolab Data found at https://teamapi.coros.com/activity/fit/getImportSportList
+Extracting data from ECharts...
+Scraping activities...
+  [Network] 200 https://teamapi.coros.com/team/user/teamlist (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/profile/private/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/account/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/dashboard/detail/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/dashboard/query (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/account/update (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/dashboard/queryCycleRecord (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/genericmessage/countAll (application/json;charset=UTF-8)
+  [Network] 200 https://teamapi.coros.com/activity/fit/getImportSportList (application/json;charset=UTF-8)
+    -> Potential Health/Evolab Data found at https://teamapi.coros.com/activity/fit/getImportSportList
+
+Scrape complete! Data saved to coros_scraped_data.json
+Captured 0 activities.
+Captured health keys: []
+Captured evolab keys: ['getImportSportList']
