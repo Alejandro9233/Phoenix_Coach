@@ -225,6 +225,14 @@ The iOS app expects `weekly_review` to be a string or nullable. We resolved a si
 10. **Normalizer Decode Crash Fix**: Resolved a critical Swift decoder crash by converting nested dictionary weekly reviews into formatted markdown strings during normalization.
 11. **Dynamic Periodization Engine (Multi-Distance Support)**: Fully refactored `backend/services/periodization_engine.py` to support distance-specific profiles (`5k`, `10k`, `Half Marathon`, `Marathon`, `Sprint`, `Olympic`). Added a new `speed_build` phase (⚡/hare icon 🐇) for 5k/10k plans, refactored allowed/forbidden menus to re-enable `VO2max Intervals` and `Tempo Runs` during speed build, and dynamically scaled expected hour/km volume targets based on race type. Also updated LLM system prompts in `response_agent.py` to adapt coaching instructions (Running coach vs. Triathlon coach) based on athlete objectives.
 
+### Cloud Migration (Render + PostgreSQL + Groq)
+12. **LLM Client Abstraction**: Rewrote AI integrations in `llm_client.py` and `response_agent.py` to transition from local Ollama (`qwen3:8b`) to cloud-hosted Groq API (`llama-3.3-70b-versatile`). 
+13. **PostgreSQL Migration**: Migrated the entire SQLite database to a managed PostgreSQL instance on Render. 
+14. **PostgreSQL Strict Typing Fixes**: Replaced SQLite-specific `julianday()` functions with cross-compatible Python `timedelta` windows for deduplication checks. Fixed a strict type-matching bug where integer `sport_code` was erroneously compared to string `sport` columns.
+15. **Render Memory Optimizations**: Render free tier imposes a strict 512MB RAM limit. To prevent OOM crashes, `knowledge_base.py` was updated to detect the `RENDER` environment variable and gracefully disable ChromaDB ONNX embeddings, falling back to an equivalent zero-memory keyword search.
+16. **Playwright Cloud Compatibility**: Configured Render to successfully install Chromium via standard `playwright install chromium` builds and added `PLAYWRIGHT_BROWSERS_PATH=0` to the environment variables to persist the browser cache into the run phase.
+17. **iOS Backend Routing**: Updated `NetworkManager.swift` to point to `https://phoenix-coach.onrender.com` instead of hardcoded local Mac IP addresses, fully decoupling the app from the local machine.
+
 ---
 
 ## 11. Suggested Next Steps & Goals
@@ -890,24 +898,24 @@ async def daily_coros_sync():
 ### Migration Checklist (In Order)
 
 ```
-[ ] 1. Sign up for Groq free account at https://console.groq.com
-[ ] 2. Generate API key at https://console.groq.com/keys
-[ ] 3. Create backend/core/llm_client.py (new file from Phase 1.1)
-[ ] 4. Refactor response_agent.py — replace 6 ollama.chat() calls (Phase 1.2)
-[ ] 5. Refactor main.py — remove Ollama globals, update /health, /chat, /chat-sync (Phase 1.3)
-[ ] 6. Test locally: GROQ_API_KEY=gsk_xxx PYTHONPATH=. python3 backend/main.py
-[ ] 7. Verify all endpoints work with Groq (plan gen, adapt, analyze, chat)
-[ ] 8. Fix main.py DATABASE_URL conditional for Postgres compatibility (Phase 2.1)
-[ ] 9. Create requirements.txt (Phase 3.1)
-[ ] 10. Create Procfile (Phase 3.2)
-[ ] 11. Deploy to Railway/Render (Phase 3.5)
-[ ] 12. Provision PostgreSQL on Railway/Render
-[ ] 13. Run SQLite → Postgres migration script from Mac (Phase 2.3)
-[ ] 14. Set all env vars in cloud dashboard (Phase 3.4)
-[ ] 15. Verify cloud deployment: curl https://your-app.up.railway.app/health
-[ ] 16. Update iOS NetworkManager.swift base URL (Phase 4.1)
-[ ] 17. Update iOS health check parsing for new response format (Phase 4.2)
-[ ] 18. Build and test iOS app against cloud backend
+[x] 1. Sign up for Groq free account at https://console.groq.com
+[x] 2. Generate API key at https://console.groq.com/keys
+[x] 3. Create backend/core/llm_client.py (new file from Phase 1.1)
+[x] 4. Refactor response_agent.py — replace 6 ollama.chat() calls (Phase 1.2)
+[x] 5. Refactor main.py — remove Ollama globals, update /health, /chat, /chat-sync (Phase 1.3)
+[x] 6. Test locally: GROQ_API_KEY=gsk_xxx PYTHONPATH=. python3 backend/main.py
+[x] 7. Verify all endpoints work with Groq (plan gen, adapt, analyze, chat)
+[x] 8. Fix main.py DATABASE_URL conditional for Postgres compatibility (Phase 2.1)
+[x] 9. Create requirements.txt (Phase 3.1)
+[x] 10. Create Procfile (Phase 3.2)
+[x] 11. Deploy to Railway/Render (Phase 3.5)
+[x] 12. Provision PostgreSQL on Railway/Render
+[x] 13. Run SQLite → Postgres migration script from Mac (Phase 2.3)
+[x] 14. Set all env vars in cloud dashboard (Phase 3.4)
+[x] 15. Verify cloud deployment: curl https://your-app.up.railway.app/health
+[x] 16. Update iOS NetworkManager.swift base URL (Phase 4.1)
+[x] 17. Update iOS health check parsing for new response format (Phase 4.2)
+[x] 18. Build and test iOS app against cloud backend
 [ ] 19. (Optional) Add API key authentication (Phase 4.3)
 [ ] 20. (Optional) Set up COROS daily cron job (Phase 5)
 ```
