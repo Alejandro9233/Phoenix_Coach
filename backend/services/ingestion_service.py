@@ -46,7 +46,7 @@ class IngestionService:
                 start_window_end = start_dt + timedelta(seconds=10)
                 existing = session.query(Activity).filter(
                     (Activity.id == str(act["labelId"])) | 
-                    ((Activity.start_time >= start_window_start) & (Activity.start_time <= start_window_end) & (Activity.sport == act.get("sportType")))
+                    ((Activity.start_time >= start_window_start) & (Activity.start_time <= start_window_end) & (Activity.sport_code == act.get("sportType")))
                 ).first()
                 
                 if existing:
