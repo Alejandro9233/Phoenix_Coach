@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from pathlib import Path
@@ -42,9 +42,11 @@ class IngestionService:
             for act in activities_data:
                 # Deduplication check: ID or Start Time
                 start_dt = datetime.utcfromtimestamp(act["timestamp"])
+                start_window_start = start_dt - timedelta(seconds=10)
+                start_window_end = start_dt + timedelta(seconds=10)
                 existing = session.query(Activity).filter(
                     (Activity.id == str(act["labelId"])) | 
-                    ((func.abs(func.julianday(Activity.start_time) - func.julianday(start_dt)) < 0.0001) & (Activity.sport == act.get("sportType")))
+                    ((Activity.start_time >= start_window_start) & (Activity.start_time <= start_window_end) & (Activity.sport == act.get("sportType")))
                 ).first()
                 
                 if existing:
@@ -215,8 +217,10 @@ class IngestionService:
                     activity.athlete_id = athlete_id
                     
                     # Check for duplicate by start_time
+                    start_window_start = activity.start_time - timedelta(seconds=10)
+                    start_window_end = activity.start_time + timedelta(seconds=10)
                     duplicate = session.query(Activity).filter(
-                        (func.abs(func.julianday(Activity.start_time) - func.julianday(activity.start_time)) < 0.0001)
+                        (Activity.start_time >= start_window_start) & (Activity.start_time <= start_window_end)
                     ).first()
                     
                     if not duplicate:
