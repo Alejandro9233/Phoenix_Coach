@@ -925,8 +925,8 @@ async def daily_coros_sync():
 | Component | Monthly Cost |
 |---|---|
 | Groq free tier (Llama 3.3 70B) | **$0** |
-| Railway Hobby (backend + Postgres) | **~$5-7** |
-| **Total** | **~$5-7/month** |
+| Render Free Web Service + Free PostgreSQL | **$0** |
+| **Total** | **$0/month** |
 
 ### Rollback Plan
 
