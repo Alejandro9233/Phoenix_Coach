@@ -9,7 +9,11 @@ from pathlib import Path
 try:
     import chromadb
     from chromadb.utils import embedding_functions
-    CHROMADB_AVAILABLE = True
+    if os.getenv("RENDER") == "true":
+        CHROMADB_AVAILABLE = False
+        print("Running on Render: disabling ChromaDB to prevent OOM. RAG will use fallback keyword search.")
+    else:
+        CHROMADB_AVAILABLE = True
 except ImportError:
     CHROMADB_AVAILABLE = False
     print("Warning: chromadb not installed. RAG will use fallback keyword search.")
