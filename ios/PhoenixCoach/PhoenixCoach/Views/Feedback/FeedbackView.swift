@@ -10,7 +10,13 @@ struct FeedbackView: View {
     private var filteredActivities: [Activity] {
         guard let activities = dashboard?.activities else { return [] }
         guard let selected = selectedSport else { return activities }
-        return activities.filter { $0.sport?.lowercased().hasPrefix(selected.lowercased()) == true }
+        return activities.filter { act in
+            let s = act.sport?.lowercased() ?? ""
+            if selected.lowercased() == "bike" {
+                return s.hasPrefix("bike") || s.hasPrefix("cycl") || s.hasPrefix("ride")
+            }
+            return s.hasPrefix(selected.lowercased())
+        }
     }
     
     private var visibleActivities: [Activity] {
@@ -187,16 +193,19 @@ struct ActivityCard: View {
             }
             
             // Stats
-            HStack(spacing: 32) {
+            HStack(alignment: .bottom) {
                 if let dist = activity.distanceM, dist > 0 {
                     let formatted = String(format: "%.1f", dist / 1000)
                     statView(label: "DISTANCE", value: formatted, unit: "km")
+                    Spacer()
                 }
                 if let _ = activity.durationSec {
                     statView(label: "TIME", value: activity.durationFormatted, unit: "")
+                    Spacer()
                 }
                 if let hr = activity.avgHr, hr > 0 {
                     statView(label: "AVG HR", value: "\(hr)", unit: "bpm")
+                    Spacer()
                 }
             }
             .padding(.top, 8)
@@ -206,6 +215,13 @@ struct ActivityCard: View {
                     .foregroundStyle(Color.white.opacity(0.05)),
                 alignment: .top
             )
+            
+            HStack {
+                Spacer()
+                Text(relativeDateString(for: activity.startTimeDate))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(DS.Colors.outline)
+            }
         }
         .padding(24)
         .background(
@@ -259,15 +275,37 @@ struct ActivityCard: View {
                 Text(value)
                     .font(.system(size: 32, weight: .ultraLight))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                 
                 if !unit.isEmpty {
                     Text(unit)
                         .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(DS.Colors.onSurface)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
             }
         }
         .padding(.top, 12)
+    }
+    
+    private func relativeDateString(for date: Date?) -> String {
+        guard let date = date else { return "" }
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return "Today"
+        } else if calendar.isDateInYesterday(date) {
+            return "Yesterday"
+        } else {
+            let formatter = DateFormatter()
+            if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
+                formatter.dateFormat = "MMM d"
+            } else {
+                formatter.dateFormat = "MMM d, yyyy"
+            }
+            return formatter.string(from: date)
+        }
     }
 }
 

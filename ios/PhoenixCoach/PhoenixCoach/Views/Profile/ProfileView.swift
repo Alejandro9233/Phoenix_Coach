@@ -163,7 +163,7 @@ struct ProfileView: View {
                 .scrollIndicators(.hidden)
             }
             .preferredColorScheme(.dark)
-            .navigationTitle("Profile")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
         }
         .alert("Profile Error", isPresented: Binding(
@@ -466,14 +466,25 @@ struct ProfileView: View {
                             .tracking(1.5)
                             .textCase(.uppercase)
                         
-                        DatePicker("", selection: $trainingStartDateVal, displayedComponents: .date)
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
-                            .tint(DS.Colors.accent)
-                            .padding(.vertical, 2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .onAppear { hasTrainingStartDate = true }
-                            .onChange(of: trainingStartDateVal) { _ in Task { await saveProfile() } }
+                        ZStack(alignment: .leading) {
+                            HStack {
+                                Text(hasTrainingStartDate ? Formatters.shortMonthDay.string(from: trainingStartDateVal) : "Select Date")
+                                    .font(.system(size: 17, weight: .light))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(activeField == .trainingStartDate ? DS.Colors.accent : DS.Colors.outline)
+                            }
+                            
+                            DatePicker("", selection: $trainingStartDateVal, displayedComponents: .date)
+                                .labelsHidden()
+                                .blendMode(.destinationOver)
+                                .opacity(0.011)
+                                .onAppear { hasTrainingStartDate = true }
+                                .onChange(of: trainingStartDateVal) { _ in Task { await saveProfile() } }
+                        }
+                        .padding(.vertical, 4)
                         
                         Rectangle()
                             .frame(height: 1)
@@ -489,14 +500,25 @@ struct ProfileView: View {
                             .tracking(1.5)
                             .textCase(.uppercase)
                         
-                        DatePicker("", selection: $raceDateVal, displayedComponents: .date)
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
-                            .tint(DS.Colors.accent)
-                            .padding(.vertical, 2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .onAppear { hasRaceDate = true }
-                            .onChange(of: raceDateVal) { _ in Task { await saveProfile() } }
+                        ZStack(alignment: .leading) {
+                            HStack {
+                                Text(hasRaceDate ? Formatters.shortMonthDay.string(from: raceDateVal) : "Select Date")
+                                    .font(.system(size: 17, weight: .light))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(activeField == .raceDate ? DS.Colors.accent : DS.Colors.outline)
+                            }
+                            
+                            DatePicker("", selection: $raceDateVal, displayedComponents: .date)
+                                .labelsHidden()
+                                .blendMode(.destinationOver)
+                                .opacity(0.011)
+                                .onAppear { hasRaceDate = true }
+                                .onChange(of: raceDateVal) { _ in Task { await saveProfile() } }
+                        }
+                        .padding(.vertical, 4)
                         
                         Rectangle()
                             .frame(height: 1)

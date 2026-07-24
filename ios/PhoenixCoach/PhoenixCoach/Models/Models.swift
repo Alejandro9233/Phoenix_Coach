@@ -361,9 +361,16 @@ struct Activity: Codable, Identifiable {
     
     var startTimeDate: Date? {
         guard let time = startTime else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: time) ?? ISO8601DateFormatter().date(from: time)
+        
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = fractionalFormatter.date(from: time) { return d }
+        
+        if let d = ISO8601DateFormatter().date(from: time) { return d }
+        
+        let naiveFormatter = DateFormatter()
+        naiveFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return naiveFormatter.date(from: time)
     }
 
     var sportEmoji: String {

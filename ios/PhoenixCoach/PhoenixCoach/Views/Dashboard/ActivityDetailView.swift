@@ -165,14 +165,6 @@ struct ActivityDetailView: View {
     
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let date = activity.startTimeDate {
-                Text(formatDate(date).uppercased())
-                    .font(.system(size: 10, weight: .medium))
-                    .tracking(2.0)
-                    .foregroundStyle(DS.Colors.outline.opacity(0.4))
-                    .padding(.bottom, 8)
-            }
-            
             HStack(spacing: 8) {
                 Text((activity.subSport ?? activity.sport ?? "Workout").uppercased())
                     .font(.system(size: 10, weight: .bold))
@@ -186,13 +178,23 @@ struct ActivityDetailView: View {
             }
             .padding(.bottom, 8)
             
-            Text(activity.sport?.uppercased() ?? "ACTIVITY")
-                .font(.system(size: 40, weight: .thin))
-                .tracking(-0.5)
-                .foregroundStyle(DS.Colors.primaryText)
-                .padding(.bottom, 32)
+            if let date = activity.startTimeDate {
+                Text(formatDate(date).uppercased())
+                    .font(.system(size: 40, weight: .thin))
+                    .tracking(-0.5)
+                    .foregroundStyle(DS.Colors.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.bottom, 32)
+            } else {
+                Text("COMPLETED")
+                    .font(.system(size: 40, weight: .thin))
+                    .tracking(-0.5)
+                    .foregroundStyle(DS.Colors.primaryText)
+                    .padding(.bottom, 32)
+            }
             
-            HStack(alignment: .bottom, spacing: 48) {
+            HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("DURATION")
                         .font(.system(size: 10, weight: .medium))
@@ -202,7 +204,11 @@ struct ActivityDetailView: View {
                         .font(.system(size: 32, weight: .ultraLight))
                         .tracking(-1.0)
                         .foregroundStyle(DS.Colors.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
+                
+                Spacer()
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("DISTANCE")
@@ -214,11 +220,17 @@ struct ActivityDetailView: View {
                             .font(.system(size: 32, weight: .ultraLight))
                             .tracking(-1.0)
                             .foregroundStyle(DS.Colors.primaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                         Text("km")
                             .font(.system(size: 18))
                             .foregroundStyle(DS.Colors.primaryText.opacity(0.5))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                     }
                 }
+                
+                Spacer()
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AVG_HR")
@@ -230,9 +242,13 @@ struct ActivityDetailView: View {
                             .font(.system(size: 32, weight: .ultraLight))
                             .tracking(-1.0)
                             .foregroundStyle(DS.Colors.primaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                         Text("bpm")
                             .font(.system(size: 18))
                             .foregroundStyle(DS.Colors.accent.opacity(0.5))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                     }
                 }
             }
@@ -401,6 +417,7 @@ struct ActivityDetailView: View {
                         .font(.system(size: 18, weight: .light))
                         .lineSpacing(6)
                         .foregroundStyle(DS.Colors.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 24)
                     
                     HStack(spacing: 24) {
@@ -413,6 +430,7 @@ struct ActivityDetailView: View {
                             .italic()
                             .lineSpacing(6)
                             .foregroundStyle(DS.Colors.primaryText.opacity(0.8))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.bottom, 48)
                     
