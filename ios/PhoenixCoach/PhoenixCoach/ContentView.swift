@@ -19,17 +19,17 @@ struct ContentView: View {
                 }
                 .tag(1)
             
-            FeedbackView()
+            DashboardView()
                 .tabItem {
-                    Image(systemName: "chart.bar.doc.horizontal.fill")
-                    Text("Log")
+                    Image(systemName: "book.fill")
+                    Text("Journal")
                 }
                 .tag(2)
             
-            DashboardView()
+            FeedbackView()
                 .tabItem {
-                    Image(systemName: "list.bullet.clipboard.fill")
-                    Text("Feedback")
+                    Image(systemName: "clock.arrow.circlepath")
+                    Text("Recent")
                 }
                 .tag(3)
             
@@ -40,7 +40,10 @@ struct ContentView: View {
                 }
                 .tag(4)
         }
-        .tint(.orange)
+        .tint(.white)
+        .onChange(of: selectedTab) { _ in
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
     }
 }
 

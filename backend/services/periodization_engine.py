@@ -1125,10 +1125,10 @@ class PeriodizationEngine:
 
         # Sport availability
         availability = {
-            "swim_days": athlete.swim_days or "wed,sat,sun",
-            "bike_days": athlete.bike_days or "mon,tue,wed,thu,fri,sat,sun",
-            "run_days": athlete.run_days or "mon,tue,wed,thu,fri,sat,sun",
-            "strength_days": athlete.strength_days or "mon,wed,fri",
+            "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
+            "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+            "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+            "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri",
         }
 
         return {

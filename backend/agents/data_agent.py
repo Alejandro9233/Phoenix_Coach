@@ -4,7 +4,7 @@ Pure Python, no LLM needed. Produces a compact text summary for the Response Age
 """
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from backend.models.database import Athlete, Activity, RecoverySnapshot
+from backend.models.database import Athlete, Activity, RecoverySnapshot, InjuryLog
 
 
 class DataAgent:
@@ -37,6 +37,22 @@ class DataAgent:
         lines = []
         lines.append(f"ATHLETE STATE ({today.strftime('%B %d, %Y')}):")
         lines.append(f"Name: {athlete.name}")
+        
+        # Active Injuries
+        active_injuries = self.db.query(InjuryLog).filter(
+            InjuryLog.athlete_id == athlete.id,
+            InjuryLog.status == "Active"
+        ).all()
+        if active_injuries:
+            lines.append("")
+            lines.append("ACTIVE INJURIES (CRITICAL):")
+            for inj in active_injuries:
+                lines.append(f"  - {inj.body_part} (Severity: {inj.severity}/10)")
+                if inj.affected_sports:
+                    lines.append(f"    Affected sports to avoid/limit: {inj.affected_sports}")
+                if inj.notes:
+                    lines.append(f"    Notes: {inj.notes}")
+
         
         # Profile thresholds
         profile_parts = []

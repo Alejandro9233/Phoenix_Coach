@@ -7,6 +7,7 @@ struct BlockCalendarView: View {
     @State private var errorMessage: String?
     @State private var showRegenConfirmation = false
     @State private var isRegenerating = false
+    @State private var showRegenSuccess = false
     
     // Tracks which phases are currently expanded
     @State private var expandedPhases: Set<String> = []
@@ -16,12 +17,12 @@ struct BlockCalendarView: View {
     
     // MARK: - Design System (Quiet Performance)
     
-    private static let backgroundColor = Color(red: 0.075, green: 0.075, blue: 0.082)        // #131315
-    private static let surfaceColor = Color(red: 0.122, green: 0.122, blue: 0.129)            // #1F1F21
-    private static let primaryTextColor = Color(red: 0.784, green: 0.776, blue: 0.780)        // #C8C6C7
-    private static let accentColor = Color(red: 1.0, green: 0.71, blue: 0.604)                // #FFB59A
-    private static let outlineColor = Color(red: 0.569, green: 0.565, blue: 0.580)            // #919094
-    private static let onSurfaceVariantColor = Color(red: 0.780, green: 0.776, blue: 0.792)   // #C7C6CA
+
+
+
+
+
+
     
     // MARK: - Computed Properties
     
@@ -60,21 +61,30 @@ struct BlockCalendarView: View {
     
     var body: some View {
         ZStack {
-            Self.backgroundColor.ignoresSafeArea()
+            DS.Colors.background.ignoresSafeArea()
             
             if isLoading {
                 ProgressView("Loading timeline...")
                     .scaleEffect(1.1)
-                    .foregroundStyle(Self.outlineColor)
+                    .foregroundStyle(DS.Colors.outline)
             } else if let error = errorMessage {
                 errorView(error)
             } else if calendarData != nil {
                 timelineContent
             }
+            
+            if isRegenerating {
+                regeneratingOverlay
+            }
+        }
+        .alert("Plan Regenerated", isPresented: $showRegenSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Your active workouts for this week have been successfully updated.")
         }
         .navigationTitle("Training Timeline")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Self.backgroundColor, for: .navigationBar)
+        .toolbarBackground(DS.Colors.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -87,7 +97,7 @@ struct BlockCalendarView: View {
                     } else {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.body.bold())
-                            .foregroundStyle(Self.accentColor)
+                            .foregroundStyle(DS.Colors.accent)
                     }
                 }
                 .disabled(isRegenerating)
@@ -186,18 +196,18 @@ struct BlockCalendarView: View {
             HStack(spacing: 8) {
                 Image(systemName: "trophy.fill")
                     .font(.caption)
-                    .foregroundStyle(Self.accentColor)
+                    .foregroundStyle(DS.Colors.accent)
                 
                 Text(data.raceName.uppercased())
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Self.accentColor)
+                    .foregroundStyle(DS.Colors.accent)
                     .tracking(1.2)
             }
             
             if let raceDate = data.raceDate {
                 Text(formatRaceDate(raceDate))
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Self.primaryTextColor)
+                    .foregroundStyle(DS.Colors.primaryText)
             }
             
             HStack(spacing: 16) {
@@ -207,7 +217,7 @@ struct BlockCalendarView: View {
             .padding(.top, 4)
         }
         .padding(16)
-        .background(Self.surfaceColor)
+        .background(DS.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -219,11 +229,11 @@ struct BlockCalendarView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Self.outlineColor)
+                .foregroundStyle(DS.Colors.outline)
                 .tracking(0.8)
             Text(value)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Self.primaryTextColor)
+                .foregroundStyle(DS.Colors.primaryText)
         }
     }
     
@@ -249,17 +259,17 @@ struct BlockCalendarView: View {
             HStack(spacing: 12) {
                 // Timeline dot
                 Circle()
-                    .fill(isActive ? Self.accentColor : (isPast ? Self.outlineColor.opacity(0.6) : Self.outlineColor.opacity(0.3)))
+                    .fill(isActive ? DS.Colors.accent : (isPast ? DS.Colors.outline.opacity(0.6) : DS.Colors.outline.opacity(0.3)))
                     .frame(width: 10, height: 10)
                     .overlay(
                         Circle()
-                            .stroke(isActive ? Self.accentColor.opacity(0.4) : Color.clear, lineWidth: 3)
+                            .stroke(isActive ? DS.Colors.accent.opacity(0.4) : Color.clear, lineWidth: 3)
                     )
                 
                 // Phase name
                 Text(phaseName.uppercased())
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(isActive ? Self.primaryTextColor : Self.outlineColor)
+                    .foregroundStyle(isActive ? DS.Colors.primaryText : DS.Colors.outline)
                     .tracking(1.0)
                 
                 Spacer()
@@ -271,14 +281,14 @@ struct BlockCalendarView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Self.accentColor.opacity(0.8))
+                        .background(DS.Colors.accent.opacity(0.8))
                         .clipShape(Capsule())
                 } else {
                     let first = weeks.first?.weekNumber ?? 0
                     let last = weeks.last?.weekNumber ?? 0
                     Text(first == last ? "WEEK \(first)" : "WEEKS \(first)-\(last)")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Self.outlineColor)
+                        .foregroundStyle(DS.Colors.outline)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Color.white.opacity(0.04))
@@ -288,7 +298,7 @@ struct BlockCalendarView: View {
                 // Chevron
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Self.outlineColor.opacity(0.6))
+                    .foregroundStyle(DS.Colors.outline.opacity(0.6))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -313,7 +323,7 @@ struct BlockCalendarView: View {
                 
                 // Node dot
                 Circle()
-                    .fill(isCurrent ? Self.accentColor : (isPast ? Self.outlineColor.opacity(0.4) : Color.white.opacity(0.15)))
+                    .fill(isCurrent ? DS.Colors.accent : (isPast ? DS.Colors.outline.opacity(0.4) : Color.white.opacity(0.15)))
                     .frame(width: 6, height: 6)
                 
                 // Bottom connector line
@@ -353,16 +363,16 @@ struct BlockCalendarView: View {
                 HStack(spacing: 6) {
                     Text("WEEK \(week.weekNumber)")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Self.outlineColor)
+                        .foregroundStyle(DS.Colors.outline)
                     
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(Self.outlineColor.opacity(0.6))
+                        .foregroundStyle(DS.Colors.outline.opacity(0.6))
                     
                     if week.isRecoveryWeek {
                         Text("RECOVERY")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Self.outlineColor)
+                            .foregroundStyle(DS.Colors.outline)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(Color.white.opacity(0.06))
@@ -373,22 +383,22 @@ struct BlockCalendarView: View {
                 if let summary = week.planSummary {
                     Text(summary)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Self.outlineColor.opacity(0.7))
+                        .foregroundStyle(DS.Colors.outline.opacity(0.7))
                         .lineLimit(1)
                 }
                 
                 HStack(spacing: 8) {
                     Text("\(week.expectedTotalHours ?? "0")h")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Self.outlineColor.opacity(0.5))
+                        .foregroundStyle(DS.Colors.outline.opacity(0.5))
                     
                     if let tl = week.actualTrainingLoad {
                         Text("•")
                             .font(.system(size: 10))
-                            .foregroundStyle(Self.outlineColor.opacity(0.3))
+                            .foregroundStyle(DS.Colors.outline.opacity(0.3))
                         Text("TL: \(Int(tl))")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Self.outlineColor.opacity(0.5))
+                            .foregroundStyle(DS.Colors.outline.opacity(0.5))
                     }
                 }
             }
@@ -397,10 +407,10 @@ struct BlockCalendarView: View {
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 10))
-                .foregroundStyle(Self.outlineColor.opacity(0.3))
+                .foregroundStyle(DS.Colors.outline.opacity(0.3))
         }
         .padding(12)
-        .background(Self.surfaceColor.opacity(0.5))
+        .background(DS.Colors.surface.opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -417,32 +427,32 @@ struct BlockCalendarView: View {
             HStack(spacing: 8) {
                 Text("WEEK \(week.weekNumber)")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Self.primaryTextColor)
+                    .foregroundStyle(DS.Colors.primaryText)
                 
                 // Pulsing dot + CURRENT label
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Self.accentColor)
+                        .fill(DS.Colors.accent)
                         .frame(width: 6, height: 6)
                     
                     Text("CURRENT")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Self.accentColor)
+                        .foregroundStyle(DS.Colors.accent)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Self.accentColor.opacity(0.12))
+                .background(DS.Colors.accent.opacity(0.12))
                 .clipShape(Capsule())
                 
                 Spacer()
                 
                 if week.isRecoveryWeek {
                     Text("RECOVERY")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.teal)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(DS.Colors.accent)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.teal.opacity(0.15))
+                        .background(DS.Colors.accent.opacity(0.15))
                         .clipShape(Capsule())
                 }
             }
@@ -451,7 +461,7 @@ struct BlockCalendarView: View {
             if let summary = week.planSummary {
                 Text(summary)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Self.onSurfaceVariantColor)
+                    .foregroundStyle(DS.Colors.onSurface)
                     .lineLimit(2)
             }
             
@@ -461,11 +471,11 @@ struct BlockCalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TARGET DURATION")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Self.outlineColor)
+                        .foregroundStyle(DS.Colors.outline)
                         .tracking(0.5)
                     Text("\(week.expectedTotalHours ?? "0")h")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(Self.primaryTextColor)
+                        .foregroundStyle(DS.Colors.primaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
@@ -478,16 +488,16 @@ struct BlockCalendarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TRAINING LOAD")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Self.outlineColor)
+                        .foregroundStyle(DS.Colors.outline)
                         .tracking(0.5)
                     if let tl = week.actualTrainingLoad {
                         Text("\(Int(tl))")
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(Self.primaryTextColor)
+                            .foregroundStyle(DS.Colors.primaryText)
                     } else {
                         Text("—")
                             .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(Self.outlineColor.opacity(0.4))
+                            .foregroundStyle(DS.Colors.outline.opacity(0.4))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -505,22 +515,22 @@ struct BlockCalendarView: View {
                 HStack(spacing: 4) {
                     Text("View schedule")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Self.outlineColor.opacity(0.5))
+                        .foregroundStyle(DS.Colors.outline.opacity(0.5))
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9))
-                        .foregroundStyle(Self.outlineColor.opacity(0.4))
+                        .foregroundStyle(DS.Colors.outline.opacity(0.4))
                 }
             }
         }
         .padding(16)
         .background(
             ZStack {
-                Self.surfaceColor
+                DS.Colors.surface
                 
                 // Subtle radial gradient overlay
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        Self.accentColor.opacity(0.06),
+                        DS.Colors.accent.opacity(0.06),
                         Color.clear
                     ]),
                     center: .topLeading,
@@ -558,7 +568,7 @@ struct BlockCalendarView: View {
                 ForEach(0..<7, id: \.self) { i in
                     let height = dayMinutes[i] > 0 ? max(dayMinutes[i] / normalizedMax * 32, 4) : 4
                     let isToday = i == currentDayIndex
-                    let barColor: Color = isToday ? Self.accentColor : Color.white.opacity(dayMinutes[i] > 0 ? 0.25 : 0.08)
+                    let barColor: Color = isToday ? DS.Colors.accent : Color.white.opacity(dayMinutes[i] > 0 ? 0.25 : 0.08)
                     
                     RoundedRectangle(cornerRadius: 2)
                         .fill(barColor)
@@ -573,7 +583,7 @@ struct BlockCalendarView: View {
                     let isToday = i == currentDayIndex
                     Text(dayLabels[i])
                         .font(.system(size: 8, weight: isToday ? .bold : .medium))
-                        .foregroundStyle(isToday ? Self.accentColor : Self.outlineColor.opacity(0.4))
+                        .foregroundStyle(isToday ? DS.Colors.accent : DS.Colors.outline.opacity(0.4))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -589,15 +599,16 @@ struct BlockCalendarView: View {
                 HStack(spacing: 6) {
                     Text("WEEK \(week.weekNumber)")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Self.primaryTextColor.opacity(0.7))
+                        .foregroundStyle(DS.Colors.primaryText.opacity(0.7))
                     
                     if week.isRecoveryWeek {
-                        Text("RECOVERY")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(.teal.opacity(0.8))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.teal.opacity(0.1))
+                        Text("RECOVERY WEEK")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.0)
+                            .foregroundStyle(DS.Colors.accent.opacity(0.8))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(DS.Colors.accent.opacity(0.1))
                             .clipShape(Capsule())
                     }
                 }
@@ -605,7 +616,7 @@ struct BlockCalendarView: View {
                 if let summary = week.planSummary {
                     Text(summary)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Self.onSurfaceVariantColor.opacity(0.6))
+                        .foregroundStyle(DS.Colors.onSurface.opacity(0.6))
                         .lineLimit(1)
                 }
                 
@@ -616,7 +627,7 @@ struct BlockCalendarView: View {
                         Text("\(week.expectedTotalHours ?? "0")h")
                             .font(.system(size: 10, weight: .semibold))
                     }
-                    .foregroundStyle(Self.outlineColor.opacity(0.5))
+                    .foregroundStyle(DS.Colors.outline.opacity(0.5))
                     
                     HStack(spacing: 3) {
                         Image(systemName: "figure.run")
@@ -624,7 +635,7 @@ struct BlockCalendarView: View {
                         Text("\(week.expectedRunKm ?? "0") km")
                             .font(.system(size: 10, weight: .semibold))
                     }
-                    .foregroundStyle(Self.outlineColor.opacity(0.5))
+                    .foregroundStyle(DS.Colors.outline.opacity(0.5))
                 }
             }
             
@@ -632,15 +643,16 @@ struct BlockCalendarView: View {
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 10))
-                .foregroundStyle(Self.outlineColor.opacity(0.3))
+                .foregroundStyle(DS.Colors.outline.opacity(0.3))
         }
         .padding(12)
-        .background(Self.surfaceColor.opacity(0.4))
+        .background(DS.Colors.surface.opacity(0.4))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.white.opacity(0.04), lineWidth: 1)
         )
+        .accessibilityElement(children: .combine)
     }
     
     // MARK: - Future Phase Placeholder
@@ -649,15 +661,15 @@ struct BlockCalendarView: View {
         HStack(spacing: 10) {
             Image(systemName: "sparkles")
                 .font(.system(size: 14))
-                .foregroundStyle(Self.outlineColor.opacity(0.5))
+                .foregroundStyle(DS.Colors.outline.opacity(0.5))
             
             Text("Future block details will populate upon completion of Week \(currentWeekNumber) assessment.")
                 .font(.system(size: 11, weight: .regular).italic())
-                .foregroundStyle(Self.outlineColor.opacity(0.5))
+                .foregroundStyle(DS.Colors.outline.opacity(0.5))
                 .lineLimit(3)
         }
         .padding(14)
-        .background(Self.surfaceColor.opacity(0.3))
+        .background(DS.Colors.surface.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -671,10 +683,10 @@ struct BlockCalendarView: View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.largeTitle)
-                .foregroundStyle(Self.accentColor.opacity(0.8))
+                .foregroundStyle(DS.Colors.accent.opacity(0.8))
             Text(error)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Self.onSurfaceVariantColor)
+                .foregroundStyle(DS.Colors.onSurface)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             Button("Retry") {
@@ -686,7 +698,7 @@ struct BlockCalendarView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
-            .background(Self.accentColor.opacity(0.8))
+            .background(DS.Colors.accent.opacity(0.8))
             .clipShape(Capsule())
         }
     }
@@ -726,15 +738,42 @@ struct BlockCalendarView: View {
         errorMessage = nil
         do {
             _ = try await network.regenerateWeeklyPlan()
+            await loadData()
             await MainActor.run {
                 self.isRegenerating = false
+                self.showRegenSuccess = true
             }
-            await loadData()
         } catch {
             await MainActor.run {
                 self.errorMessage = "Regeneration failed: \(error.localizedDescription)"
                 self.isRegenerating = false
             }
+        }
+    }
+    
+    private var regeneratingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 16) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(DS.Colors.accent)
+                
+                Text("Regenerating Plan...")
+                    .font(.headline)
+                    .foregroundStyle(DS.Colors.primaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            .padding(24)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
         }
     }
     
@@ -798,12 +837,12 @@ struct WeeklyWorkoutsDetailSheet: View {
     let week: BlockWeek
     
     // Design system
-    private static let backgroundColor = Color(red: 0.075, green: 0.075, blue: 0.082)
-    private static let surfaceColor = Color(red: 0.122, green: 0.122, blue: 0.129)
-    private static let primaryTextColor = Color(red: 0.784, green: 0.776, blue: 0.780)
-    private static let accentColor = Color(red: 1.0, green: 0.71, blue: 0.604)
-    private static let outlineColor = Color(red: 0.569, green: 0.565, blue: 0.580)
-    private static let onSurfaceVariantColor = Color(red: 0.780, green: 0.776, blue: 0.792)
+
+
+
+
+
+
     
     // Sort workouts by day of week to ensure correct visual order
     private var sortedWorkouts: [CalendarWorkout] {
@@ -817,7 +856,7 @@ struct WeeklyWorkoutsDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Self.backgroundColor.ignoresSafeArea()
+                DS.Colors.background.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -825,34 +864,34 @@ struct WeeklyWorkoutsDetailSheet: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("WEEK OVERVIEW")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Self.accentColor)
+                                .foregroundStyle(DS.Colors.accent)
                                 .tracking(1.0)
                             
                             Text(week.phaseName)
                                 .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(Self.primaryTextColor)
+                                .foregroundStyle(DS.Colors.primaryText)
                             
                             Text("Week \(week.weekNumber) • \(week.isRecoveryWeek ? "Recovery Week" : "Build Week \(week.cycleWeek)/3")")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Self.outlineColor)
+                                .foregroundStyle(DS.Colors.outline)
                             
                             Rectangle()
                                 .fill(Color.white.opacity(0.06))
                                 .frame(height: 1)
                             
                             HStack(spacing: 20) {
-                                statBadge(icon: "clock.fill", title: "Expected Hours", value: "\(week.expectedTotalHours ?? "0") hrs", color: Self.accentColor)
-                                statBadge(icon: "figure.run", title: "Target Run", value: "\(week.expectedRunKm ?? "0") km", color: .green)
+                                statBadge(icon: "clock.fill", title: "Expected Hours", value: "\(week.expectedTotalHours ?? "0") hrs", color: DS.Colors.accent)
+                                statBadge(icon: "figure.run", title: "Target Run", value: "\(week.expectedRunKm ?? "0") km", color: DS.Colors.accent)
                             }
                             
                             if let tl = week.actualTrainingLoad {
                                 HStack(spacing: 20) {
-                                    statBadge(icon: "bolt.fill", title: "Training Load", value: "\(Int(tl))", color: Self.accentColor)
+                                    statBadge(icon: "bolt.fill", title: "Training Load", value: "\(Int(tl))", color: DS.Colors.accent)
                                 }
                             }
                         }
                         .padding(16)
-                        .background(Self.surfaceColor)
+                        .background(DS.Colors.surface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -863,7 +902,7 @@ struct WeeklyWorkoutsDetailSheet: View {
                         if week.hasPlan, !sortedWorkouts.isEmpty {
                             Text("DAILY SCHEDULE")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Self.outlineColor)
+                                .foregroundStyle(DS.Colors.outline)
                                 .tracking(1.0)
                                 .padding(.horizontal, 4)
                             
@@ -875,16 +914,16 @@ struct WeeklyWorkoutsDetailSheet: View {
                             VStack(spacing: 20) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 36))
-                                    .foregroundStyle(Self.accentColor.opacity(0.6))
+                                    .foregroundStyle(DS.Colors.accent.opacity(0.6))
                                     .symbolEffect(.bounce, options: .repeating)
                                 
                                 Text("Projected Phase Prescriptions")
                                     .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(Self.primaryTextColor)
+                                    .foregroundStyle(DS.Colors.primaryText)
                                 
                                 Text("This is a projected future week in your periodization timeline. The AI coach will compile your day-by-day customized schedule when this week becomes active.\n\nExpected guidelines for this phase:")
                                     .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(Self.outlineColor)
+                                    .foregroundStyle(DS.Colors.outline)
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal)
                                 
@@ -896,11 +935,11 @@ struct WeeklyWorkoutsDetailSheet: View {
                                     guidelineRow(sport: "strength", text: "3x Strength (Hypertrophy focus)")
                                 }
                                 .padding(14)
-                                .background(Self.accentColor.opacity(0.05))
+                                .background(DS.Colors.accent.opacity(0.05))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             .padding(20)
-                            .background(Self.surfaceColor)
+                            .background(DS.Colors.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
@@ -913,7 +952,7 @@ struct WeeklyWorkoutsDetailSheet: View {
             }
             .navigationTitle("Week \(week.weekNumber) Schedule")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Self.backgroundColor, for: .navigationBar)
+            .toolbarBackground(DS.Colors.background, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -921,7 +960,7 @@ struct WeeklyWorkoutsDetailSheet: View {
                         dismiss()
                     }
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Self.accentColor)
+                    .foregroundStyle(DS.Colors.accent)
                 }
             }
         }
@@ -941,11 +980,11 @@ struct WeeklyWorkoutsDetailSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title.uppercased())
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Self.outlineColor)
+                    .foregroundStyle(DS.Colors.outline)
                     .tracking(0.5)
                 Text(value)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Self.primaryTextColor)
+                    .foregroundStyle(DS.Colors.primaryText)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -956,7 +995,7 @@ struct WeeklyWorkoutsDetailSheet: View {
             HStack {
                 Text(w.day.uppercased())
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Self.accentColor)
+                    .foregroundStyle(DS.Colors.accent)
                     .tracking(0.8)
                 Spacer()
                 Text(sportEmoji(for: w.sport))
@@ -966,7 +1005,7 @@ struct WeeklyWorkoutsDetailSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(w.title)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Self.primaryTextColor)
+                    .foregroundStyle(DS.Colors.primaryText)
                 
                 HStack(spacing: 12) {
                     HStack(spacing: 3) {
@@ -982,7 +1021,7 @@ struct WeeklyWorkoutsDetailSheet: View {
                             .font(.system(size: 11, weight: .medium))
                     }
                 }
-                .foregroundStyle(Self.outlineColor)
+                .foregroundStyle(DS.Colors.outline)
             }
             
             // Muscle groups capsules if strength
@@ -1003,7 +1042,7 @@ struct WeeklyWorkoutsDetailSheet: View {
             }
         }
         .padding(12)
-        .background(Self.surfaceColor.opacity(0.6))
+        .background(DS.Colors.surface.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -1017,7 +1056,7 @@ struct WeeklyWorkoutsDetailSheet: View {
                 .font(.body)
             Text(text)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Self.onSurfaceVariantColor)
+                .foregroundStyle(DS.Colors.onSurface)
             Spacer()
         }
     }
@@ -1034,13 +1073,6 @@ struct WeeklyWorkoutsDetailSheet: View {
     }
     
     private func colorForMuscleGroup(_ group: String) -> Color {
-        switch group.lowercased() {
-        case "chest": return .pink
-        case "shoulders": return .orange
-        case "back": return .teal
-        case "legs": return .green
-        case "arms": return .purple
-        default: return .secondary
-        }
+        return DS.Colors.outline
     }
 }

@@ -6,7 +6,10 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from backend.models.database import Base, Athlete, Activity, RecoverySnapshot
+from backend.models.database import (
+    Base, Athlete, Activity, ActivityRecord, RecoverySnapshot, 
+    AthleteFeedback, CoachingRecommendation, WeeklyPlan, InjuryLog
+)
 from backend.services.fit_importer import parse_fit_file
 from backend.services.coros_scraper import CorosScraper
 from sqlalchemy import create_engine
@@ -146,10 +149,10 @@ def get_athlete_profile(db: Session = Depends(get_db)):
         "race_type": athlete.race_type or "Triathlon",
         "race_distance": athlete.race_distance,
         "race_date": str(athlete.race_date) if athlete.race_date else None,
-        "swim_days": athlete.swim_days or "wed,sat,sun",
-        "bike_days": athlete.bike_days or "mon,tue,wed,thu,fri,sat,sun",
-        "run_days": athlete.run_days or "mon,tue,wed,thu,fri,sat,sun",
-        "strength_days": athlete.strength_days or "mon,wed,fri",
+        "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
+        "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+        "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+        "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri",
         "target_finish_time": athlete.target_finish_time,
         "training_start_date": str(athlete.training_start_date) if athlete.training_start_date else None,
     }
@@ -194,6 +197,62 @@ def update_athlete_profile(body: dict, db: Session = Depends(get_db)):
     db.refresh(athlete)
     print(f"Profile updated: {athlete.name}, race={athlete.race_name} on {athlete.race_date}, start={athlete.training_start_date}")
     return {"status": "ok", "message": "Profile updated"}
+
+@app.get("/athlete/injuries")
+def get_athlete_injuries(db: Session = Depends(get_db)):
+    from backend.models.database import InjuryLog
+    athlete = db.query(Athlete).first()
+    if not athlete:
+        return []
+    injuries = db.query(InjuryLog).filter(InjuryLog.athlete_id == athlete.id).order_by(InjuryLog.date_reported.desc()).all()
+    return [
+        {
+            "id": inj.id,
+            "date_reported": str(inj.date_reported) if inj.date_reported else None,
+            "body_part": inj.body_part,
+            "status": inj.status,
+            "severity": inj.severity,
+            "notes": inj.notes,
+            "affected_sports": inj.affected_sports
+        } for inj in injuries
+    ]
+
+@app.post("/athlete/injuries")
+def create_athlete_injury(body: dict, db: Session = Depends(get_db)):
+    from backend.models.database import InjuryLog
+    from datetime import date
+    
+    athlete = db.query(Athlete).first()
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+        
+    injury = InjuryLog(
+        athlete_id=athlete.id,
+        date_reported=date.fromisoformat(body["date_reported"]) if "date_reported" in body and body["date_reported"] else date.today(),
+        body_part=body.get("body_part"),
+        status=body.get("status", "Active"),
+        severity=body.get("severity"),
+        notes=body.get("notes"),
+        affected_sports=body.get("affected_sports")
+    )
+    db.add(injury)
+    db.commit()
+    db.refresh(injury)
+    return {"status": "ok", "message": "Injury logged", "id": injury.id}
+
+@app.put("/athlete/injuries/{injury_id}")
+def update_athlete_injury(injury_id: int, body: dict, db: Session = Depends(get_db)):
+    from backend.models.database import InjuryLog
+    injury = db.query(InjuryLog).filter(InjuryLog.id == injury_id).first()
+    if not injury:
+        raise HTTPException(status_code=404, detail="Injury not found")
+        
+    for field in ["status", "severity", "notes", "affected_sports", "body_part"]:
+        if field in body:
+            setattr(injury, field, body[field])
+            
+    db.commit()
+    return {"status": "ok", "message": "Injury updated"}
 
 @app.post("/sync")
 async def sync_data(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -300,10 +359,10 @@ def get_weekly_plan(db: Session = Depends(get_db)):
         "race_distance": athlete.race_distance,
         "race_date": str(athlete.race_date) if athlete.race_date else None,
         "weekly_hours_target": athlete.weekly_hours_target or 8.0,
-        "swim_days": athlete.swim_days or "wed,sat,sun",
-        "bike_days": athlete.bike_days or "mon,tue,wed,thu,fri,sat,sun",
-        "run_days": athlete.run_days or "mon,tue,wed,thu,fri,sat,sun",
-        "strength_days": athlete.strength_days or "mon,wed,fri"
+        "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
+        "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+        "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+        "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri"
     } if athlete else {}
     
     # Compute Training Context using PeriodizationEngine

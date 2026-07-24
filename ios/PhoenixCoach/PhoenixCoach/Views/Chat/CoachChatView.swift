@@ -41,6 +41,7 @@ struct CoachChatView: View {
                         }
                         .padding()
                     }
+                    .scrollDismissesKeyboard(.interactively)
                     .onChange(of: messages.count) {
                         scrollToBottom(proxy: proxy)
                     }
@@ -55,7 +56,7 @@ struct CoachChatView: View {
                 inputBar
             }
             .navigationTitle("Coach Phoenix")
-            .background(Color(.systemBackground))
+            .background(DS.Colors.background)
             .task {
                 await network.checkConnection()
                 
@@ -104,14 +105,14 @@ struct CoachChatView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color.blue.opacity(0.85))
+        .background(DS.Colors.surface)
     }
     
     private var welcomeMessage: some View {
         VStack(spacing: 12) {
             Image(systemName: "flame.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(.orange)
+                .foregroundStyle(DS.Colors.accent)
             Text("Ask Your Coach")
                 .font(.title2.bold())
             Text("I know your training data, recovery metrics, and coaching principles. Ask me anything about your training.")
@@ -133,6 +134,7 @@ struct CoachChatView: View {
     
     private func suggestionChip(_ text: String) -> some View {
         Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             inputText = text
             Task { await sendMessage() }
         } label: {
@@ -145,6 +147,7 @@ struct CoachChatView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Ask coach: \(text)")
     }
     
     private func messageBubble(_ message: ChatMessage) -> some View {
@@ -155,13 +158,35 @@ struct CoachChatView: View {
                 Text(message.content)
                     .font(.subheadline)
                     .padding(12)
-                    .background(message.role == .user ? Color.orange : Color(.systemGray5))
-                    .foregroundStyle(message.role == .user ? .white : .primary)
+                    .background(
+                        message.role == .user 
+                            ? AnyShapeStyle(DS.Colors.accent) 
+                            : (message.isError ? AnyShapeStyle(DS.Colors.danger.opacity(0.2)) : AnyShapeStyle(Material.ultraThinMaterial))
+                    )
+                    .foregroundStyle(message.role == .user ? .black : DS.Colors.primaryText)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
+                
+                if message.isError {
+                    Button(action: {
+                        if let lastUserMsg = messages.last(where: { $0.role == .user }) {
+                            messages.removeAll { $0.id == message.id }
+                            inputText = lastUserMsg.content
+                            Task { await sendMessage() }
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Retry")
+                        }
+                        .font(.caption.bold())
+                        .foregroundStyle(DS.Colors.accent)
+                    }
+                    .padding(.leading, 8)
+                }
                 
                 Text(message.timestamp, style: .time)
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(DS.Colors.outline)
             }
             
             if message.role == .coach { Spacer(minLength: 60) }
@@ -174,7 +199,7 @@ struct CoachChatView: View {
                 HStack(spacing: 5) {
                     ForEach(0..<3) { i in
                         Circle()
-                            .fill(.orange)
+                            .fill(DS.Colors.accent)
                             .frame(width: 8, height: 8)
                             .scaleEffect(isLoading ? 1.0 : 0.5)
                             .opacity(isLoading ? 1.0 : 0.3)
@@ -190,7 +215,7 @@ struct CoachChatView: View {
                 ThinkingStatusText()
             }
             .padding(12)
-            .background(Color(.systemGray5))
+            .background(DS.Colors.surface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             Spacer()
         }
@@ -201,17 +226,18 @@ struct CoachChatView: View {
             TextField("Ask your coach...", text: $inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .padding(12)
-                .background(Color(.systemGray6))
+                .background(DS.Colors.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .lineLimit(1...4)
                 .focused($isInputFocused)
             
             Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 Task { await sendMessage() }
             } label: {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(inputText.isEmpty || isLoading ? .gray : .orange)
+                    .foregroundStyle(inputText.isEmpty || isLoading ? .gray : DS.Colors.accent)
             }
             .disabled(inputText.isEmpty || isLoading)
         }
@@ -271,7 +297,8 @@ struct CoachChatView: View {
             }
         } catch {
             await MainActor.run {
-                messages[coachMsgIndex].content = "Local coach error: \(error.localizedDescription)"
+                messages[coachMsgIndex].content = "I hit a snag. Let's try that again."
+                messages[coachMsgIndex].isError = true
                 isLoading = false
                 isStreaming = false
             }

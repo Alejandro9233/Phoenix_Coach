@@ -141,6 +141,17 @@ class CoachingRecommendation(Base):
     coaching_note = Column(Text, nullable=True)
     plan_vs_actual_score = Column(Float, nullable=True)
 
+class InjuryLog(Base):
+    __tablename__ = "injury_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.id"))
+    date_reported = Column(Date, index=True)
+    body_part = Column(String)
+    status = Column(String) # e.g. "Active", "Recovering", "Resolved"
+    severity = Column(Integer, nullable=True) # 1-10
+    notes = Column(Text, nullable=True)
+    affected_sports = Column(String, nullable=True) # comma-separated like "run,bike"
+
 class WeeklyPlan(Base):
     __tablename__ = "weekly_plans"
     id = Column(Integer, primary_key=True, index=True)

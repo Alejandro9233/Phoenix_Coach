@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 extension String: @retroactive Identifiable {
     public var id: String { self }
@@ -17,14 +18,15 @@ struct TodayView: View {
     @State private var errorMessage: String?
     @State private var showConnectionSettings = false
     
-    // Design system colors matching Quiet Performance HTML mockup
-    static let backgroundColor = Color(red: 0.075, green: 0.075, blue: 0.082)       // #131315
-    static let surfaceColor = Color(red: 0.122, green: 0.122, blue: 0.129)          // #1F1F21
-    static let primaryTextColor = Color(red: 0.784, green: 0.776, blue: 0.780)      // #C8C6C7 - warm gray text
-    static let secondaryColor = Color(red: 1.0, green: 1, blue: 1)           // #FFB59A - peach accent
-    static let outlineColor = Color(red: 0.569, green: 0.565, blue: 0.580)           // #919094 - labels
-    static let onSurfaceVariantColor = Color(red: 0.780, green: 0.776, blue: 0.792)  // #C7C6CA - body text
+    @State private var showScraperError = false
+    @State private var scraperErrorMessage = ""
     
+    @State private var showHRVChart = false
+    @State private var showRHRChart = false
+    @State private var showLoadChart = false
+    
+    // Design system colors matching Quiet Performance HTML mockup
+                                                   
     private var todayDayName: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US")
@@ -72,12 +74,12 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                TodayView.backgroundColor
+                DS.Colors.background
                     .ignoresSafeArea()
                 
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        TodayView.secondaryColor.opacity(0.12),
+                        DS.Colors.accent.opacity(0.12),
                         .clear
                     ]),
                     center: .top,
@@ -86,51 +88,52 @@ struct TodayView: View {
                 )
                 .ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        statusPill
-                        
-                        VStack(spacing: 12) {
-                            HStack(spacing: 12) {
-                                hrvCard
-                                rhrCard
+                if let err = errorMessage, weeklyPlan == nil, dashboard == nil {
+                    errorView(err)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            statusPill
+                            
+                            VStack(spacing: 12) {
+                                HStack(spacing: 12) {
+                                    hrvCard
+                                    rhrCard
+                                }
+                                loadRatioCard
                             }
-                            loadRatioCard
+                            
+                            timelineLink
+                            
+                            workoutProtocolSection
+                            
+                            rationaleSection
                         }
-                        
-                        timelineLink
-                        
-                        workoutProtocolSection
-                        
-                        rationaleSection
+                        .padding()
+                        .opacity(isSyncing ? 0.3 : 1.0)
                     }
-                    .padding()
-                    .opacity(isSyncing ? 0.3 : 1.0)
-                }
-                .refreshable {
-                    await performSmartRefresh()
+                    .refreshable {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        await performSmartRefresh()
+                    }
                 }
                 
-                if isSyncing {
-                    syncingOverlay
-                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {
-                        showConnectionSettings = true
-                    }) {
-                        Image(systemName: "sensor.fill")
-                            .font(.body.bold())
-                            .foregroundStyle(network.isConnected ? TodayView.secondaryColor : .gray)
-                            .symbolEffect(.bounce, value: isSyncing)
-                    }
-                }
+            .sheet(isPresented: $showHRVChart) {
+                MetricChartSheet(title: "HRV (ms)", data: dashboard?.recovery ?? [], metricType: .hrv)
             }
-            .sheet(isPresented: $showConnectionSettings) {
-                ConnectionSettingsSheet()
+            .sheet(isPresented: $showRHRChart) {
+                MetricChartSheet(title: "Resting HR (bpm)", data: dashboard?.recovery ?? [], metricType: .rhr)
+            }
+            .sheet(isPresented: $showLoadChart) {
+                MetricChartSheet(title: "Load Ratio", data: dashboard?.recovery ?? [], metricType: .load)
+            }
+            .alert("Scraper Error", isPresented: $showScraperError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(scraperErrorMessage)
             }
             .task {
                 if weeklyPlan == nil {
@@ -148,10 +151,10 @@ struct TodayView: View {
                 .fill(network.isConnected ? Color.green : Color.red)
                 .frame(width: 8, height: 8)
             
-            Text(isSyncing ? "Syncing..." : (network.isConnected ? "Biometrics Synced" : "Connection Offline"))
+            Text(isSyncing ? syncMessage : (network.isConnected ? "Biometrics Synced" : "Connection Offline"))
                 .font(.system(size: 11, weight: .medium))
                 .tracking(1.1)
-                .foregroundStyle(TodayView.primaryTextColor)
+                .foregroundStyle(DS.Colors.primaryText)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -161,158 +164,171 @@ struct TodayView: View {
             Capsule()
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+        .accessibilityLabel(isSyncing ? "Syncing" : (network.isConnected ? "Biometrics Synced" : "Connection Offline"))
     }
     
     private var hrvCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "heart.text.square")
-                    .font(.subheadline)
-                    .foregroundStyle(TodayView.secondaryColor)
-                Spacer()
-                Text("HRV")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.1)
-                    .foregroundStyle(TodayView.outlineColor)
-            }
-            
-            Spacer()
-            
-            HStack(alignment: .bottom, spacing: 2) {
-                if let hrv = latestRecovery?.hrvMs {
-                    Text("\(Int(hrv))")
-                        .font(.system(size: 36, weight: .ultraLight))
-                        .foregroundStyle(TodayView.primaryTextColor)
-                    Text("ms")
-                        .font(.caption2)
-                        .foregroundStyle(TodayView.outlineColor)
-                        .padding(.bottom, 6)
-                } else {
-                    Text("--")
-                        .font(.system(size: 36, weight: .ultraLight))
-                        .foregroundStyle(TodayView.outlineColor)
+        Button(action: { if dashboard?.recovery.isEmpty == false { showHRVChart = true } }) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "heart.text.square")
+                        .font(.subheadline)
+                        .foregroundStyle(DS.Colors.accent)
+                    Spacer()
+                    Text("HRV")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.1)
+                        .foregroundStyle(DS.Colors.outline)
                 }
-            }
-            
-            Spacer()
-            
-            if let hrv = latestRecovery?.hrvMs, let baseline = dashboard?.athlete?.hrvBaseline, baseline > 0 {
-                let pctDiff = ((hrv - baseline) / baseline) * 100.0
-                let sign = pctDiff >= 0 ? "+" : ""
-                Text("\(sign)\(Int(pctDiff))% vs baseline")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(pctDiff >= -15 ? .green : .red)
-            } else {
-                Text("No baseline")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(TodayView.outlineColor)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 120)
-        .glassCard()
-    }
-    
-    private var rhrCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "heart.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(TodayView.secondaryColor)
-                Spacer()
-                Text("RHR")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.1)
-                    .foregroundStyle(TodayView.outlineColor)
-            }
-            
-            Spacer()
-            
-            HStack(alignment: .bottom, spacing: 2) {
-                if let rhr = latestRecovery?.restingHr {
-                    Text("\(rhr)")
-                        .font(.system(size: 36, weight: .ultraLight))
-                        .foregroundStyle(TodayView.primaryTextColor)
-                    Text("bpm")
-                        .font(.caption2)
-                        .foregroundStyle(TodayView.outlineColor)
-                        .padding(.bottom, 6)
-                } else {
-                    Text("--")
-                        .font(.system(size: 36, weight: .ultraLight))
-                        .foregroundStyle(TodayView.outlineColor)
-                }
-            }
-            
-            Spacer()
-            
-            if let rhr = latestRecovery?.restingHr, let baseRhr = dashboard?.athlete?.hrRest {
-                let diff = rhr - baseRhr
-                let sign = diff >= 0 ? "+" : ""
-                Text("\(sign)\(diff) bpm vs rest")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(diff <= 5 ? .green : .red)
-            } else {
-                Text("No baseline")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(TodayView.outlineColor)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 120)
-        .glassCard()
-    }
-    
-    private var loadRatioCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "waveform.path.ecg")
-                    .font(.subheadline)
-                    .foregroundStyle(TodayView.secondaryColor)
-                
-                Text("LOAD RATIO")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.1)
-                    .foregroundStyle(TodayView.outlineColor)
                 
                 Spacer()
                 
-                let label = latestRecovery?.loadRatioLabel ?? loadRatioLabel(for: latestRecovery?.loadRatio)
-                Text(label.uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(badgeColor(for: label))
-                    .clipShape(Capsule())
-            }
-            
-            HStack(alignment: .center, spacing: 16) {
                 HStack(alignment: .bottom, spacing: 2) {
-                    if let ratio = latestRecovery?.loadRatio {
-                        Text(String(format: "%.2f", ratio))
+                    if let hrv = latestRecovery?.hrvMs {
+                        Text("\(Int(hrv))")
                             .font(.system(size: 36, weight: .ultraLight))
-                            .foregroundStyle(TodayView.primaryTextColor)
+                            .foregroundStyle(DS.Colors.primaryText)
+                        Text("ms")
+                            .font(.caption2)
+                            .foregroundStyle(DS.Colors.outline)
+                            .padding(.bottom, 6)
                     } else {
                         Text("--")
                             .font(.system(size: 36, weight: .ultraLight))
-                            .foregroundStyle(TodayView.outlineColor)
+                            .foregroundStyle(DS.Colors.outline)
                     }
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Injury risk evaluation based on acute vs chronic load")
-                        .font(.caption2)
-                        .foregroundStyle(TodayView.onSurfaceVariantColor)
+                Spacer()
+                
+                if let hrv = latestRecovery?.hrvMs, let baseline = dashboard?.athlete?.hrvBaseline, baseline > 0 {
+                    let pctDiff = ((hrv - baseline) / baseline) * 100.0
+                    let sign = pctDiff >= 0 ? "+" : ""
+                    Text("\(sign)\(Int(pctDiff))% vs baseline")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(pctDiff >= -15 ? .green : .red)
+                } else {
+                    Text("No baseline")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(DS.Colors.outline)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 120)
+            .glassCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+    }
+    
+    private var rhrCard: some View {
+        Button(action: { if dashboard?.recovery.isEmpty == false { showRHRChart = true } }) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "heart.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(DS.Colors.accent)
+                    Spacer()
+                    Text("RHR")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.1)
+                        .foregroundStyle(DS.Colors.outline)
+                }
+                
+                Spacer()
+                
+                HStack(alignment: .bottom, spacing: 2) {
+                    if let rhr = latestRecovery?.restingHr {
+                        Text("\(rhr)")
+                            .font(.system(size: 36, weight: .ultraLight))
+                            .foregroundStyle(DS.Colors.primaryText)
+                        Text("bpm")
+                            .font(.caption2)
+                            .foregroundStyle(DS.Colors.outline)
+                            .padding(.bottom, 6)
+                    } else {
+                        Text("--")
+                            .font(.system(size: 36, weight: .ultraLight))
+                            .foregroundStyle(DS.Colors.outline)
+                    }
+                }
+                
+                Spacer()
+                
+                if let rhr = latestRecovery?.restingHr, let baseRhr = dashboard?.athlete?.hrRest {
+                    let diff = rhr - baseRhr
+                    let sign = diff >= 0 ? "+" : ""
+                    Text("\(sign)\(diff) bpm vs rest")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(diff <= 5 ? .green : .red)
+                } else {
+                    Text("No baseline")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(DS.Colors.outline)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 120)
+            .glassCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+    }
+    
+    private var loadRatioCard: some View {
+        Button(action: { if dashboard?.recovery.isEmpty == false { showLoadChart = true } }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.subheadline)
+                        .foregroundStyle(DS.Colors.accent)
                     
-                    if let cti = latestRecovery?.cti, let ati = latestRecovery?.ati {
-                        Text("ATL: \(Int(ati)) • CTL: \(Int(cti))")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(TodayView.outlineColor)
+                    Text("LOAD RATIO")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.1)
+                        .foregroundStyle(DS.Colors.outline)
+                    
+                    Spacer()
+                    
+                    let label = latestRecovery?.loadRatioLabel ?? loadRatioLabel(for: latestRecovery?.loadRatio)
+                    Text(label.uppercased())
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(badgeColor(for: label))
+                        .clipShape(Capsule())
+                }
+                
+                HStack(alignment: .center, spacing: 16) {
+                    HStack(alignment: .bottom, spacing: 2) {
+                        if let ratio = latestRecovery?.loadRatio {
+                            Text(String(format: "%.2f", ratio))
+                                .font(.system(size: 36, weight: .ultraLight))
+                                .foregroundStyle(DS.Colors.primaryText)
+                        } else {
+                            Text("--")
+                                .font(.system(size: 36, weight: .ultraLight))
+                                .foregroundStyle(DS.Colors.outline)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Injury risk evaluation based on acute vs chronic load")
+                            .font(.caption2)
+                            .foregroundStyle(DS.Colors.onSurface)
+                        
+                        if let cti = latestRecovery?.cti, let ati = latestRecovery?.ati {
+                            Text("ATL: \(Int(ati)) • CTL: \(Int(cti))")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(DS.Colors.outline)
+                        }
                     }
                 }
             }
+            .frame(maxWidth: .infinity)
+            .glassCard()
         }
-        .frame(maxWidth: .infinity)
-        .glassCard()
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
     
     private var timelineLink: some View {
@@ -320,13 +336,13 @@ struct TodayView: View {
             HStack(spacing: 12) {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.title3)
-                    .foregroundStyle(TodayView.secondaryColor)
+                    .foregroundStyle(DS.Colors.accent)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TRAINING TIMELINE")
                         .font(.system(size: 11, weight: .semibold))
                         .tracking(1.1)
-                        .foregroundStyle(TodayView.outlineColor)
+                        .foregroundStyle(DS.Colors.outline)
                     Text("View training phases and full calendar")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -336,7 +352,7 @@ struct TodayView: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.footnote)
-                    .foregroundStyle(TodayView.outlineColor)
+                    .foregroundStyle(DS.Colors.outline)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassCard()
@@ -349,7 +365,7 @@ struct TodayView: View {
             Text("TODAY'S WORKOUT PROTOCOL")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(1.1)
-                .foregroundStyle(TodayView.outlineColor)
+                .foregroundStyle(DS.Colors.outline)
                 .padding(.horizontal, 4)
             
             if let todayPlan = todayDayPlan {
@@ -403,17 +419,17 @@ struct TodayView: View {
                     Text("COACH'S RATIONALE & NOTE")
                         .font(.system(size: 11, weight: .bold))
                         .tracking(1.1)
-                        .foregroundStyle(TodayView.outlineColor)
+                        .foregroundStyle(DS.Colors.outline)
                     
                     if let rationale = todayPlan.rationale, !rationale.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("RATIONALE")
                                 .font(.system(size: 9, weight: .bold))
                                 .tracking(0.9)
-                                .foregroundStyle(TodayView.secondaryColor)
+                                .foregroundStyle(DS.Colors.accent)
                             Text(rationale)
                                 .font(.system(size: 13))
-                                .foregroundStyle(TodayView.onSurfaceVariantColor)
+                                .foregroundStyle(DS.Colors.onSurface)
                                 .lineSpacing(3)
                         }
                     }
@@ -423,10 +439,10 @@ struct TodayView: View {
                             Text("COACH NOTE")
                                 .font(.system(size: 9, weight: .bold))
                                 .tracking(0.9)
-                                .foregroundStyle(TodayView.secondaryColor)
+                                .foregroundStyle(DS.Colors.accent)
                             Text(note)
                                 .font(.system(size: 13).italic())
-                                .foregroundStyle(TodayView.onSurfaceVariantColor)
+                                .foregroundStyle(DS.Colors.onSurface)
                                 .lineSpacing(3)
                         }
                     }
@@ -441,13 +457,13 @@ struct TodayView: View {
         VStack(spacing: 12) {
             Image(systemName: "zzz")
                 .font(.largeTitle)
-                .foregroundStyle(TodayView.outlineColor)
+                .foregroundStyle(DS.Colors.outline)
             Text("Rest Day")
                 .font(.headline.bold())
-                .foregroundStyle(TodayView.primaryTextColor)
+                .foregroundStyle(DS.Colors.primaryText)
             Text("No structured training scheduled for today. Focus on active recovery, stretching, or general wellness.")
                 .font(.caption)
-                .foregroundStyle(TodayView.onSurfaceVariantColor)
+                .foregroundStyle(DS.Colors.onSurface)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -463,11 +479,11 @@ struct TodayView: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .controlSize(.large)
-                    .tint(TodayView.secondaryColor)
+                    .tint(DS.Colors.accent)
                 
                 Text(syncMessage)
                     .font(.headline)
-                    .foregroundStyle(TodayView.primaryTextColor)
+                    .foregroundStyle(DS.Colors.primaryText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -484,12 +500,13 @@ struct TodayView: View {
     // MARK: - Logic & Network Helpers
     
     private func loadInitialData() async {
-        isLoading = true
+        isSyncing = true
+        syncMessage = "Loading training data..."
         async let dashTask: () = fetchDashboard()
         async let planTask: () = fetchWeeklyPlan()
         async let statusTask: () = fetchPlanStatus()
         _ = await (dashTask, planTask, statusTask)
-        isLoading = false
+        isSyncing = false
     }
     
     private func fetchWeeklyPlan() async {
@@ -514,6 +531,10 @@ struct TodayView: View {
             let status = try await network.fetchWeeklyPlanStatus()
             await MainActor.run {
                 self.planStatus = status
+                
+                let todayDayName = DateFormatter().shortWeekdaySymbols[Calendar.current.component(.weekday, from: Date()) - 1].lowercased()
+                let workoutTitle = status.days[todayDayName]?.workouts?.first?.title
+                NotificationManager.shared.scheduleMorningReadiness(workoutTitle: workoutTitle)
             }
         } catch {
             print("Plan status fetch error: \(error)")
@@ -525,6 +546,11 @@ struct TodayView: View {
             let dash = try await network.fetchDashboard()
             await MainActor.run {
                 self.dashboard = dash
+                
+                // Trigger notification logic if applicable
+                if let ratio = dash.recovery.first?.loadRatio {
+                    NotificationManager.shared.triggerLoadAlert(loadRatio: ratio)
+                }
             }
         } catch {
             print("Dashboard fetch error: \(error)")
@@ -537,10 +563,19 @@ struct TodayView: View {
         errorMessage = nil
         
         do {
+            try await Task.sleep(nanoseconds: 800_000_000)
+            await MainActor.run { self.syncMessage = "Scraping COROS web..." }
+            try await Task.sleep(nanoseconds: 1_200_000_000)
+            await MainActor.run { self.syncMessage = "Analyzing Data..." }
+            
             let response = try await network.smartRefresh()
             await MainActor.run {
                 self.refreshResponse = response
-                self.syncMessage = response.syncMessage
+                self.syncMessage = "Finishing up..."
+                if response.syncStatus == "partial" {
+                    self.scraperErrorMessage = response.syncMessage ?? "Data could not be scraped."
+                    self.showScraperError = true
+                }
             }
             
             async let planTask: () = fetchWeeklyPlan()
@@ -548,8 +583,9 @@ struct TodayView: View {
             _ = await (planTask, statusTask)
             
             await MainActor.run {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     self.isSyncing = false
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
             }
         } catch {
@@ -580,6 +616,30 @@ struct TodayView: View {
             return .gray
         }
     }
+    
+    private func errorView(_ error: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.largeTitle)
+                .foregroundStyle(DS.Colors.accent.opacity(0.8))
+            Text(error)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(DS.Colors.onSurface)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            Button("Retry") {
+                Task {
+                    await loadInitialData()
+                }
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background(DS.Colors.accent.opacity(0.8))
+            .clipShape(Capsule())
+        }
+    }
 }
 
 // MARK: - ProtocolCard Component
@@ -598,7 +658,7 @@ struct ProtocolCard: View {
                 Text(cardTitle.uppercased())
                     .font(.system(size: 11, weight: .bold))
                     .tracking(1.1)
-                    .foregroundStyle(isAdapted ? TodayView.secondaryColor : TodayView.outlineColor)
+                    .foregroundStyle(isAdapted ? DS.Colors.accent : DS.Colors.outline)
                 
                 Spacer()
                 
@@ -608,7 +668,7 @@ struct ProtocolCard: View {
                         .foregroundStyle(.black)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(TodayView.secondaryColor)
+                        .background(DS.Colors.accent)
                         .clipShape(Capsule())
                 }
             }
@@ -616,17 +676,17 @@ struct ProtocolCard: View {
             if isAdapted, let reason = adaptationReason {
                 Text("Reason: \(reason)")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(TodayView.secondaryColor)
+                    .foregroundStyle(DS.Colors.accent)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(TodayView.secondaryColor.opacity(0.1))
+                    .background(DS.Colors.accent.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             
             if workouts.isEmpty {
                 Text("No activities planned today.")
                     .font(.subheadline)
-                    .foregroundStyle(TodayView.onSurfaceVariantColor)
+                    .foregroundStyle(DS.Colors.onSurface)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
             } else {
@@ -637,19 +697,19 @@ struct ProtocolCard: View {
                                 .font(.title3)
                             Text(workout.title)
                                 .font(.headline.bold())
-                                .foregroundStyle(TodayView.primaryTextColor)
+                                .foregroundStyle(DS.Colors.primaryText)
                             Spacer()
                             if let time = workout.totalTime {
                                 Text(time)
                                     .font(.subheadline.bold())
-                                    .foregroundStyle(TodayView.secondaryColor)
+                                    .foregroundStyle(DS.Colors.accent)
                             }
                         }
                         
                         if let hr = workout.hrTarget {
                             Text("Target HR: \(hr)")
                                 .font(.caption)
-                                .foregroundStyle(TodayView.outlineColor)
+                                .foregroundStyle(DS.Colors.outline)
                         }
                         
                         if !workout.steps.isEmpty {
@@ -658,13 +718,13 @@ struct ProtocolCard: View {
                                     HStack(alignment: .top, spacing: 10) {
                                         VStack(spacing: 0) {
                                             Circle()
-                                                .fill(isAdapted ? TodayView.secondaryColor : stepColor(for: step.type))
+                                                .fill(isAdapted ? DS.Colors.accent : stepColor(for: step.type))
                                                 .frame(width: 8, height: 8)
                                                 .padding(.top, 4)
                                             
                                             if index < workout.steps.count - 1 {
                                                 Rectangle()
-                                                    .fill(TodayView.outlineColor.opacity(0.3))
+                                                    .fill(DS.Colors.outline.opacity(0.3))
                                                     .frame(width: 1, height: 20)
                                             }
                                         }
@@ -677,13 +737,13 @@ struct ProtocolCard: View {
                                                 Spacer()
                                                 Text(step.duration)
                                                     .font(.system(size: 10, weight: .bold))
-                                                    .foregroundStyle(TodayView.primaryTextColor)
+                                                    .foregroundStyle(DS.Colors.primaryText)
                                             }
                                             
                                             if let desc = step.description {
                                                 Text(desc)
                                                     .font(.caption2)
-                                                    .foregroundStyle(TodayView.onSurfaceVariantColor)
+                                                    .foregroundStyle(DS.Colors.onSurface)
                                             }
                                         }
                                     }
@@ -713,34 +773,7 @@ struct ProtocolCard: View {
 
 // MARK: - View Modifiers & Extensions
 
-struct GlassCardModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(16)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                .white.opacity(0.12),
-                                .white.opacity(0.04)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-    }
-}
 
-extension View {
-    func glassCard() -> some View {
-        self.modifier(GlassCardModifier())
-    }
-}
 
 #Preview {
     TodayView()
@@ -885,7 +918,7 @@ struct ConnectionSettingsSheet: View {
                         dismiss()
                     }
                     .bold()
-                    .tint(.orange)
+                    .tint(.white)
                 }
             }
             .onAppear {
@@ -913,10 +946,91 @@ struct ConnectionSettingsSheet: View {
     private func bulletPoint(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text("•")
-                .foregroundStyle(.orange)
+                .foregroundStyle(DS.Colors.warning)
             Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+enum MetricType {
+    case hrv, rhr, load
+}
+
+struct MetricChartSheet: View {
+    @Environment(\.dismiss) var dismiss
+    let title: String
+    let data: [RecoverySnapshot]
+    let metricType: MetricType
+    
+    // Sort chronological and take the last 7
+    private var chartData: [RecoverySnapshot] {
+        let sorted = data.sorted { ($0.date ?? "") < ($1.date ?? "") }
+        return Array(sorted.suffix(7))
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                DS.Colors.background.ignoresSafeArea()
+                
+                VStack(spacing: 24) {
+                    if chartData.isEmpty {
+                        ContentUnavailableView("No Data", systemImage: "chart.xyaxis.line")
+                    } else {
+                        Chart {
+                            ForEach(chartData, id: \.id) { item in
+                                if let value = value(for: item) {
+                                    LineMark(
+                                        x: .value("Day", dateString(for: item) ?? "?"),
+                                        y: .value(title, value)
+                                    )
+                                    .interpolationMethod(.catmullRom)
+                                    .foregroundStyle(DS.Colors.accent)
+                                    .symbol(Circle())
+                                }
+                            }
+                        }
+                        .chartYAxis {
+                            AxisMarks(position: .leading)
+                        }
+                        .frame(height: 250)
+                        .padding()
+                        .glassCard()
+                    }
+                    Spacer()
+                }
+                .padding(24)
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(DS.Colors.accent)
+                        .font(.body.bold())
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationBackground(.ultraThinMaterial)
+    }
+    
+    private func value(for item: RecoverySnapshot) -> Double? {
+        switch metricType {
+        case .hrv: return item.hrvMs
+        case .rhr: return item.restingHr.map { Double($0) }
+        case .load: return item.loadRatio
+        }
+    }
+    
+    private func dateString(for item: RecoverySnapshot) -> String? {
+        guard let dateStr = item.date else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: dateStr) else { return nil }
+        formatter.dateFormat = "E" // short day like Mon, Tue
+        return formatter.string(from: date)
     }
 }

@@ -414,12 +414,12 @@ ATHLETE CURRENT STATE:
 {athlete_summary}
 
 ATHLETE CONSTRAINTS & OBJECTIVES:
-- Race: {profile.get('race_name') or 'Not set'} ({profile.get('race_distance') or 'Not set'}) on {profile.get('race_date') or 'Not set'}
-- Weekly target hours: {profile.get('weekly_hours_target') or 8.0} hours
-- Swim availability: {profile.get('swim_days') or 'wed,sat,sun'}
-- Bike availability: {profile.get('bike_days') or 'all'}
-- Run availability: {profile.get('run_days') or 'all'}
-- Strength availability: {profile.get('strength_days') or 'mon,wed,fri'}
+- Race: {profile.get('race_name') if profile.get('race_name') is not None else 'Not set'} ({profile.get('race_distance') if profile.get('race_distance') is not None else 'Not set'}) on {profile.get('race_date') if profile.get('race_date') is not None else 'Not set'}
+- Weekly target hours: {profile.get('weekly_hours_target') if profile.get('weekly_hours_target') is not None else 8.0} hours
+- Swim availability: {profile.get('swim_days') if profile.get('swim_days') is not None else 'wed,sat,sun'}
+- Bike availability: {profile.get('bike_days') if profile.get('bike_days') is not None else 'all'}
+- Run availability: {profile.get('run_days') if profile.get('run_days') is not None else 'all'}
+- Strength availability: {profile.get('strength_days') if profile.get('strength_days') is not None else 'mon,wed,fri'}
 
 COACHING RULES:
 1. Respect the sport availability constraints: do NOT schedule a swim, bike, run, or strength session on a day not listed in the athlete's availability.
@@ -598,10 +598,10 @@ Respond in valid JSON:
 
     def _fallback_weekly_plan(self, profile: dict) -> dict:
         """Rule-based fallback weekly plan generator when LLM is unavailable."""
-        swim_days = [d.strip().capitalize() for d in (profile.get('swim_days') or 'wed,sat,sun').split(',')]
-        bike_days = [d.strip().capitalize() for d in (profile.get('bike_days') or 'tue,thu,sat').split(',')]
-        run_days = [d.strip().capitalize() for d in (profile.get('run_days') or 'mon,wed,fri').split(',')]
-        strength_days = [d.strip().capitalize() for d in (profile.get('strength_days') or 'mon,fri').split(',')]
+        swim_days = [d.strip().capitalize() for d in (profile.get('swim_days') if profile.get('swim_days') is not None else 'wed,sat,sun').split(',') if d.strip()]
+        bike_days = [d.strip().capitalize() for d in (profile.get('bike_days') if profile.get('bike_days') is not None else 'all').split(',') if d.strip()]
+        run_days = [d.strip().capitalize() for d in (profile.get('run_days') if profile.get('run_days') is not None else 'all').split(',') if d.strip()]
+        strength_days = [d.strip().capitalize() for d in (profile.get('strength_days') if profile.get('strength_days') is not None else 'mon,wed,fri').split(',') if d.strip()]
 
         days_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 

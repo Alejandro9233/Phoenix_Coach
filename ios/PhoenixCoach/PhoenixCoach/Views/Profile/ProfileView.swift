@@ -2,6 +2,15 @@ import SwiftUI
 
 struct ProfileView: View {
     @ObservedObject private var network = NetworkManager.shared
+
+    // Design system colors matching Quiet Performance HTML mockup
+
+
+
+
+
+
+
     @State private var backendURLText = ""
     
     @State private var profile: AthleteProfile = AthleteProfile(
@@ -12,9 +21,18 @@ struct ProfileView: View {
         runDays: "mon,tue,wed,thu,fri,sat,sun",
         strengthDays: "mon,wed,fri"
     )
-    @State private var raceDateVal = Date()
-    @State private var hasRaceDate = false
-    @State private var trainingStartDateVal = Date()
+    // Form State
+    @State private var hasRaceDate: Bool = false
+    @State private var raceDateVal: Date = Date()
+    @State private var trainingStartDateVal: Date = Date()
+    
+    // Notification Preferences
+    @AppStorage("notifyMorningReadiness") private var notifyMorningReadiness: Bool = true
+    @AppStorage("notifyCoachAnalysis") private var notifyCoachAnalysis: Bool = true
+    @AppStorage("notifyLoadAlerts") private var notifyLoadAlerts: Bool = true
+    @AppStorage("notifyRaceCountdown") private var notifyRaceCountdown: Bool = true
+    
+    // UI State
     @State private var hasTrainingStartDate = false
     @State private var targetHours = 3
     @State private var targetMinutes = 45
@@ -57,8 +75,19 @@ struct ProfileView: View {
         NavigationStack {
             ZStack {
                 // Obsidian Dark Background
-                Color(hex: "#131315")
+                DS.Colors.background
                     .ignoresSafeArea()
+                
+                RadialGradient(
+                    gradient: Gradient(colors: [
+                        DS.Colors.accent.opacity(0.12),
+                        .clear
+                    ]),
+                    center: .top,
+                    startRadius: 0,
+                    endRadius: 400
+                )
+                .ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -71,7 +100,7 @@ struct ProfileView: View {
                             
                             Text("Configure your parameters for the coaching algorithm.")
                                 .font(.system(size: 15, weight: .light))
-                                .foregroundStyle(Color(hex: "#c7c6ca"))
+                                .foregroundStyle(DS.Colors.onSurface)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 8)
@@ -79,16 +108,14 @@ struct ProfileView: View {
                         if isLoading {
                             VStack(spacing: 16) {
                                 ProgressView()
-                                    .tint(Color(hex: "#ffb59a"))
+                                    .tint(DS.Colors.accent)
                                 Text("Loading athlete profile...")
                                     .font(.system(size: 14, weight: .light))
-                                    .foregroundStyle(Color(hex: "#919094"))
+                                    .foregroundStyle(DS.Colors.outline)
                             }
                             .padding(80)
                             .frame(maxWidth: .infinity)
                         } else {
-                            // Backend URL Configuration
-                            backendConfigSection
                             
                             // General Profile Telemetry Card
                             generalTelemetrySection
@@ -98,6 +125,35 @@ struct ProfileView: View {
                             
                             // Weekly Constraints Availability Matrix Card
                             weeklyConstraintsSection
+                            
+                            // Notifications Section
+                            notificationsSection
+                            
+                            // Injury Log Link
+                            NavigationLink(destination: InjuryLogView()) {
+                                HStack {
+                                    Image(systemName: "cross.case.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(DS.Colors.accent)
+                                    Text("Injury History")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(DS.Colors.outline)
+                                }
+                                .padding()
+                                .background(Color.white.opacity(0.04))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 8)
+                            .padding(.bottom, 40)
                             
                         }
                     }
@@ -109,50 +165,17 @@ struct ProfileView: View {
             .preferredColorScheme(.dark)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(hex: "#131315"), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        // Saving Status Indicator
-                        if isSaving {
-                            ProgressView()
-                                .tint(Color(hex: "#ffb59a"))
-                                .scaleEffect(0.7)
-                        } else if saveSuccess {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Color(hex: "#4ade80"))
-                                .onAppear {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                        saveSuccess = false
-                                    }
-                                }
-                        }
-                        
-                        // Connection Status Router Widget
-                        Button {
-                            Task {
-                                await network.checkConnection()
-                            }
-                        } label: {
-                            Image(systemName: "wifi.router.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(network.isConnected ? Color(hex: "#4ade80") : Color(hex: "#ffb4ab"))
-                                .padding(8)
-                                .background(Color.white.opacity(0.04))
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
+        }
+        .alert("Profile Error", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                if let msg = errorMessage {
+                    Text(msg)
                 }
             }
-        }
         .task {
             backendURLText = network.baseURL
             await loadProfile()
@@ -164,124 +187,7 @@ struct ProfileView: View {
     
     // MARK: - Sections
     
-    // BACKEND CONFIGURATION
-    private var backendConfigSection: some View {
-        GlassPanelCard {
-            VStack(alignment: .leading, spacing: 18) {
-                // Section Header
-                HStack(spacing: 8) {
-                    Image(systemName: "tune")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color(hex: "#919094"))
-                    Text("BACKEND CONFIGURATION")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(.white)
-                }
-                .padding(.bottom, 2)
-                
-                // Server URL Subtle Input
-                SubtleUnderlineField(
-                    label: "Server URL",
-                    text: $backendURLText,
-                    placeholder: "http://192.168.x.x:8001",
-                    isFocused: activeField == .serverURL,
-                    keyboardType: .URL
-                )
-                .focused($activeField, equals: .serverURL)
-                .onSubmit {
-                    network.baseURL = backendURLText
-                    Task {
-                        await network.checkConnection()
-                    }
-                }
-                
-                // Status Info Row
-                HStack {
-                    Text("Status")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color(hex: "#919094"))
-                    Spacer()
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(network.isConnected ? Color(hex: "#4ade80") : Color(hex: "#ffb4ab"))
-                            .frame(width: 8, height: 8)
-                        Text(network.isConnected ? "Connected" : "Disconnected")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(network.isConnected ? Color(hex: "#4ade80") : Color(hex: "#ffb4ab"))
-                    }
-                }
-                .padding(.top, 2)
-                
-                if network.isConnected {
-                    HStack {
-                        Text("Ollama LLM")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color(hex: "#919094"))
-                        Spacer()
-                        Text(network.isOllamaConnected ? "Available" : "Offline")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(network.isOllamaConnected ? Color(hex: "#4ade80") : Color(hex: "#fb923c"))
-                    }
-                }
-                
-                Divider()
-                    .background(Color.white.opacity(0.06))
-                    .padding(.vertical, 2)
-                
-                // Actions Buttons (Test & Apply, Reset Default)
-                HStack(spacing: 12) {
-                    Button {
-                        network.baseURL = backendURLText
-                        Task {
-                            await network.checkConnection()
-                            if network.isConnected {
-                                await loadProfile()
-                            }
-                        }
-                    } label: {
-                        Text("TEST & APPLY")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.0)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color(hex: "#ffb59a").opacity(0.12))
-                            .foregroundStyle(Color(hex: "#ffb59a"))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(Color(hex: "#ffb59a").opacity(0.25), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button {
-                        network.resetToDefaultURL()
-                        backendURLText = network.baseURL
-                        Task {
-                            if network.isConnected {
-                                await loadProfile()
-                            }
-                        }
-                    } label: {
-                        Text("RESET DEFAULT")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.0)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color.white.opacity(0.04))
-                            .foregroundStyle(Color(hex: "#c7c6ca"))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
+
     
     // GENERAL PROFILE TELEMETRY
     private var generalTelemetrySection: some View {
@@ -291,7 +197,7 @@ struct ProfileView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 15))
-                        .foregroundStyle(Color(hex: "#919094"))
+                        .foregroundStyle(DS.Colors.outline)
                     Text("GENERAL TELEMETRY")
                         .font(.system(size: 11, weight: .bold))
                         .tracking(1.5)
@@ -308,6 +214,7 @@ struct ProfileView: View {
                 )
                 .focused($activeField, equals: .name)
                 
+
                 // Age & Weight Column Grid (Tap to open Dropdown-style Pickers)
                 HStack(spacing: 24) {
                     // Age Button
@@ -322,7 +229,7 @@ struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Age")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(showAgePicker ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
+                                .foregroundStyle(showAgePicker ? DS.Colors.accent : DS.Colors.outline)
                                 .tracking(1.5)
                                 .textCase(.uppercase)
                             
@@ -333,13 +240,13 @@ struct ProfileView: View {
                                 Spacer()
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(showAgePicker ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
+                                    .foregroundStyle(showAgePicker ? DS.Colors.accent : DS.Colors.outline)
                             }
                             .padding(.vertical, 4)
                             
                             Rectangle()
                                 .frame(height: 1)
-                                .foregroundStyle(showAgePicker ? Color(hex: "#ffb59a") : Color.white.opacity(0.1))
+                                .foregroundStyle(showAgePicker ? DS.Colors.accent : Color.white.opacity(0.1))
                         }
                     }
                     .buttonStyle(.plain)
@@ -361,7 +268,7 @@ struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Weight (KG)")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(showWeightPicker ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
+                                .foregroundStyle(showWeightPicker ? DS.Colors.accent : DS.Colors.outline)
                                 .tracking(1.5)
                                 .textCase(.uppercase)
                             
@@ -372,13 +279,13 @@ struct ProfileView: View {
                                 Spacer()
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(showWeightPicker ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
+                                    .foregroundStyle(showWeightPicker ? DS.Colors.accent : DS.Colors.outline)
                             }
                             .padding(.vertical, 4)
                             
                             Rectangle()
                                 .frame(height: 1)
-                                .foregroundStyle(showWeightPicker ? Color(hex: "#ffb59a") : Color.white.opacity(0.1))
+                                .foregroundStyle(showWeightPicker ? DS.Colors.accent : Color.white.opacity(0.1))
                         }
                     }
                     .buttonStyle(.plain)
@@ -391,7 +298,7 @@ struct ProfileView: View {
                         HStack {
                             Text("Select Age")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color(hex: "#919094"))
+                                .foregroundStyle(DS.Colors.outline)
                                 .tracking(1.0)
                             Spacer()
                             Button("Done") {
@@ -402,7 +309,7 @@ struct ProfileView: View {
                                 Task { await saveProfile() }
                             }
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color(hex: "#ffb59a"))
+                            .foregroundStyle(DS.Colors.accent)
                         }
                         .padding(.horizontal, 12)
                         .padding(.top, 8)
@@ -434,7 +341,7 @@ struct ProfileView: View {
                         HStack {
                             Text("Select Weight")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color(hex: "#919094"))
+                                .foregroundStyle(DS.Colors.outline)
                                 .tracking(1.0)
                             Spacer()
                             Button("Done") {
@@ -447,7 +354,7 @@ struct ProfileView: View {
                                 Task { await saveProfile() }
                             }
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color(hex: "#ffb59a"))
+                            .foregroundStyle(DS.Colors.accent)
                         }
                         .padding(.horizontal, 12)
                         .padding(.top, 8)
@@ -459,7 +366,7 @@ struct ProfileView: View {
                                 }
                             }
                             .pickerStyle(.wheel)
-                            .frame(maxWidth: .infinity)
+                            .frame(minWidth: 50)
                             
                             Text(".")
                                 .font(.system(size: 24, weight: .bold))
@@ -471,11 +378,11 @@ struct ProfileView: View {
                                 }
                             }
                             .pickerStyle(.wheel)
-                            .frame(maxWidth: .infinity)
+                            .frame(minWidth: 50)
                             
                             Text("kg")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color(hex: "#919094"))
+                                .foregroundStyle(DS.Colors.outline)
                                 .padding(.trailing, 8)
                         }
                         .frame(height: 110)
@@ -489,32 +396,6 @@ struct ProfileView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 4)
                 }
-                
-                // Training Start Date
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Training Start Date")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(activeField == .trainingStartDate ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
-                        .tracking(1.5)
-                        .textCase(.uppercase)
-                    
-                    HStack {
-                        DatePicker("", selection: $trainingStartDateVal, displayedComponents: .date)
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
-                            .tint(Color(hex: "#ffb59a"))
-                        Spacer()
-                    }
-                    .padding(.vertical, 2)
-                    .onAppear {
-                        hasTrainingStartDate = true
-                    }
-                    
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundStyle(activeField == .trainingStartDate ? Color(hex: "#ffb59a") : Color.white.opacity(0.1))
-                }
-                .focused($activeField, equals: .trainingStartDate)
             }
         }
     }
@@ -527,7 +408,7 @@ struct ProfileView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "flag.fill")
                         .font(.system(size: 15))
-                        .foregroundStyle(Color(hex: "#919094"))
+                        .foregroundStyle(DS.Colors.outline)
                     Text("RACE OBJECTIVE")
                         .font(.system(size: 11, weight: .bold))
                         .tracking(1.5)
@@ -575,72 +456,89 @@ struct ProfileView: View {
                     options: distancesForType
                 )
                 
-                // Race Date & Target Time Columns
+                // Dates Row
                 HStack(spacing: 24) {
-                    // Race Date Picker
+                    // Training Start Date
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Start Date")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(activeField == .trainingStartDate ? DS.Colors.accent : DS.Colors.outline)
+                            .tracking(1.5)
+                            .textCase(.uppercase)
+                        
+                        DatePicker("", selection: $trainingStartDateVal, displayedComponents: .date)
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            .tint(DS.Colors.accent)
+                            .padding(.vertical, 2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .onAppear { hasTrainingStartDate = true }
+                            .onChange(of: trainingStartDateVal) { _ in Task { await saveProfile() } }
+                        
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundStyle(activeField == .trainingStartDate ? DS.Colors.accent : Color.white.opacity(0.1))
+                    }
+                    .focused($activeField, equals: .trainingStartDate)
+                    
+                    // Race Date
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Race Date")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(activeField == .raceDate ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
+                            .foregroundStyle(activeField == .raceDate ? DS.Colors.accent : DS.Colors.outline)
+                            .tracking(1.5)
+                            .textCase(.uppercase)
+                        
+                        DatePicker("", selection: $raceDateVal, displayedComponents: .date)
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            .tint(DS.Colors.accent)
+                            .padding(.vertical, 2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .onAppear { hasRaceDate = true }
+                            .onChange(of: raceDateVal) { _ in Task { await saveProfile() } }
+                        
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundStyle(activeField == .raceDate ? DS.Colors.accent : Color.white.opacity(0.1))
+                    }
+                    .focused($activeField, equals: .raceDate)
+                }
+                
+                // Target Finish Time (Tap to open Duration Picker)
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showDurationPicker.toggle()
+                        showAgePicker = false
+                        showWeightPicker = false
+                        activeField = showDurationPicker ? .targetTime : nil
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Target Time")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(showDurationPicker ? DS.Colors.accent : DS.Colors.outline)
                             .tracking(1.5)
                             .textCase(.uppercase)
                         
                         HStack {
-                            DatePicker("", selection: $raceDateVal, displayedComponents: .date)
-                                .labelsHidden()
-                                .datePickerStyle(.compact)
-                                .tint(Color(hex: "#ffb59a"))
-                                .onChange(of: raceDateVal) { _ in
-                                    Task { await saveProfile() }
-                                }
+                            Text(String(format: "%02dh %02dm %02ds", targetHours, targetMinutes, targetSeconds))
+                                .font(.system(size: 17, weight: .light))
+                                .foregroundStyle(.white)
                             Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(showDurationPicker ? DS.Colors.accent : DS.Colors.outline)
                         }
-                        .padding(.vertical, 2)
-                        .onAppear {
-                            hasRaceDate = true
-                        }
+                        .padding(.vertical, 4)
                         
                         Rectangle()
                             .frame(height: 1)
-                            .foregroundStyle(activeField == .raceDate ? Color(hex: "#ffb59a") : Color.white.opacity(0.1))
+                            .foregroundStyle(showDurationPicker ? DS.Colors.accent : Color.white.opacity(0.1))
                     }
-                    .focused($activeField, equals: .raceDate)
-                    
-                    // Target Finish Time (Tap to open Duration Picker)
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showDurationPicker.toggle()
-                            showAgePicker = false
-                            showWeightPicker = false
-                            activeField = showDurationPicker ? .targetTime : nil
-                        }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Target Time")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(showDurationPicker ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
-                                .tracking(1.5)
-                                .textCase(.uppercase)
-                            
-                            HStack {
-                                Text(String(format: "%02dh %02dm %02ds", targetHours, targetMinutes, targetSeconds))
-                                    .font(.system(size: 17, weight: .light))
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(showDurationPicker ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
-                            }
-                            .padding(.vertical, 4)
-                            
-                            Rectangle()
-                                .frame(height: 1)
-                                .foregroundStyle(showDurationPicker ? Color(hex: "#ffb59a") : Color.white.opacity(0.1))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .focused($activeField, equals: .targetTime)
                 }
+                .buttonStyle(.plain)
+                .focused($activeField, equals: .targetTime)
                 
                 // Expandable Duration Picker Wheels
                 if showDurationPicker {
@@ -648,7 +546,7 @@ struct ProfileView: View {
                         HStack {
                             Text("Select Duration (HH : MM : SS)")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color(hex: "#919094"))
+                                .foregroundStyle(DS.Colors.outline)
                                 .tracking(1.0)
                             Spacer()
                             Button("Done") {
@@ -659,7 +557,7 @@ struct ProfileView: View {
                                 Task { await saveProfile() }
                             }
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color(hex: "#ffb59a"))
+                            .foregroundStyle(DS.Colors.accent)
                         }
                         .padding(.horizontal, 12)
                         .padding(.top, 8)
@@ -709,7 +607,7 @@ struct ProfileView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "square.grid.3x3.fill")
                         .font(.system(size: 15))
-                        .foregroundStyle(Color(hex: "#919094"))
+                        .foregroundStyle(DS.Colors.outline)
                     Text("WEEKLY CONSTRAINTS")
                         .font(.system(size: 11, weight: .bold))
                         .tracking(1.5)
@@ -725,13 +623,13 @@ struct ProfileView: View {
                     
                     Spacer()
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         ForEach(dayLabels, id: \.self) { label in
                             Text(String(label.prefix(1))) // M, T, W, T, F, S, S
                                 .font(.system(size: 10, weight: .bold))
                                 .tracking(1.0)
-                                .foregroundStyle(Color(hex: "#919094"))
-                                .frame(width: 32, alignment: .center)
+                                .foregroundStyle(DS.Colors.outline)
+                                .frame(width: 28, alignment: .center)
                         }
                     }
                 }
@@ -739,9 +637,13 @@ struct ProfileView: View {
                 // Sport Matrix Rows
                 VStack(spacing: 14) {
                     sportMatrixRow(title: "SWIM", sport: "swim", selection: $selectedSwimDays)
+                        .onChange(of: selectedSwimDays) { _ in Task { await saveProfile() } }
                     sportMatrixRow(title: "BIKE", sport: "bike", selection: $selectedBikeDays)
+                        .onChange(of: selectedBikeDays) { _ in Task { await saveProfile() } }
                     sportMatrixRow(title: "RUN", sport: "run", selection: $selectedRunDays)
+                        .onChange(of: selectedRunDays) { _ in Task { await saveProfile() } }
                     sportMatrixRow(title: "STRNG", sport: "strength", selection: $selectedStrengthDays)
+                        .onChange(of: selectedStrengthDays) { _ in Task { await saveProfile() } }
                 }
             }
         }
@@ -752,12 +654,12 @@ struct ProfileView: View {
             Text(title)
                 .font(.system(size: 10, weight: .bold))
                 .tracking(1.5)
-                .foregroundStyle(Color(hex: "#919094"))
+                .foregroundStyle(DS.Colors.outline)
                 .frame(width: 55, alignment: .leading)
             
             Spacer()
             
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
                 ForEach(0..<daysOfWeek.count, id: \.self) { idx in
                     let day = daysOfWeek[idx]
                     let isSelected = selection.wrappedValue.contains(day)
@@ -768,10 +670,46 @@ struct ProfileView: View {
                         } else {
                             selection.wrappedValue.insert(day)
                         }
-                        Task { await saveProfile() }
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: - Notifications Section
+    
+    private var notificationsSection: some View {
+        VStack(spacing: 0) {
+            // Section Header
+            HStack {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(DS.Colors.accent)
+                Text("NOTIFICATIONS")
+                    .font(.system(size: 12, weight: .heavy))
+                    .tracking(2.0)
+                    .foregroundStyle(DS.Colors.onSurface)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+            
+            VStack(spacing: 16) {
+                Toggle("Morning Readiness", isOn: $notifyMorningReadiness)
+                    .tint(DS.Colors.accent)
+                Toggle("Coach Analysis Ready", isOn: $notifyCoachAnalysis)
+                    .tint(DS.Colors.accent)
+                Toggle("Training Load Alerts", isOn: $notifyLoadAlerts)
+                    .tint(DS.Colors.accent)
+                Toggle("Race Countdown", isOn: $notifyRaceCountdown)
+                    .tint(DS.Colors.accent)
+            }
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(DS.Colors.primaryText)
+            .padding(20)
+            .frame(maxWidth: .infinity)
+            .glassCard()
         }
     }
     
@@ -870,11 +808,17 @@ struct ProfileView: View {
             try await NetworkManager.shared.updateAthleteProfile(profile)
             await MainActor.run {
                 isSaving = false
-                saveSuccess = true
+                let haptic = UINotificationFeedbackGenerator()
+                haptic.notificationOccurred(.success)
+                withAnimation(.spring) {
+                    saveSuccess = true
+                }
             }
         } catch {
             await MainActor.run {
                 isSaving = false
+                let haptic = UINotificationFeedbackGenerator()
+                haptic.notificationOccurred(.error)
                 errorMessage = "Failed to update profile: \(error.localizedDescription)"
             }
         }
@@ -954,39 +898,7 @@ struct ProfileView: View {
 
 // MARK: - Reusable Custom Styling Components
 
-// Glassmorphism Card Wrapper
-struct GlassPanelCard<Content: View>: View {
-    var content: Content
-    
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-    
-    var body: some View {
-        content
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.015))
-            )
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.white.opacity(0.18),
-                                Color.white.opacity(0.04)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.4), radius: 20, x: 0, y: 10)
-    }
-}
+
 
 // Subtle Focus-Aware Underlined Text Field
 struct SubtleUnderlineField: View {
@@ -1000,20 +912,20 @@ struct SubtleUnderlineField: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(isFocused ? Color(hex: "#ffb59a") : Color(hex: "#919094"))
+                .foregroundStyle(isFocused ? DS.Colors.accent : DS.Colors.outline)
                 .tracking(1.5)
                 .textCase(.uppercase)
             
             TextField(placeholder, text: $text)
                 .font(.system(size: 18, weight: .light))
                 .foregroundStyle(.white)
-                .tint(Color(hex: "#ffb59a"))
+                .tint(DS.Colors.accent)
                 .keyboardType(keyboardType)
                 .autocorrectionDisabled()
             
             Rectangle()
                 .frame(height: 1)
-                .foregroundStyle(isFocused ? Color(hex: "#ffb59a") : Color.white.opacity(0.1))
+                .foregroundStyle(isFocused ? DS.Colors.accent : Color.white.opacity(0.1))
         }
     }
 }
@@ -1028,7 +940,7 @@ struct ElegantDropdownField: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color(hex: "#919094"))
+                .foregroundStyle(DS.Colors.outline)
                 .tracking(1.5)
                 .textCase(.uppercase)
             
@@ -1046,7 +958,7 @@ struct ElegantDropdownField: View {
                     Spacer()
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#919094"))
+                        .foregroundStyle(DS.Colors.outline)
                 }
                 .padding(.vertical, 4)
             }
@@ -1068,7 +980,7 @@ struct SegmentedSelector: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Type")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Color(hex: "#919094"))
+                .foregroundStyle(DS.Colors.outline)
                 .tracking(1.5)
                 .textCase(.uppercase)
             
@@ -1090,9 +1002,9 @@ struct SegmentedSelector: View {
                             .padding(.vertical, 8)
                             .background(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(isSelected ? Color(hex: "#ffb59a") : Color.clear)
+                                    .fill(isSelected ? DS.Colors.accent : Color.clear)
                             )
-                            .foregroundStyle(isSelected ? Color(hex: "#380d00") : Color(hex: "#c7c6ca"))
+                            .foregroundStyle(isSelected ? Color.black : DS.Colors.onSurface)
                     }
                     .buttonStyle(.plain)
                 }
@@ -1119,74 +1031,52 @@ struct MatrixToggleButton: View {
             ZStack {
                 Circle()
                     .fill(isSelected ? activeBgColor : Color.white.opacity(0.04))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
                 
                 Circle()
                     .strokeBorder(isSelected ? activeStrokeColor : Color.white.opacity(0.08), lineWidth: 1)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
             }
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
             .shadow(color: isSelected ? activeShadowColor : Color.clear, radius: isSelected ? 8 : 0)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(sport) \(isSelected ? "enabled" : "disabled")")
     }
     
     private var activeBgColor: Color {
         switch sport.lowercased() {
-        case "swim": return Color(hex: "#4ade80").opacity(0.15)
+        case "swim": return DS.Colors.success.opacity(0.15)
         case "bike": return Color(hex: "#60a5fa").opacity(0.15)
         case "run": return Color(hex: "#fb923c").opacity(0.15)
         case "strength", "strng": return Color(hex: "#a78bfa").opacity(0.15)
-        default: return Color(hex: "#ffb59a").opacity(0.15)
+        default: return DS.Colors.accent.opacity(0.15)
         }
     }
     
     private var activeStrokeColor: Color {
         switch sport.lowercased() {
-        case "swim": return Color(hex: "#4ade80").opacity(0.7)
+        case "swim": return DS.Colors.success.opacity(0.7)
         case "bike": return Color(hex: "#60a5fa").opacity(0.7)
         case "run": return Color(hex: "#fb923c").opacity(0.7)
         case "strength", "strng": return Color(hex: "#a78bfa").opacity(0.7)
-        default: return Color(hex: "#ffb59a").opacity(0.7)
+        default: return DS.Colors.accent.opacity(0.7)
         }
     }
     
     private var activeShadowColor: Color {
         switch sport.lowercased() {
-        case "swim": return Color(hex: "#4ade80").opacity(0.3)
+        case "swim": return DS.Colors.success.opacity(0.3)
         case "bike": return Color(hex: "#60a5fa").opacity(0.3)
         case "run": return Color(hex: "#fb923c").opacity(0.3)
         case "strength", "strng": return Color(hex: "#a78bfa").opacity(0.3)
-        default: return Color(hex: "#ffb59a").opacity(0.3)
+        default: return DS.Colors.accent.opacity(0.3)
         }
     }
 }
 
-// HEX Color Parser Helper Extension
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
+
 
 #Preview {
     ProfileView()

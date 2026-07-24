@@ -137,12 +137,34 @@ class NetworkManager: ObservableObject {
     
     // MARK: - Dashboard
     
-    func fetchDashboard() async throws -> DashboardResponse {
+    private var cachedDashboardMemory: DashboardResponse? = nil
+    private var lastDashboardFetch: Date? = nil
+    
+    func fetchDashboard(forceRefresh: Bool = false) async throws -> DashboardResponse {
+        if !forceRefresh, let cached = cachedDashboardMemory, let lastFetch = lastDashboardFetch, Date().timeIntervalSince(lastFetch) < 300 {
+            return cached
+        }
+        
         guard let url = URL(string: "\(baseURL)/dashboard") else {
             throw NetworkError.invalidURL
         }
-        let (data, _) = try await session.data(from: url)
-        return try decoder.decode(DashboardResponse.self, from: data)
+        
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 10 // Quicker timeout for offline fallback
+            let (data, _) = try await session.data(for: request)
+            UserDefaults.standard.set(data, forKey: "cached_dashboard")
+            let response = try decoder.decode(DashboardResponse.self, from: data)
+            self.cachedDashboardMemory = response
+            self.lastDashboardFetch = Date()
+            return response
+        } catch {
+            if let cachedData = UserDefaults.standard.data(forKey: "cached_dashboard"),
+               let cachedResponse = try? decoder.decode(DashboardResponse.self, from: cachedData) {
+                return cachedResponse
+            }
+            throw error
+        }
     }
     
     // MARK: - Chat (Streaming via SSE)
@@ -231,6 +253,47 @@ class NetworkManager: ObservableObject {
         }
     }
     
+    // MARK: - Injuries
+    
+    func fetchInjuries() async throws -> [Injury] {
+        guard let url = URL(string: "\(baseURL)/athlete/injuries") else {
+            throw NetworkError.invalidURL
+        }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode([Injury].self, from: data)
+    }
+    
+    func addInjury(_ injury: Injury) async throws {
+        guard let url = URL(string: "\(baseURL)/athlete/injuries") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(injury)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+    }
+    
+    func updateInjury(_ injury: Injury) async throws {
+        guard let id = injury.id, let url = URL(string: "\(baseURL)/athlete/injuries/\(id)") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(injury)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+    }
+    
     // MARK: - Activity Analysis
     
     func fetchActivityAnalysis(activityID: String) async throws -> ActivityAnalysis {
@@ -271,8 +334,19 @@ class NetworkManager: ObservableObject {
         guard let url = URL(string: "\(baseURL)/weekly-plan") else {
             throw NetworkError.invalidURL
         }
-        let (data, _) = try await session.data(from: url)
-        return try decoder.decode(WeeklyPlanResponse.self, from: data)
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 10
+            let (data, _) = try await session.data(for: request)
+            UserDefaults.standard.set(data, forKey: "cached_weekly_plan")
+            return try decoder.decode(WeeklyPlanResponse.self, from: data)
+        } catch {
+            if let cachedData = UserDefaults.standard.data(forKey: "cached_weekly_plan"),
+               let cachedResponse = try? decoder.decode(WeeklyPlanResponse.self, from: cachedData) {
+                return cachedResponse
+            }
+            throw error
+        }
     }
     
     func adaptTodayWorkout() async throws -> DayPlan {

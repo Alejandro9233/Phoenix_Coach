@@ -237,7 +237,7 @@ struct WorkoutStep: Codable, Identifiable {
 
 struct DashboardResponse: Codable {
     let athlete: Athlete?
-    let activities: [Activity]
+    var activities: [Activity]
     let recovery: [RecoverySnapshot]
 }
 
@@ -259,6 +259,26 @@ struct Athlete: Codable {
         case thresholdPaceMinKm = "threshold_pace_min_km"
         case hrvBaseline = "hrv_baseline"
         case staminaLevel = "stamina_level"
+    }
+}
+
+struct Injury: Codable, Identifiable {
+    var id: Int?
+    var dateReported: String?
+    var bodyPart: String?
+    var status: String?
+    var severity: Int?
+    var notes: String?
+    var affectedSports: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case dateReported = "date_reported"
+        case bodyPart = "body_part"
+        case status
+        case severity
+        case notes
+        case affectedSports = "affected_sports"
     }
 }
 
@@ -297,16 +317,23 @@ struct AthleteProfile: Codable {
 struct Activity: Codable, Identifiable {
     let id: String?
     let sport: String?
+    let subSport: String?
     let startTime: String?
-    let durationSec: Double?  // Backend sends Float
+    let durationSec: Double?
     let distanceM: Double?
     let avgHr: Int?
     let maxHr: Int?
     let trainingLoad: Double?
     let avgPowerWatts: Double?
+    let totalAscentM: Double?
+    let cadence: Int?
+    let calories: Int?
+    let avg_cadence_scraped: Int?
+    let calories_scraped: Int?
     
     enum CodingKeys: String, CodingKey {
         case id, sport
+        case subSport = "sub_sport"
         case startTime = "start_time"
         case durationSec = "duration_sec"
         case distanceM = "distance_m"
@@ -314,6 +341,9 @@ struct Activity: Codable, Identifiable {
         case maxHr = "max_hr"
         case trainingLoad = "training_load"
         case avgPowerWatts = "avg_power_watts"
+        case totalAscentM = "total_ascent_m"
+        case cadence, calories
+        case avg_cadence_scraped, calories_scraped
     }
     
     var durationFormatted: String {
@@ -381,6 +411,7 @@ struct ChatMessage: Identifiable {
     let role: Role
     var content: String
     let timestamp: Date
+    var isError: Bool = false
     
     enum Role {
         case user, coach
