@@ -58,7 +58,7 @@ For items categorized iOS-UI:
 1. Build and run on Simulator.
 2. Capture before/after screenshots using `xcrun simctl io booted screenshot`
    for each affected view — do not use a browser subagent, this app has no
-   browser surface.
+   browser surface. If you create a temporary shell script (e.g., `run_sim.sh`) to automate the build and screenshot process, you MUST delete it from the project root immediately after taking the screenshots to keep the workspace clean.
 3. Do not mark complete without an attached screenshot.
 4. No logic changes in this step — layout/formatting only (e.g. `DesignSystem.swift`
    tokens, `.lineLimit()`/`.minimumScaleFactor()` for text truncation, `DateFormatter`

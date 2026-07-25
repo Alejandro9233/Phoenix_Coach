@@ -231,6 +231,7 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
     total_planned_minutes = 0
     total_actual_minutes = 0
     total_actual_load = 0
+    all_workout_scores = []
 
     for day_name in day_names_ordered:
         day_plan = days_dict.get(day_name)
@@ -308,6 +309,7 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
                     "planned_sport": planned_sport,
                     **compliance,
                 })
+                all_workout_scores.append(compliance.get("score", 0))
 
                 total_completed_sessions += 1
                 total_actual_minutes += (best_match.duration_sec or 0) / 60
@@ -322,6 +324,8 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
                     "hr_on_target": None,
                     "notes": "No matching activity found." if is_past else "Upcoming workout.",
                 })
+                if is_past:
+                    all_workout_scores.append(0)
 
         # Also account for extra (unmatched) activities
         extra_activities = []
@@ -362,6 +366,8 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
         enriched_days[day_name] = enriched_day
 
     # Build week progress
+    compliance_score = round(sum(all_workout_scores) / len(all_workout_scores)) if all_workout_scores else 0
+
     week_progress = {
         "sessions_completed": total_completed_sessions,
         "sessions_planned": total_planned_sessions,
@@ -372,6 +378,7 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
         "hours_done": round(total_actual_minutes / 60, 1),
         "hours_planned": round(total_planned_minutes / 60, 1),
         "total_training_load": round(total_actual_load),
+        "compliance_score": compliance_score,
     }
 
     return {

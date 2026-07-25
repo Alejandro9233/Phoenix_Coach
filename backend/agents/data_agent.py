@@ -4,7 +4,7 @@ Pure Python, no LLM needed. Produces a compact text summary for the Response Age
 """
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from backend.models.database import Athlete, Activity, RecoverySnapshot, InjuryLog
+from backend.models.database import Athlete, Activity, RecoverySnapshot, InjuryLog, AthleteFeedback
 
 
 class DataAgent:
@@ -148,6 +148,25 @@ class DataAgent:
                 total_run_km = sum((a.distance_m or 0) / 1000 for a in week_acts if a.sport == "running")
                 if total_run_km > 0:
                     lines.append(f"  Week running km: {total_run_km:.1f}")
+        
+        # Recent Athlete Feedback / Journal
+        recent_feedback = self.db.query(AthleteFeedback).filter(
+            AthleteFeedback.athlete_id == athlete.id,
+            AthleteFeedback.date >= cutoff
+        ).order_by(AthleteFeedback.date.desc()).limit(3).all()
+        
+        if recent_feedback:
+            lines.append("")
+            lines.append("RECENT ATHLETE FEEDBACK (JOURNAL):")
+            for fb in recent_feedback:
+                date_str = fb.date.strftime("%b %d") if fb.date else "?"
+                parts = []
+                if fb.rpe: parts.append(f"RPE: {fb.rpe}/10")
+                if fb.soreness: parts.append(f"Soreness: {fb.soreness}/5")
+                if fb.motivation: parts.append(f"Motivation: {fb.motivation}/5")
+                lines.append(f"  [{date_str}] " + ", ".join(parts))
+                if fb.general_notes:
+                    lines.append(f"    Notes: {fb.general_notes}")
         
         # Weekly plan compliance
         try:

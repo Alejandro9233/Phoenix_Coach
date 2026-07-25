@@ -155,6 +155,7 @@ struct WeekProgress: Codable {
     let hoursDone: Double
     let hoursPlanned: Double
     let totalTrainingLoad: Int
+    let complianceScore: Int?
     
     enum CodingKeys: String, CodingKey {
         case sessionsCompleted = "sessions_completed"
@@ -163,6 +164,7 @@ struct WeekProgress: Codable {
         case hoursDone = "hours_done"
         case hoursPlanned = "hours_planned"
         case totalTrainingLoad = "total_training_load"
+        case complianceScore = "compliance_score"
     }
 }
 

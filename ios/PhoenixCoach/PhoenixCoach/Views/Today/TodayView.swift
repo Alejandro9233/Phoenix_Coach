@@ -107,6 +107,8 @@ struct TodayView: View {
                             
                             workoutProtocolSection
                             
+                            complianceSection
+                            
                             rationaleSection
                         }
                         .padding()
@@ -410,6 +412,48 @@ struct TodayView: View {
                 emptyDayCard
             }
         }
+    }
+    
+    private var complianceSection: some View {
+        Group {
+            if let score = planStatus?.weekProgress?.complianceScore {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("WEEKLY ADHERENCE")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.1)
+                        .foregroundStyle(DS.Colors.outline)
+                    
+                    HStack(alignment: .center, spacing: 16) {
+                        Text("\(score)")
+                            .font(.system(size: 48, weight: .ultraLight))
+                            .foregroundStyle(complianceColor(for: score))
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("/ 100")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(DS.Colors.outline)
+                            
+                            if let completed = planStatus?.weekProgress?.sessionsCompleted,
+                               let planned = planStatus?.weekProgress?.sessionsPlanned {
+                                Text("\(completed) of \(planned) sessions completed")
+                                    .font(.caption2)
+                                    .foregroundStyle(DS.Colors.onSurface)
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glassCard()
+            }
+        }
+    }
+    
+    private func complianceColor(for score: Int) -> Color {
+        if score >= 90 { return .green }
+        if score >= 80 { return .teal }
+        if score >= 70 { return .orange }
+        return .red
     }
     
     private var rationaleSection: some View {
