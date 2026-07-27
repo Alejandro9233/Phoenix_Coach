@@ -29,6 +29,8 @@ For each opportunity found, output a short proposal card:
 - **Why now**: why this is worth doing (unblocks something, fixes a known
   gap, low effort/high value, etc.)
 - **Effort estimate**: S / M / L
+- **Nature**: VISUAL (new/changed UI, needs design judgment) or
+  FIX-OR-BACKEND (logic, bug, backend-only, no design judgment needed)
 - **Risk**: does this touch production data models, the periodization
   engine, or API contracts already in use? Flag HIGH RISK explicitly if so.
 
@@ -39,15 +41,25 @@ so the King isn't overwhelmed.
 Stop and wait for approval. Do not proceed to implementation until the King
 selects one or more proposals explicitly (e.g. "do #2" or "do #1 and #3").
 
-## Step 4 — Execute approved proposals only
-Once approved, treat each one like a normal bug-batch item:
-- Backend change → passing test required before marked done
-- iOS-logic change → clean Xcode build + explanation of approach
-- iOS-UI change → before/after Simulator screenshot
-No proposal is implemented without this proof, same as the bugbatch workflow.
+## Step 4 — Auto-route to the right workflow
+Once one or more proposals are approved, route automatically without asking
+which workflow to use:
+- If a proposal's Nature is VISUAL → call /design with that proposal as the
+  brief. Do not write SwiftUI directly — let /design generate Stitch options
+  first and wait for a variant to be approved before implementing.
+- If a proposal's Nature is FIX-OR-BACKEND → call /bugbatch with that
+  proposal reframed as a bug/change item, following its triage → fix →
+  verify steps.
+- If a proposal has both a backend and a visual component, call /bugbatch
+  first for the backend/API part, then /design for the UI part once the
+  backend is verified working.
+
+Multiple approved proposals may be routed in parallel via subagents if they
+don't touch shared files.
 
 ## Hard rule
 Never modify `periodization_engine.py`, database schema/migrations, or any
 existing API contract as part of an unapproved proposal — these require
 explicit, separate confirmation even after a proposal is greenlit, since
-they affect live production data on Render.
+they affect live production data on Render. This rule applies regardless of
+which downstream workflow (/design or /bugbatch) ends up executing the work.

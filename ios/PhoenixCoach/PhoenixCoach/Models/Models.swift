@@ -517,32 +517,7 @@ struct AdaptationResult: Codable {
 
 // MARK: - Context Builder
 
-struct ContextBuilder {
-    static func buildSystemPrompt(profile: AthleteProfile?, dashboard: DashboardResponse?, plan: WeeklyPlanResponse?, todayName: String) -> String {
-        var context = "You are Phoenix, an elite triathlon AI coach. You are talking to your athlete directly.\n"
-        
-        if let p = profile {
-            context += "Athlete Profile: Training for \(p.raceName ?? "a race") (\(p.raceDistance ?? "Unknown")).\n"
-        }
-        
-        if let d = dashboard, let todayMetrics = d.recovery.first {
-            context += "Today's Recovery Metrics: HRV is \(todayMetrics.hrvMs ?? 0)ms, Resting HR is \(todayMetrics.restingHr ?? 0) bpm, Training Balance (TIB) is \(todayMetrics.tib ?? 0).\n"
-        }
-        
-        if let p = plan {
-            if let sum = p.weekSummary {
-                context += "This week's focus: \(sum.focus). Target: \(sum.expectedTotalHours ?? 0) hrs.\n"
-            }
-            if let todayPlan = p.days[todayName] {
-                let workoutNames = todayPlan.workouts?.map { $0.title }.joined(separator: " and ") ?? "Rest"
-                context += "Today's Plan: \(workoutNames). \(todayPlan.summary)\n"
-            }
-        }
-        
-        context += "Rule: Be concise, direct, and conversational. Do not output raw JSON, just speak normally to the athlete."
-        return context
-    }
-}
+// ContextBuilder removed since LLM prompts are now handled entirely by the backend
 
 // MARK: - Training Context (from /training-context endpoint)
 

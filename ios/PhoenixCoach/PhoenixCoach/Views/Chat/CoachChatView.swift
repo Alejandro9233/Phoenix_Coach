@@ -3,7 +3,6 @@ import Combine
 
 struct CoachChatView: View {
     @StateObject private var network = NetworkManager.shared
-    @StateObject private var llm = LocalLLMManager.shared
     
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
@@ -11,19 +10,9 @@ struct CoachChatView: View {
     @State private var isStreaming = false
     @FocusState private var isInputFocused: Bool
     
-    // Context Data
-    @State private var profile: AthleteProfile?
-    @State private var dashboard: DashboardResponse?
-    @State private var plan: WeeklyPlanResponse?
-    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Connection status banner
-                if !llm.isModelLoaded {
-                    connectionBanner
-                }
-                
                 // Messages
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -59,22 +48,6 @@ struct CoachChatView: View {
             .background(DS.Colors.background)
             .task {
                 await network.checkConnection()
-                
-                // Fetch context silently
-                async let p = try? network.fetchAthleteProfile()
-                async let d = try? network.fetchDashboard()
-                async let w = try? network.fetchWeeklyPlan()
-                
-                let (profileResult, dashResult, planResult) = await (p, d, w)
-                self.profile = profileResult
-                self.dashboard = dashResult
-                self.plan = planResult
-                
-                // Start loading the local model
-                await llm.loadModel()
-            }
-            .onDisappear {
-                llm.unloadModel()
             }
         }
     }
@@ -88,25 +61,6 @@ struct CoachChatView: View {
     }
     
     // MARK: - Components
-    
-    private var connectionBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "cpu")
-                .font(.caption)
-            Text(llm.isDownloading ? llm.statusMessage : "Coach Brain Loading...")
-                .font(.caption.bold())
-            Spacer()
-            if llm.isDownloading {
-                ProgressView(value: llm.downloadProgress)
-                    .progressViewStyle(.linear)
-                    .frame(width: 60)
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(DS.Colors.surface)
-    }
     
     private var welcomeMessage: some View {
         VStack(spacing: 12) {
@@ -264,20 +218,8 @@ struct CoachChatView: View {
         let coachMsg = ChatMessage(role: .coach, content: "", timestamp: Date())
         messages.append(coachMsg)
         
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "EEEE"
-        let todayName = formatter.string(from: Date())
-        
-        let systemPrompt = ContextBuilder.buildSystemPrompt(
-            profile: profile,
-            dashboard: dashboard,
-            plan: plan,
-            todayName: todayName
-        )
-        
         do {
-            let stream = llm.generateStream(prompt: text, systemPrompt: systemPrompt)
+            let stream = try await network.sendChatStream(message: text)
             
             for try await token in stream {
                 await MainActor.run {
