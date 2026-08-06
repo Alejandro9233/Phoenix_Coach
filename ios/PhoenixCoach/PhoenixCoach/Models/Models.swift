@@ -189,6 +189,10 @@ struct Workout: Codable {
     let hrTarget: String?
     let muscleGroups: [String]?
     
+    var sportIcon: String {
+        PhoenixCoach.sportIcon(for: sport)
+    }
+    
     enum CodingKeys: String, CodingKey {
         case sport, title, steps
         case totalTime = "total_time"
@@ -375,14 +379,27 @@ struct Activity: Codable, Identifiable {
         return naiveFormatter.date(from: time)
     }
 
-    var sportEmoji: String {
-        switch sport?.lowercased() {
-        case "running": return "🏃"
-        case "cycling": return "🚴"
-        case "swimming": return "🏊"
-        case "strength", "training": return "🏋️"
-        default: return "🏅"
-        }
+    var sportIcon: String {
+        PhoenixCoach.sportIcon(for: sport)
+    }
+}
+
+// MARK: - Global Sport Icon Helper
+
+func sportIcon(for sport: String?) -> String {
+    switch sport?.lowercased() {
+    case "run", "running", "trail_running":
+        return "figure.run"
+    case "swim", "swimming", "open_water_swimming":
+        return "figure.pool.swim"
+    case "bike", "ride", "cycling", "indoor_cycling":
+        return "figure.outdoor.cycle"
+    case "strength", "strng", "training", "gym":
+        return "figure.strengthtraining.traditional"
+    case "rest", "recovery":
+        return "bed.double.fill"
+    default:
+        return "figure.run"
     }
 }
 
@@ -592,6 +609,10 @@ struct CalendarWorkout: Codable, Identifiable {
     let hrTarget: String?
     let muscleGroups: [String]?
     let stepsCount: Int?
+    
+    var sportIcon: String {
+        PhoenixCoach.sportIcon(for: sport)
+    }
     
     enum CodingKeys: String, CodingKey {
         case day, sport, title

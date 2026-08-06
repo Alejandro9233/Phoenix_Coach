@@ -255,13 +255,7 @@ struct ActivityCard: View {
     }
     
     private var iconForSport: String {
-        switch activity.sport?.lowercased() {
-        case "run", "running": return "figure.run"
-        case "swim", "swimming": return "figure.pool.swim"
-        case "bike", "ride", "cycling": return "figure.outdoor.cycle"
-        case "strength", "strng": return "figure.strengthtraining.traditional"
-        default: return "figure.run"
-        }
+        sportIcon(for: activity.sport)
     }
     
     private func statView(label: String, value: String, unit: String) -> some View {

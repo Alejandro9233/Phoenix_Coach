@@ -73,23 +73,17 @@ struct TodayView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                DS.Colors.background
-                    .ignoresSafeArea()
-                
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        DS.Colors.accent.opacity(0.12),
-                        .clear
-                    ]),
-                    center: .top,
-                    startRadius: 0,
-                    endRadius: 400
-                )
-                .ignoresSafeArea()
-                
+            Group {
                 if let err = errorMessage, weeklyPlan == nil, dashboard == nil {
-                    errorView(err)
+                    ScrollView {
+                        errorView(err)
+                            .frame(maxWidth: .infinity, minHeight: 400)
+                    }
+                    .refreshable {
+                        print("🔄 Pull-to-refresh triggered (error state)")
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        await performSmartRefresh()
+                    }
                 } else {
                     ScrollView {
                         VStack(spacing: 24) {
@@ -115,14 +109,50 @@ struct TodayView: View {
                         .opacity(isSyncing ? 0.3 : 1.0)
                     }
                     .refreshable {
+                        print("🔄 Pull-to-refresh triggered")
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         await performSmartRefresh()
                     }
                 }
-                
+            }
+            .background {
+                ZStack {
+                    DS.Colors.background
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            DS.Colors.accent.opacity(0.12),
+                            .clear
+                        ]),
+                        center: .top,
+                        startRadius: 0,
+                        endRadius: 400
+                    )
+                }
+                .ignoresSafeArea()
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task {
+                            print("🔄 Toolbar refresh tapped")
+                            await performSmartRefresh()
+                        }
+                    } label: {
+                        if isSyncing {
+                            ProgressView()
+                                .tint(DS.Colors.accent)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(DS.Colors.accent)
+                        }
+                    }
+                    .disabled(isSyncing)
+                }
+            }
             .sheet(isPresented: $showHRVChart) {
                 MetricChartSheet(title: "HRV (ms)", data: dashboard?.recovery ?? [], metricType: .hrv)
             }
@@ -585,9 +615,9 @@ struct TodayView: View {
         }
     }
     
-    private func fetchDashboard() async {
+    private func fetchDashboard(forceRefresh: Bool = false) async {
         do {
-            let dash = try await network.fetchDashboard()
+            let dash = try await network.fetchDashboard(forceRefresh: forceRefresh)
             await MainActor.run {
                 self.dashboard = dash
                 
@@ -606,6 +636,7 @@ struct TodayView: View {
         syncMessage = "Connecting to backend..."
         errorMessage = nil
         
+        // Step 1: Try COROS sync (best-effort — don't block data refresh if this fails)
         do {
             try await Task.sleep(nanoseconds: 800_000_000)
             await MainActor.run { self.syncMessage = "Scraping COROS web..." }
@@ -615,27 +646,28 @@ struct TodayView: View {
             let response = try await network.smartRefresh()
             await MainActor.run {
                 self.refreshResponse = response
-                self.syncMessage = "Finishing up..."
                 if response.syncStatus == "partial" {
                     self.scraperErrorMessage = response.syncMessage ?? "Data could not be scraped."
                     self.showScraperError = true
                 }
             }
-            
-            async let planTask: () = fetchWeeklyPlan()
-            async let statusTask: () = fetchPlanStatus()
-            _ = await (planTask, statusTask)
-            
-            await MainActor.run {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    self.isSyncing = false
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                }
-            }
         } catch {
-            await MainActor.run {
-                self.errorMessage = "Sync failed: \(error.localizedDescription)"
+            print("Smart refresh sync error (non-fatal): \(error)")
+            // Don't abort — still fetch latest data below
+        }
+        
+        // Step 2: Always refresh all data from backend
+        await MainActor.run { self.syncMessage = "Refreshing data..." }
+        
+        async let dashTask: () = fetchDashboard(forceRefresh: true)
+        async let planTask: () = fetchWeeklyPlan()
+        async let statusTask: () = fetchPlanStatus()
+        _ = await (dashTask, planTask, statusTask)
+        
+        await MainActor.run {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.isSyncing = false
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
         }
     }
@@ -736,9 +768,10 @@ struct ProtocolCard: View {
             } else {
                 ForEach(workouts, id: \.title) { workout in
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text(workout.sportEmoji)
-                                .font(.title3)
+                        HStack(spacing: 8) {
+                            Image(systemName: workout.sportIcon)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(DS.Colors.accent)
                             Text(workout.title)
                                 .font(.headline.bold())
                                 .foregroundStyle(DS.Colors.primaryText)
@@ -824,20 +857,7 @@ struct ProtocolCard: View {
         .preferredColorScheme(.dark)
 }
 
-// MARK: - Workout Extension
 
-extension Workout {
-    var sportEmoji: String {
-        switch sport.lowercased() {
-        case "running": return "🏃"
-        case "cycling": return "🚴"
-        case "swimming": return "🏊"
-        case "strength": return "🏋️"
-        case "rest": return "😴"
-        default: return "🏅"
-        }
-    }
-}
 
 struct ConnectionSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss

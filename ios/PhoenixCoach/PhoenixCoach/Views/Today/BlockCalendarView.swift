@@ -998,8 +998,9 @@ struct WeeklyWorkoutsDetailSheet: View {
                     .foregroundStyle(DS.Colors.accent)
                     .tracking(0.8)
                 Spacer()
-                Text(sportEmoji(for: w.sport))
-                    .font(.system(size: 16))
+                Image(systemName: w.sportIcon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(DS.Colors.accent)
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -1008,15 +1009,16 @@ struct WeeklyWorkoutsDetailSheet: View {
                     .foregroundStyle(DS.Colors.primaryText)
                 
                 HStack(spacing: 12) {
-                    HStack(spacing: 3) {
-                        Text("⏱️")
+                    HStack(spacing: 4) {
+                        Image(systemName: "timer")
                             .font(.system(size: 10))
                         Text(w.totalTime ?? "--")
                             .font(.system(size: 11, weight: .medium))
                     }
-                    HStack(spacing: 3) {
-                        Text("❤️")
+                    HStack(spacing: 4) {
+                        Image(systemName: "heart.fill")
                             .font(.system(size: 10))
+                            .foregroundStyle(Color.red.opacity(0.8))
                         Text("Zone \(w.hrTarget ?? "--")")
                             .font(.system(size: 11, weight: .medium))
                     }
@@ -1052,23 +1054,14 @@ struct WeeklyWorkoutsDetailSheet: View {
     
     private func guidelineRow(sport: String, text: String) -> some View {
         HStack(spacing: 10) {
-            Text(sportEmoji(for: sport))
-                .font(.body)
+            Image(systemName: sportIcon(for: sport))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(DS.Colors.accent)
+                .frame(width: 20)
             Text(text)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(DS.Colors.onSurface)
             Spacer()
-        }
-    }
-    
-    private func sportEmoji(for sport: String) -> String {
-        switch sport.lowercased() {
-        case "running": return "🏃"
-        case "cycling": return "🚴"
-        case "swimming": return "🏊"
-        case "strength": return "🏋️"
-        case "rest": return "😴"
-        default: return "😴"
         }
     }
     
