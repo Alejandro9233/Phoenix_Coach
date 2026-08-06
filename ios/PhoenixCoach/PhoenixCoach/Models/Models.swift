@@ -609,13 +609,14 @@ struct CalendarWorkout: Codable, Identifiable {
     let hrTarget: String?
     let muscleGroups: [String]?
     let stepsCount: Int?
+    let steps: [WorkoutStep]?
     
     var sportIcon: String {
         PhoenixCoach.sportIcon(for: sport)
     }
     
     enum CodingKeys: String, CodingKey {
-        case day, sport, title
+        case day, sport, title, steps
         case totalTime = "total_time"
         case hrTarget = "hr_target"
         case muscleGroups = "muscle_groups"

@@ -1288,6 +1288,15 @@ class PeriodizationEngine:
                     day_data = days_dict.get(day_name, {})
                     day_workouts = day_data.get("workouts", [])
                     for w in day_workouts:
+                        raw_steps = w.get("steps", [])
+                        steps_data = []
+                        for s in raw_steps:
+                            steps_data.append({
+                                "type": s.get("type", "main"),
+                                "duration": str(s.get("duration", "0")),
+                                "zone": s.get("zone"),
+                                "description": s.get("description")
+                            })
                         workouts_list.append({
                             "day": day_name,
                             "sport": w.get("sport", "rest"),
@@ -1295,7 +1304,8 @@ class PeriodizationEngine:
                             "total_time": w.get("total_time") or "0 min",
                             "hr_target": w.get("hr_target") or "--",
                             "muscle_groups": w.get("muscle_groups", []),
-                            "steps_count": len(w.get("steps", []))
+                            "steps_count": len(raw_steps),
+                            "steps": steps_data
                         })
             else:
                 # If no plan exists yet, provide projected target values from the phase

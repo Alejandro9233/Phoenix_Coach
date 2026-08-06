@@ -836,13 +836,8 @@ struct WeeklyWorkoutsDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     let week: BlockWeek
     
-    // Design system
-
-
-
-
-
-
+    // Tracks which workout rows are expanded
+    @State private var expandedWorkouts: Set<UUID> = []
     
     // Sort workouts by day of week to ensure correct visual order
     private var sortedWorkouts: [CalendarWorkout] {
@@ -991,65 +986,234 @@ struct WeeklyWorkoutsDetailSheet: View {
     }
     
     private func workoutRow(_ w: CalendarWorkout) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(w.day.uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(DS.Colors.accent)
-                    .tracking(0.8)
-                Spacer()
-                Image(systemName: w.sportIcon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(DS.Colors.accent)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(w.title)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(DS.Colors.primaryText)
-                
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "timer")
-                            .font(.system(size: 10))
-                        Text(w.totalTime ?? "--")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    HStack(spacing: 4) {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Color.red.opacity(0.8))
-                        Text("Zone \(w.hrTarget ?? "--")")
-                            .font(.system(size: 11, weight: .medium))
+        let isExpanded = expandedWorkouts.contains(w.id)
+        
+        return VStack(alignment: .leading, spacing: 0) {
+            // Tappable header row
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    if isExpanded {
+                        expandedWorkouts.remove(w.id)
+                    } else {
+                        expandedWorkouts.insert(w.id)
                     }
                 }
-                .foregroundStyle(DS.Colors.outline)
-            }
-            
-            // Muscle groups capsules if strength
-            if w.sport.lowercased() == "strength", let groups = w.muscleGroups, !groups.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 5) {
-                        ForEach(groups, id: \.self) { group in
-                            Text(group.uppercased())
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(colorForMuscleGroup(group))
-                                .clipShape(Capsule())
+            } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text(w.day.uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(DS.Colors.accent)
+                            .tracking(0.8)
+                        Spacer()
+                        
+                        HStack(spacing: 6) {
+                            Image(systemName: w.sportIcon)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(DS.Colors.accent)
+                            
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(DS.Colors.outline.opacity(0.5))
                         }
                     }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(w.title)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(DS.Colors.primaryText)
+                            .multilineTextAlignment(.leading)
+                        
+                        HStack(spacing: 12) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "timer")
+                                    .font(.system(size: 10))
+                                Text(w.totalTime ?? "--")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            HStack(spacing: 4) {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Color.red.opacity(0.8))
+                                Text("Zone \(w.hrTarget ?? "--")")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                        }
+                        .foregroundStyle(DS.Colors.outline)
+                    }
                 }
+                .padding(12)
+            }
+            .buttonStyle(.plain)
+            
+            // Expanded disclosure content
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 12) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 1)
+                        .padding(.horizontal, 4)
+                    
+                    // Workout segments timeline
+                    if let steps = w.steps, !steps.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("WORKOUT SEGMENTS")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(DS.Colors.outline)
+                                .tracking(0.8)
+                            
+                            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                                HStack(alignment: .top, spacing: 10) {
+                                    // Timeline dot + connector
+                                    VStack(spacing: 0) {
+                                        Circle()
+                                            .fill(stepColor(for: step.type))
+                                            .frame(width: 7, height: 7)
+                                            .padding(.top, 3)
+                                        
+                                        if index < steps.count - 1 {
+                                            Rectangle()
+                                                .fill(DS.Colors.outline.opacity(0.2))
+                                                .frame(width: 1)
+                                                .frame(maxHeight: .infinity)
+                                        }
+                                    }
+                                    .frame(width: 8)
+                                    
+                                    // Step content
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack {
+                                            Text(step.type.uppercased())
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(stepColor(for: step.type))
+                                            
+                                            Spacer()
+                                            
+                                            Text("\(step.duration) min")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundStyle(DS.Colors.primaryText)
+                                        }
+                                        
+                                        if let zone = step.zone {
+                                            Text("Zone \(zone)")
+                                                .font(.system(size: 9, weight: .medium))
+                                                .foregroundStyle(DS.Colors.outline)
+                                        }
+                                        
+                                        if let desc = step.description, !desc.isEmpty {
+                                            Text(desc)
+                                                .font(.system(size: 10, weight: .regular))
+                                                .foregroundStyle(DS.Colors.onSurface.opacity(0.6))
+                                                .lineLimit(2)
+                                        }
+                                    }
+                                    .padding(.bottom, index < steps.count - 1 ? 4 : 0)
+                                }
+                            }
+                        }
+                        .padding(10)
+                        .background(Color.white.opacity(0.03))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    
+                    // Muscle groups (for strength workouts)
+                    if w.sport.lowercased() == "strength", let groups = w.muscleGroups, !groups.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("MUSCLE GROUPS")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(DS.Colors.outline)
+                                .tracking(0.8)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 5) {
+                                    ForEach(groups, id: \.self) { group in
+                                        Text(group.uppercased())
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 3)
+                                            .background(colorForMuscleGroup(group))
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Training intent note
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 11))
+                            .foregroundStyle(DS.Colors.accent.opacity(0.7))
+                            .padding(.top, 1)
+                        
+                        Text(trainingIntent(for: w))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(DS.Colors.onSurface.opacity(0.7))
+                            .lineSpacing(2)
+                    }
+                    .padding(10)
+                    .background(DS.Colors.accent.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(12)
-        .background(DS.Colors.surface.opacity(0.6))
+        .background(DS.Colors.surface.opacity(isExpanded ? 0.8 : 0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                .stroke(isExpanded ? Color.white.opacity(0.1) : Color.white.opacity(0.04), lineWidth: 1)
         )
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: isExpanded)
+    }
+    
+    private func stepColor(for type: String) -> Color {
+        switch type.lowercased() {
+        case "warmup": return .blue
+        case "main": return .purple
+        case "recovery": return .green
+        case "cooldown": return .teal
+        case "interval", "intervals": return .orange
+        default: return .gray
+        }
+    }
+    
+    private func trainingIntent(for w: CalendarWorkout) -> String {
+        let sport = w.sport.lowercased()
+        let zone = w.hrTarget ?? ""
+        
+        if sport == "strength" {
+            let groups = w.muscleGroups?.joined(separator: ", ") ?? "full body"
+            return "Strength session targeting \(groups). Focus on controlled tempo and full range of motion."
+        }
+        
+        if zone.contains("1") || zone.lowercased().contains("recovery") {
+            return "Active recovery session. Keep effort conversational to promote blood flow and adaptation."
+        } else if zone.contains("2") {
+            return "Aerobic base building. Maintain steady-state effort to develop mitochondrial density and fat oxidation."
+        } else if zone.contains("3") {
+            return "Tempo effort. Sustained work at lactate threshold to improve race-pace endurance."
+        } else if zone.contains("4") {
+            return "Threshold intervals. High-intensity work to push VO2max ceiling and lactate clearance."
+        } else if zone.contains("5") {
+            return "Peak intensity. Short, maximal efforts to develop neuromuscular power and speed."
+        }
+        
+        switch sport {
+        case "swimming":
+            return "Swim session focusing on technique efficiency and stroke mechanics in the water."
+        case "cycling":
+            return "Cycling session to build pedaling economy and aerobic power on the bike."
+        case "running":
+            return "Run session building aerobic capacity and running economy."
+        case "yoga", "mobility":
+            return "Mobility and flexibility work. Focus on breath control and joint range of motion."
+        default:
+            return "Training session designed to build fitness within your current periodization block."
+        }
     }
     
     private func guidelineRow(sport: String, text: String) -> some View {

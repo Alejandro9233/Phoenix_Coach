@@ -24,6 +24,8 @@ struct TodayView: View {
     @State private var showHRVChart = false
     @State private var showRHRChart = false
     @State private var showLoadChart = false
+    @State private var showAdaptationSheet = false
+    @State private var preferOriginalProtocol = false
     
     // Design system colors matching Quiet Performance HTML mockup
                                                    
@@ -161,6 +163,15 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showLoadChart) {
                 MetricChartSheet(title: "Load Ratio", data: dashboard?.recovery ?? [], metricType: .load)
+            }
+            .sheet(isPresented: $showAdaptationSheet) {
+                if let todayPlan = todayDayPlan {
+                    AdaptationComparisonSheet(
+                        todayPlan: todayPlan,
+                        latestRecovery: latestRecovery,
+                        preferOriginal: $preferOriginalProtocol
+                    )
+                }
             }
             .alert("Scraper Error", isPresented: $showScraperError) {
                 Button("OK", role: .cancel) { }
@@ -394,50 +405,52 @@ struct TodayView: View {
     
     private var workoutProtocolSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("TODAY'S WORKOUT PROTOCOL")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.1)
-                .foregroundStyle(DS.Colors.outline)
-                .padding(.horizontal, 4)
+            HStack {
+                Text("TODAY'S WORKOUT PROTOCOL")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.1)
+                    .foregroundStyle(DS.Colors.outline)
+                
+                Spacer()
+                
+                if let todayPlan = todayDayPlan,
+                   todayPlan.adaptation != nil && !(todayPlan.adaptation?.isEmpty ?? true) {
+                    Button {
+                        showAdaptationSheet = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "waveform.path.ecg")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Compare Telemetry")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(DS.Colors.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 4)
             
             if let todayPlan = todayDayPlan {
                 let hasAdaptation = todayPlan.adaptation != nil && !(todayPlan.adaptation?.isEmpty ?? true)
+                let activeWorkouts = (hasAdaptation && preferOriginalProtocol)
+                    ? (todayPlan.originalWorkouts ?? todayPlan.workouts ?? [])
+                    : (todayPlan.workouts ?? [])
+                let isCurrentlyAdapted = hasAdaptation && !preferOriginalProtocol
                 
-                if hasAdaptation {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ProtocolCard(
-                                cardTitle: "Original Protocol",
-                                workouts: todayPlan.originalWorkouts ?? todayPlan.workouts ?? [],
-                                rationale: todayPlan.rationale,
-                                coachNote: todayPlan.coachNote,
-                                isAdapted: false,
-                                adaptationReason: nil
-                            )
-                            .frame(width: 320)
-                            
-                            ProtocolCard(
-                                cardTitle: "AI Adapted Protocol",
-                                workouts: todayPlan.workouts ?? [],
-                                rationale: todayPlan.rationale,
-                                coachNote: todayPlan.coachNote,
-                                isAdapted: true,
-                                adaptationReason: todayPlan.adaptation
-                            )
-                            .frame(width: 320)
-                        }
-                        .padding(.horizontal, 4)
-                    }
-                } else {
-                    ProtocolCard(
-                        cardTitle: "Original Protocol",
-                        workouts: todayPlan.workouts ?? [],
-                        rationale: todayPlan.rationale,
-                        coachNote: todayPlan.coachNote,
-                        isAdapted: false,
-                        adaptationReason: nil
-                    )
-                }
+                ProtocolCard(
+                    cardTitle: isCurrentlyAdapted ? "AI Adapted Protocol" : (preferOriginalProtocol ? "Original Blueprint (Active)" : "Original Protocol"),
+                    workouts: activeWorkouts,
+                    rationale: todayPlan.rationale,
+                    coachNote: todayPlan.coachNote,
+                    isAdapted: isCurrentlyAdapted,
+                    adaptationReason: isCurrentlyAdapted ? todayPlan.adaptation : nil,
+                    onTapCompare: hasAdaptation ? { showAdaptationSheet = true } : nil
+                )
             } else {
                 emptyDayCard
             }
@@ -727,6 +740,7 @@ struct ProtocolCard: View {
     let coachNote: String?
     let isAdapted: Bool
     let adaptationReason: String?
+    var onTapCompare: (() -> Void)? = nil
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -750,13 +764,43 @@ struct ProtocolCard: View {
             }
             
             if isAdapted, let reason = adaptationReason {
-                Text("Reason: \(reason)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(DS.Colors.accent)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(DS.Colors.accent.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                if let onTap = onTapCompare {
+                    Button(action: onTap) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(DS.Colors.accent)
+                            
+                            Text("Reason: \(reason)")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(DS.Colors.accent)
+                                .lineLimit(2)
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 2) {
+                                Text("Compare")
+                                    .font(.system(size: 10, weight: .bold))
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .foregroundStyle(DS.Colors.outline)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(DS.Colors.accent.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text("Reason: \(reason)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(DS.Colors.accent)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(DS.Colors.accent.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
             }
             
             if workouts.isEmpty {
@@ -844,6 +888,297 @@ struct ProtocolCard: View {
         case "recovery": return .green
         case "cooldown": return .teal
         default: return .gray
+        }
+    }
+}
+
+// MARK: - Adaptation Comparison Sheet (Telemetry Modal)
+
+struct AdaptationComparisonSheet: View {
+    let todayPlan: DayPlan
+    let latestRecovery: RecoverySummary?
+    @Binding var preferOriginal: Bool
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Subtitle banner
+                    Text("Coach modified today's prescription based on overnight recovery telemetry.")
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(DS.Colors.onSurface)
+                    
+                    // Biometric Triggers Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "waveform.path.ecg")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(DS.Colors.accent)
+                            Text("OVERNIGHT TELEMETRY TRIGGERS")
+                                .font(.system(size: 10, weight: .bold))
+                                .tracking(1.0)
+                                .foregroundStyle(DS.Colors.outline)
+                        }
+                        
+                        HStack(spacing: 10) {
+                            if let hrv = latestRecovery?.hrvMs {
+                                telemetryMetricTile(
+                                    label: "HRV",
+                                    value: "\(Int(hrv)) ms",
+                                    subtitle: "Telemetry Driver",
+                                    isWarning: true
+                                )
+                            }
+                            if let rhr = latestRecovery?.restingHr {
+                                telemetryMetricTile(
+                                    label: "RESTING HR",
+                                    value: "\(rhr) bpm",
+                                    subtitle: "Elevated",
+                                    isWarning: false
+                                )
+                            }
+                            if let load = latestRecovery?.loadRatio {
+                                telemetryMetricTile(
+                                    label: "LOAD RATIO",
+                                    value: String(format: "%.2f", load),
+                                    subtitle: load > 1.3 ? "High Load" : "Balanced",
+                                    isWarning: load > 1.3
+                                )
+                            }
+                        }
+                        
+                        if let reason = todayPlan.adaptation, !reason.isEmpty {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(DS.Colors.accent)
+                                    .padding(.top, 2)
+                                Text(reason)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(DS.Colors.primaryText)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                    .glassCard()
+                    
+                    // Side-by-Side / Stacked Session Comparison
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("PROTOCOL COMPARISON")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.0)
+                            .foregroundStyle(DS.Colors.outline)
+                        
+                        // AI Adapted Card (Recommended)
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("AI ADAPTED PROTOCOL")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(DS.Colors.accent)
+                                Spacer()
+                                if !preferOriginal {
+                                    Text("ACTIVE")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(DS.Colors.accent)
+                                        .clipShape(Capsule())
+                                }
+                            }
+                            
+                            if let workouts = todayPlan.workouts, !workouts.isEmpty {
+                                ForEach(workouts, id: \.title) { w in
+                                    comparisonWorkoutRow(w, isAccent: true)
+                                }
+                            }
+                        }
+                        .padding(14)
+                        .background(Color.white.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DS.Radius.medium)
+                                .stroke(!preferOriginal ? Color.white.opacity(0.4) : Color.white.opacity(0.1), lineWidth: !preferOriginal ? 1.5 : 1)
+                        )
+                        
+                        // Original Blueprint Card
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("ORIGINAL BLUEPRINT")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(DS.Colors.outline)
+                                Spacer()
+                                if preferOriginal {
+                                    Text("ACTIVE (OVERRIDE)")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(DS.Colors.outline)
+                                        .clipShape(Capsule())
+                                }
+                            }
+                            
+                            let origWorkouts = todayPlan.originalWorkouts ?? todayPlan.workouts ?? []
+                            if !origWorkouts.isEmpty {
+                                ForEach(origWorkouts, id: \.title) { w in
+                                    comparisonWorkoutRow(w, isAccent: false)
+                                }
+                            } else {
+                                Text("No original session data recorded.")
+                                    .font(.caption)
+                                    .foregroundStyle(DS.Colors.outline)
+                            }
+                        }
+                        .padding(14)
+                        .background(Color.black.opacity(0.3))
+                        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DS.Radius.medium)
+                                .stroke(preferOriginal ? Color.white.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                    }
+                    
+                    // Coach's Rationale
+                    if let rationale = todayPlan.rationale ?? todayPlan.coachNote, !rationale.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "brain.head.profile")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(DS.Colors.accent)
+                                Text("COACH'S INTENT")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1.0)
+                                    .foregroundStyle(DS.Colors.outline)
+                            }
+                            Text(rationale)
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(DS.Colors.onSurface)
+                                .lineSpacing(3)
+                        }
+                        .glassCard()
+                    }
+                    
+                    // Action Decision Buttons
+                    VStack(spacing: 10) {
+                        Button {
+                            preferOriginal = false
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Keep AI Adaptation (Recommended)")
+                            }
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(DS.Colors.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
+                        }
+                        
+                        Button {
+                            preferOriginal = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Override & Use Original Plan")
+                            }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(DS.Colors.onSurface)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DS.Radius.medium)
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            )
+                        }
+                    }
+                    .padding(.top, 6)
+                }
+                .padding(20)
+            }
+            .background(DS.Colors.background.ignoresSafeArea())
+            .navigationTitle("Adaptation Telemetry")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(DS.Colors.outline)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.fraction(0.88), .large])
+        .presentationDragIndicator(.visible)
+    }
+    
+    private func telemetryMetricTile(label: String, value: String, subtitle: String, isWarning: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(DS.Colors.outline)
+            Text(value)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(isWarning ? DS.Colors.warning : DS.Colors.primaryText)
+            Text(subtitle)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(isWarning ? DS.Colors.warning.opacity(0.8) : DS.Colors.outline)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+    
+    private func comparisonWorkoutRow(_ w: Workout, isAccent: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: w.sportIcon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isAccent ? DS.Colors.accent : DS.Colors.outline)
+                Text(w.title)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(DS.Colors.primaryText)
+                Spacer()
+                if let t = w.totalTime {
+                    Text(t)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(isAccent ? DS.Colors.accent : DS.Colors.outline)
+                }
+            }
+            if let hr = w.hrTarget {
+                Text("Target HR: \(hr)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(DS.Colors.outline)
+            }
+            if !w.steps.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(Array(w.steps.prefix(4).enumerated()), id: \.offset) { _, step in
+                        Text("\(step.type.prefix(4).uppercased()) \(step.duration)")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundStyle(DS.Colors.outline)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                }
+            }
         }
     }
 }
