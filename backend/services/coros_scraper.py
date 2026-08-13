@@ -32,8 +32,20 @@ class CorosScraper:
         print(f"Logging into COROS as {self.email}...")
         await page.goto(f"{self.base_url}/admin/views/dash-board#/login")
         
-        # Wait for login form
-        await page.wait_for_selector('input[type="text"]')
+        # Wait for either the login form OR the dashboard to load
+        try:
+            print("  Waiting for login form or dashboard...")
+            await page.wait_for_selector('input[type="text"], .app-container, .arco-layout-sider', timeout=15000)
+            
+            # Check if we are already logged in (dashboard is visible and no login form)
+            is_login_form_visible = await page.locator('input[type="text"]').is_visible()
+            if not is_login_form_visible:
+                print("  Dashboard detected right away. Already logged in!")
+                return
+        except Exception as e:
+            print(f"  Warning: Neither login form nor dashboard detected initially: {e}")
+            
+        print("  Login form detected. Filling credentials...")
         await page.fill('input[type="text"]', self.email)
         await page.fill('input[type="password"]', self.password)
         
@@ -147,7 +159,10 @@ class CorosScraper:
                     await page.goto(f"{self.base_url}/admin/views/data-analysis", wait_until="networkidle")
                 
                 print("  Waiting for EvoLab content...")
-                await page.wait_for_selector('.data-analysis-card-container, .admin-card-box', timeout=30000)
+                try:
+                    await page.wait_for_selector('.data-analysis-card-container, .admin-card-box', timeout=30000)
+                except Exception as e:
+                    print(f"  Warning: EvoLab content timeout, continuing anyway.")
                 await page.wait_for_timeout(8000)
                 
                 # 3. Navigate to Activity List page
@@ -159,7 +174,10 @@ class CorosScraper:
                     print(f"  Tab click failed, trying direct URL: {e}")
                     await page.goto(f"{self.base_url}/admin/views/dash-board#/personal/list", wait_until="networkidle")
                 
-                await page.wait_for_selector('.arco-table', timeout=20000)
+                try:
+                    await page.wait_for_selector('.arco-table', timeout=20000)
+                except Exception as e:
+                    print(f"  Warning: .arco-table timeout, continuing anyway.")
                 await page.wait_for_timeout(5000)
                 
                 print(f"\n✅ Scrape complete: {len(captured_data['activities'])} activities, {len(captured_data['evolab'])} EvoLab endpoints")
