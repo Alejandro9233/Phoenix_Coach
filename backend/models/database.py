@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime, Date, ForeignKey, JSON, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -30,6 +31,12 @@ class Athlete(Base):
     strength_days = Column(String, default="mon,wed,fri")
     training_start_date = Column(Date, nullable=True)  # Anchors 3:1 build/recovery cycle
     target_finish_time = Column(String, nullable=True)  # "3:45:00" (HH:MM:SS)
+    
+    # COROS enriched fields
+    cycle_power_zones = Column(JSON, nullable=True)
+    pace_zones = Column(JSON, nullable=True)
+    hr_zones = Column(JSON, nullable=True)
+    head_pic_url = Column(String, nullable=True)
 
 class Activity(Base):
     __tablename__ = "activities"
@@ -161,3 +168,22 @@ class WeeklyPlan(Base):
     created_at = Column(DateTime, default=None)
     last_adapted = Column(DateTime, nullable=True)
 
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    id = Column(Integer, primary_key=True, index=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.id"))
+    title = Column(String, default="New Conversation")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"))
+    role = Column(String)  # "user" or "assistant"
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    session = relationship("ChatSession", back_populates="messages")

@@ -10,9 +10,15 @@ struct CoachChatView: View {
     @State private var isStreaming = false
     @FocusState private var isInputFocused: Bool
     
+    // Session state
+    @State private var showHistory = false
+    @State private var sessions: [APIChatSession] = []
+    @State private var currentSessionId: Int? = nil
+    
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        ZStack(alignment: .leading) {
+            NavigationStack {
+                VStack(spacing: 0) {
                 // Messages
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -44,13 +50,62 @@ struct CoachChatView: View {
                 // Input bar
                 inputBar
             }
-            .navigationTitle("Coach Phoenix")
+            }
+            .navigationTitle(currentSessionId == nil ? "New Chat" : "Coach Phoenix")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        withAnimation(.spring()) {
+                            showHistory.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundStyle(DS.Colors.accent)
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        startNewChat()
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                            .foregroundStyle(DS.Colors.accent)
+                    }
+                }
+            }
             .background(DS.Colors.background)
             .task {
                 await network.checkConnection()
+                await loadSessions()
             }
         }
+        
+        // Slide out drawer
+        if showHistory {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring()) {
+                        showHistory = false
+                    }
+                }
+            
+            ChatHistoryDrawer(
+                sessions: sessions,
+                currentSessionId: currentSessionId,
+                onSelect: { session in
+                    loadSessionHistory(sessionId: session.id)
+                    withAnimation(.spring()) {
+                        showHistory = false
+                    }
+                }
+            )
+            .frame(width: 280)
+            .transition(.move(edge: .leading))
+        }
     }
+}
     
     private func scrollToBottom(proxy: ScrollViewProxy) {
         if let last = messages.last {
@@ -219,7 +274,7 @@ struct CoachChatView: View {
         messages.append(coachMsg)
         
         do {
-            let stream = try await network.sendChatStream(message: text)
+            let stream = try await network.sendChatStream(message: text, sessionId: currentSessionId)
             
             for try await token in stream {
                 await MainActor.run {
@@ -244,6 +299,52 @@ struct CoachChatView: View {
                 isLoading = false
                 isStreaming = false
             }
+        }
+    }
+    
+    // MARK: - Session Management
+    
+    private func loadSessions() async {
+        do {
+            let fetched = try await network.fetchChatSessions()
+            await MainActor.run {
+                self.sessions = fetched
+            }
+        } catch {
+            print("Failed to load sessions: \(error)")
+        }
+    }
+    
+    private func loadSessionHistory(sessionId: Int) {
+        currentSessionId = sessionId
+        isLoading = true
+        Task {
+            do {
+                let history = try await network.fetchChatSessionHistory(sessionId: sessionId)
+                await MainActor.run {
+                    self.messages = history.map { apiMsg in
+                        ChatMessage(
+                            role: apiMsg.role == "user" ? .user : .coach,
+                            content: apiMsg.content,
+                            timestamp: ISO8601DateFormatter().date(from: apiMsg.createdAt) ?? Date()
+                        )
+                    }
+                    self.isLoading = false
+                }
+            } catch {
+                print("Failed to load history: \(error)")
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+    
+    private func startNewChat() {
+        currentSessionId = nil
+        messages = []
+        Task {
+            await loadSessions()
         }
     }
 }

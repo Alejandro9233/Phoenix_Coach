@@ -444,6 +444,29 @@ struct ChatMessage: Identifiable {
     }
 }
 
+struct APIChatSession: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let updatedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case updatedAt = "updated_at"
+    }
+}
+
+struct APIChatMessage: Codable, Identifiable {
+    let id: Int
+    let role: String
+    let content: String
+    let createdAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id, role, content
+        case createdAt = "created_at"
+    }
+}
+
 // MARK: - Feedback
 
 struct StrengthExercise: Codable, Identifiable {

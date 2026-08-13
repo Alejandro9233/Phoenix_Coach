@@ -171,7 +171,7 @@ class NetworkManager: ObservableObject {
     
     /// Send a chat message and receive tokens as they stream from the LLM.
     /// Returns an AsyncThrowingStream that yields token strings as they arrive.
-    func sendChatStream(message: String) -> AsyncThrowingStream<String, Error> {
+    func sendChatStream(message: String, sessionId: Int? = nil) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -184,7 +184,10 @@ class NetworkManager: ObservableObject {
                     request.httpMethod = "POST"
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    let body = ["message": message]
+                    var body: [String: Any] = ["message": message]
+                    if let sid = sessionId {
+                        body["session_id"] = sid
+                    }
                     request.httpBody = try JSONSerialization.data(withJSONObject: body)
                     
                     let (bytes, response) = try await session.bytes(for: request)
@@ -220,14 +223,17 @@ class NetworkManager: ObservableObject {
     }
     
     /// Synchronous chat fallback — returns the full response at once.
-    func sendChat(message: String) async throws -> String {
+    func sendChat(message: String, sessionId: Int? = nil) async throws -> String {
         guard let url = URL(string: "\(baseURL)/chat-sync") else {
             throw NetworkError.invalidURL
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body = ["message": message]
+        var body: [String: Any] = ["message": message]
+        if let sid = sessionId {
+            body["session_id"] = sid
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, _) = try await session.data(for: request)
         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -235,6 +241,30 @@ class NetworkManager: ObservableObject {
             return reply
         }
         return String(data: data, encoding: .utf8) ?? "No response"
+    }
+    
+    // MARK: - Chat Sessions
+    
+    func fetchChatSessions() async throws -> [APIChatSession] {
+        guard let url = URL(string: "\(baseURL)/chat/sessions") else {
+            throw NetworkError.invalidURL
+        }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode([APIChatSession].self, from: data)
+    }
+    
+    func fetchChatSessionHistory(sessionId: Int) async throws -> [APIChatMessage] {
+        guard let url = URL(string: "\(baseURL)/chat/sessions/\(sessionId)") else {
+            throw NetworkError.invalidURL
+        }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode([APIChatMessage].self, from: data)
     }
     
     // MARK: - Feedback

@@ -8,7 +8,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from backend.models.database import (
     Base, Athlete, Activity, ActivityRecord, RecoverySnapshot, 
-    AthleteFeedback, CoachingRecommendation, WeeklyPlan, InjuryLog
+    AthleteFeedback, CoachingRecommendation, WeeklyPlan, InjuryLog,
+    ChatSession, ChatMessage
 )
 from backend.services.fit_importer import parse_fit_file
 from backend.services.coros_scraper import CorosScraper
@@ -725,6 +726,111 @@ def _strip_think_tags(text: str) -> str:
     return cleaned.strip()
 
 
+def _build_chat_context(db: Session, summary: str, rag_context: str) -> str:
+    from backend.services.periodization_engine import PeriodizationEngine
+    from backend.services.plan_normalizer import normalize_plan
+    from backend.models.database import WeeklyPlan
+    from datetime import date, timedelta, datetime
+    import json
+
+    engine = PeriodizationEngine()
+    training_context = engine.compute_context(db)
+    
+    today = date.today()
+    start_of_week = today - timedelta(days=today.weekday())
+    plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+    plan_json = {}
+    if plan_record:
+        plan_json = normalize_plan(plan_record.plan_json)
+        
+    context_str = f"TRAINING PHASE: {training_context.get('current_phase', 'Unknown')}\n"
+    context_str += f"WEEKS TO RACE: {training_context.get('weeks_to_race', 'N/A')}\n"
+    
+    today_day_name = datetime.now().strftime("%A")
+    if plan_json and "days" in plan_json:
+        today_plan = plan_json["days"].get(today_day_name)
+        context_str += f"\nTODAY'S WORKOUT ({today_day_name}):\n"
+        if today_plan:
+            context_str += json.dumps(today_plan, indent=2)
+        else:
+            context_str += "Rest day / No workout planned."
+            
+        context_str += "\n\nFULL WEEK SCHEDULE:\n"
+        for day, info in plan_json["days"].items():
+            context_str += f"- {day}: {info.get('summary', info.get('focus', 'Rest'))}\n"
+            
+    system_prompt = f"""You are Phoenix, an elite personal coach. You know this athlete's exact schedule, zones, and goals. You talk like a real coach — direct, confident, no fluff.
+
+ATHLETE DATA & ZONES:
+{summary}
+
+{context_str}
+
+COACHING KNOWLEDGE:
+{rag_context}
+
+RULES:
+- Lead with the answer, then give 1-2 key reasons using the athlete's actual numbers or their scheduled workouts.
+- Maximum 4-6 lines total. No headers, no essays, no bullet-point lists longer than 3 items.
+- If the athlete asks a yes/no question, start with yes or no.
+- Reference specific data points (Pace Zones, HR Zones, Today's Workout, etc.) to justify your advice.
+- Sound like a coach in person, not a textbook.
+- If they ask what to do today, refer directly to TODAY'S WORKOUT."""
+    return system_prompt
+
+
+@app.get("/chat/sessions")
+def get_chat_sessions(db: Session = Depends(get_db)):
+    """Return all chat sessions for the athlete."""
+    athlete = db.query(Athlete).first()
+    if not athlete:
+        return []
+    sessions = db.query(ChatSession).filter(ChatSession.athlete_id == athlete.id).order_by(ChatSession.updated_at.desc()).all()
+    return [
+        {
+            "id": s.id,
+            "title": s.title,
+            "updated_at": str(s.updated_at)
+        } for s in sessions
+    ]
+
+@app.post("/chat/sessions")
+def create_chat_session(db: Session = Depends(get_db)):
+    """Create a new empty chat session."""
+    athlete = db.query(Athlete).first()
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    new_session = ChatSession(athlete_id=athlete.id)
+    db.add(new_session)
+    db.commit()
+    db.refresh(new_session)
+    return {"id": new_session.id, "title": new_session.title}
+
+@app.get("/chat/sessions/{session_id}")
+def get_chat_session_history(session_id: int, db: Session = Depends(get_db)):
+    """Return the full message history for a session."""
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    messages = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
+    return [
+        {
+            "id": m.id,
+            "role": m.role,
+            "content": m.content,
+            "created_at": str(m.created_at)
+        } for m in messages
+    ]
+
+@app.delete("/chat/sessions/{session_id}")
+def delete_chat_session(session_id: int, db: Session = Depends(get_db)):
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session:
+        db.delete(session)
+        db.commit()
+    return {"status": "ok"}
+
+
 @app.post("/chat")
 async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
     """
@@ -739,8 +845,37 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
     from backend.agents.data_agent import DataAgent
     
     message = body.get("message", "")
+    session_id = body.get("session_id")
+    
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
+        
+    athlete = db.query(Athlete).first()
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+        
+    # Get or create session
+    chat_session = None
+    if session_id:
+        chat_session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if not chat_session:
+        # Create a new session and auto-generate a title based on the first message
+        title = message[:30] + "..." if len(message) > 30 else message
+        chat_session = ChatSession(athlete_id=athlete.id, title=title)
+        db.add(chat_session)
+        db.commit()
+        db.refresh(chat_session)
+        session_id = chat_session.id
+    else:
+        # Update timestamp
+        from datetime import datetime
+        chat_session.updated_at = datetime.utcnow()
+        db.commit()
+        
+    # Save user message
+    user_msg = ChatMessage(session_id=session_id, role="user", content=message)
+    db.add(user_msg)
+    db.commit()
     
     # Build athlete context
     data_agent = DataAgent(db)
@@ -751,33 +886,33 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
     rag_chunks = kb.query(message, n_results=3)
     rag_context = "\n\n".join(rag_chunks) if rag_chunks else ""
     
-    system_prompt = f"""You are Phoenix, an elite triathlon coach. You talk like a real coach — direct, confident, no fluff.
+    system_prompt = _build_chat_context(db, summary, rag_context)
 
-ATHLETE DATA:
-{summary}
-
-COACHING KNOWLEDGE:
-{rag_context}
-
-RULES:
-- Lead with the answer, then give 1-2 key reasons using the athlete's actual numbers.
-- Maximum 4-6 lines total. No headers, no essays, no bullet-point lists longer than 3 items.
-- If the athlete asks a yes/no question, start with yes or no.
-- Reference specific data points (HR zones, load ratio, TIB, etc.) to justify your advice.
-- Sound like a coach in person, not a textbook."""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": message}
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Fetch history
+    history = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
+    for h in history:
+        messages.append({"role": h.role, "content": h.content})
 
     async def event_stream():
         """Generator that yields SSE events with streamed tokens."""
+        full_response = ""
         try:
             from backend.core.llm_client import chat_completion_stream
             async for token in chat_completion_stream(messages):
+                full_response += token
                 yield f"data: {json.dumps({'token': token})}\n\n"
             yield "data: [DONE]\n\n"
+            
+            # Save assistant response
+            db_save = SessionLocal()
+            try:
+                ai_msg = ChatMessage(session_id=session_id, role="assistant", content=full_response)
+                db_save.add(ai_msg)
+                db_save.commit()
+            finally:
+                db_save.close()
         except Exception as e:
             print(f"LLM STREAMING ERROR: {e}")
             fallback = f"Coach is temporarily unavailable. Error: {str(e)[:100]}"
@@ -801,8 +936,35 @@ async def chat_with_coach_sync(body: dict, db: Session = Depends(get_db)):
     from backend.agents.data_agent import DataAgent
     
     message = body.get("message", "")
+    session_id = body.get("session_id")
+    
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
+        
+    athlete = db.query(Athlete).first()
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+        
+    # Get or create session
+    chat_session = None
+    if session_id:
+        chat_session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if not chat_session:
+        title = message[:30] + "..." if len(message) > 30 else message
+        chat_session = ChatSession(athlete_id=athlete.id, title=title)
+        db.add(chat_session)
+        db.commit()
+        db.refresh(chat_session)
+        session_id = chat_session.id
+    else:
+        from datetime import datetime
+        chat_session.updated_at = datetime.utcnow()
+        db.commit()
+        
+    # Save user message
+    user_msg = ChatMessage(session_id=session_id, role="user", content=message)
+    db.add(user_msg)
+    db.commit()
     
     # Build athlete context
     data_agent = DataAgent(db)
@@ -813,27 +975,24 @@ async def chat_with_coach_sync(body: dict, db: Session = Depends(get_db)):
     rag_chunks = kb.query(message, n_results=3)
     rag_context = "\n\n".join(rag_chunks) if rag_chunks else ""
     
-    system_prompt = f"""You are Phoenix, an elite triathlon coach. You talk like a real coach — direct, confident, no fluff.
+    system_prompt = _build_chat_context(db, summary, rag_context)
 
-ATHLETE DATA:
-{summary}
-
-COACHING KNOWLEDGE:
-{rag_context}
-
-RULES:
-- Lead with the answer, then give 1-2 key reasons using the athlete's actual numbers.
-- Maximum 4-6 lines total. No headers, no essays, no bullet-point lists longer than 3 items.
-- If the athlete asks a yes/no question, start with yes or no.
-- Reference specific data points (HR zones, load ratio, TIB, etc.) to justify your advice.
-- Sound like a coach in person, not a textbook."""
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Fetch history
+    history = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
+    for h in history:
+        messages.append({"role": h.role, "content": h.content})
 
     try:
         from backend.core.llm_client import chat_completion
-        content = chat_completion(messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message}
-        ])
+        content = chat_completion(messages=messages)
+        
+        # Save assistant message
+        ai_msg = ChatMessage(session_id=session_id, role="assistant", content=content)
+        db.add(ai_msg)
+        db.commit()
+        
         return {"response": content}
     except Exception as e:
         print(f"LLM ERROR in /chat-sync: {e}")

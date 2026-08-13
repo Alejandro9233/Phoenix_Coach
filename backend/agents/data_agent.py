@@ -56,6 +56,7 @@ class DataAgent:
         
         # Profile thresholds
         profile_parts = []
+        if athlete.weight_kg: profile_parts.append(f"Weight: {athlete.weight_kg}kg")
         if athlete.vo2_max: profile_parts.append(f"VO2max: {athlete.vo2_max}")
         if athlete.hr_rest: profile_parts.append(f"RHR: {athlete.hr_rest} bpm")
         if athlete.hr_max: profile_parts.append(f"LTHR: {athlete.hr_max} bpm")
@@ -67,6 +68,28 @@ class DataAgent:
         if athlete.hrv_baseline: profile_parts.append(f"HRV Baseline: {athlete.hrv_baseline} ms")
         if profile_parts:
             lines.append(f"Profile: {', '.join(profile_parts)}")
+            
+        # Zones
+        if athlete.hr_zones:
+            zone_strs = []
+            for z in athlete.hr_zones:
+                zone_strs.append(f"Z{z['index']+1} <{z['hr']}bpm")
+            lines.append(f"HR Zones: {', '.join(zone_strs)}")
+            
+        if athlete.pace_zones:
+            zone_strs = []
+            for z in athlete.pace_zones:
+                pace = z['pace']
+                mins = int(pace / 60)
+                secs = int(pace % 60)
+                zone_strs.append(f"Z{z['index']+1} {mins}:{secs:02d}/km")
+            lines.append(f"Pace Zones: {', '.join(zone_strs)}")
+            
+        if athlete.cycle_power_zones:
+            zone_strs = []
+            for z in athlete.cycle_power_zones:
+                zone_strs.append(f"Z{z['index']+1} <{z['power']}W")
+            lines.append(f"Power Zones (FTP {athlete.ftp_watts or '?'}W): {', '.join(zone_strs)}")
         
         # Latest recovery metrics
         if snapshots:

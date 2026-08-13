@@ -179,6 +179,43 @@ class IngestionService:
                         athlete.hrv_baseline = float(latest_hrv_base)
                         print(f"  Latest HRV Base: {latest_hrv_base}")
 
+            # 6. Extract personal zones and profile data (ftp, weight, zones)
+            # Iterate through all captured endpoints to find these keys
+            for endpoint_name, endpoint_data in evolab_data.items():
+                if not isinstance(endpoint_data, dict):
+                    continue
+                
+                # Check at the root of the payload
+                if "lthrZone" in endpoint_data: athlete.hr_zones = endpoint_data["lthrZone"]
+                if "ltspZone" in endpoint_data: athlete.pace_zones = endpoint_data["ltspZone"]
+                if "cyclePowerZone" in endpoint_data: athlete.cycle_power_zones = endpoint_data["cyclePowerZone"]
+                if "ftp" in endpoint_data: athlete.ftp_watts = float(endpoint_data["ftp"])
+                
+                # Sometimes it's inside zoneData
+                zone_data = endpoint_data.get("zoneData")
+                if zone_data:
+                    if "lthrZone" in zone_data: athlete.hr_zones = zone_data["lthrZone"]
+                    if "ltspZone" in zone_data: athlete.pace_zones = zone_data["ltspZone"]
+                    if "cyclePowerZone" in zone_data: athlete.cycle_power_zones = zone_data["cyclePowerZone"]
+                    if "ftp" in zone_data: athlete.ftp_watts = float(zone_data["ftp"])
+                
+                if "weight" in endpoint_data:
+                    try:
+                        athlete.weight_kg = float(endpoint_data["weight"])
+                    except (ValueError, TypeError):
+                        pass
+                
+                if "headPic" in endpoint_data:
+                    athlete.head_pic_url = endpoint_data["headPic"]
+                    
+                # Check inside summaryInfo (where it appeared in our debug dump)
+                si = endpoint_data.get("summaryInfo", {})
+                if si:
+                    if "lthrZone" in si: athlete.hr_zones = si["lthrZone"]
+                    if "ltspZone" in si: athlete.pace_zones = si["ltspZone"]
+                    if "cyclePowerZone" in si: athlete.cycle_power_zones = si["cyclePowerZone"]
+                    if "ftp" in si: athlete.ftp_watts = float(si["ftp"])
+
             session.commit()
             print("Successfully ingested COROS data into the database.")
         except Exception as e:

@@ -111,11 +111,16 @@ class CorosScraper:
                             captured_data["activities"] = activity_list
                             print(f"    -> SUCCESS: Captured {len(captured_data['activities'])} activities")
                         
-                        # Catch health/evolab data (analyse, dashboard, etc.)
                         if any(k in url.lower() for k in ["health", "evolab", "metric", "fitness", "sport", "analyse", "dashboard"]):
                             endpoint = url.split("coros.com/")[-1].split("?")[0].replace("/", "_")
                             captured_data["evolab"][endpoint] = json_data
                             print(f"    -> Captured EvoLab data for: {endpoint}")
+                            
+                        # Also capture ANY payload that contains weight/profile info (the user's API Code 420BE2BB)
+                        elif isinstance(json_data, dict) and any(k in json_data for k in ["weight", "lthrZone", "ftp", "ltspZone"]):
+                            endpoint = url.split("coros.com/")[-1].split("?")[0].replace("/", "_") + "_profile"
+                            captured_data["evolab"][endpoint] = json_data
+                            print(f"    -> Captured Profile data for: {endpoint}")
                             
                             if "analyse_query" in endpoint:
                                 with open("analyse_debug.json", "w") as f:
