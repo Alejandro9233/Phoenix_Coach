@@ -50,7 +50,6 @@ struct CoachChatView: View {
                 // Input bar
                 inputBar
             }
-            }
             .navigationTitle(currentSessionId == nil ? "New Chat" : "Coach Phoenix")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
