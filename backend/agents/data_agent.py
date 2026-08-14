@@ -5,6 +5,7 @@ Pure Python, no LLM needed. Produces a compact text summary for the Response Age
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from backend.models.database import Athlete, Activity, RecoverySnapshot, InjuryLog, AthleteFeedback
+from backend.utils.timezone import get_local_today
 
 
 class DataAgent:
@@ -20,7 +21,7 @@ class DataAgent:
         if not athlete:
             return "No athlete profile found."
         
-        today = datetime.now().date()
+        today = get_local_today()
         cutoff = today - timedelta(days=lookback_days)
         
         # Get recent recovery snapshots

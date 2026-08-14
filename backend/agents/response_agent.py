@@ -181,7 +181,8 @@ class ResponseAgent:
         rag_context = "\n\n---\n\n".join(rag_chunks) if rag_chunks else "No coaching knowledge available."
 
         # 2. Build the user prompt
-        today = datetime.now().strftime("%A, %B %d, %Y")
+        from backend.utils.timezone import get_local_now
+        today = get_local_now().strftime("%A, %B %d, %Y")
         user_prompt = f"""Today is {today}.
 
 Here is the athlete's current state:

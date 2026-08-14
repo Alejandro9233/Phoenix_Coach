@@ -439,15 +439,16 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
 @app.post("/weekly-plan/adapt-today")
 def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
-    from datetime import date, timedelta, datetime
+    from datetime import timedelta, datetime
+    from backend.utils.timezone import get_local_now, get_local_today
     from backend.models.database import WeeklyPlan, Activity
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
     from backend.services.periodization_engine import PeriodizationEngine
     
-    today = date.today()
+    today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
-    today_day_name = datetime.now().strftime("%A")  # Monday, Tuesday, etc.
+    today_day_name = get_local_now().strftime("%A")  # Monday, Tuesday, etc.
     
     plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
     if not plan_record:
@@ -730,13 +731,14 @@ def _build_chat_context(db: Session, summary: str, rag_context: str) -> str:
     from backend.services.periodization_engine import PeriodizationEngine
     from backend.services.plan_normalizer import normalize_plan
     from backend.models.database import WeeklyPlan
-    from datetime import date, timedelta, datetime
+    from datetime import timedelta
+    from backend.utils.timezone import get_local_now, get_local_today
     import json
 
     engine = PeriodizationEngine()
     training_context = engine.compute_context(db)
     
-    today = date.today()
+    today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
     plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
     plan_json = {}
@@ -746,7 +748,7 @@ def _build_chat_context(db: Session, summary: str, rag_context: str) -> str:
     context_str = f"TRAINING PHASE: {training_context.get('current_phase', 'Unknown')}\n"
     context_str += f"WEEKS TO RACE: {training_context.get('weeks_to_race', 'N/A')}\n"
     
-    today_day_name = datetime.now().strftime("%A")
+    today_day_name = get_local_now().strftime("%A")
     if plan_json and "days" in plan_json:
         today_plan = plan_json["days"].get(today_day_name)
         context_str += f"\nTODAY'S WORKOUT ({today_day_name}):\n"
