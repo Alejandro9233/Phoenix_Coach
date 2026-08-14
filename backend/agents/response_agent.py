@@ -552,6 +552,104 @@ Respond ONLY with the JSON block. Do not write introductory or concluding conver
             adapted["adaptation"] = None
             return adapted
 
+    def generate_remaining_days(self, athlete_summary: str, profile: dict,
+                                 training_context: dict,
+                                 completed_days_summary: str,
+                                 days_to_plan: list[str]) -> dict:
+        """
+        Generate a partial weekly plan for only the remaining days.
+        
+        Receives a summary of what the athlete already completed this week
+        and generates only the specified remaining days, ensuring proper
+        volume balancing and no missed key sessions.
+        """
+        context_text = _format_training_context(training_context)
+        menu_text = _format_workout_menu(training_context)
+
+        # RAG context
+        phase_name = training_context.get("phase_name", "Foundation")
+        priorities = training_context.get("phase_priorities", "base building")
+        rag_query = f"{phase_name} {priorities} weekly training plan"
+        rag_chunks = self.kb.query(rag_query, n_results=3)
+        rag_context = "\n\n---\n\n".join(rag_chunks) if rag_chunks else ""
+
+        weeks = training_context.get("weeks_to_race", "?")
+        race = training_context.get("race_name", "the race")
+        race_type = training_context.get("race_type", "Triathlon")
+        race_dist = training_context.get("race_distance", "Marathon")
+        coach_style = "running" if race_type == "Running" else "triathlon"
+
+        days_list = ", ".join(days_to_plan)
+        days_json_template = "\n".join([f'    "{d}": {{ ... }}' for d in days_to_plan])
+
+        system = f"""You are Phoenix, an elite {coach_style} coach. You are coaching an athlete toward {race} ({race_dist}) in {weeks} weeks.
+
+You are generating a PARTIAL training plan to fill in the remaining days of the current week.
+The athlete has already completed some training this week. You MUST account for the volume, 
+load, and stimulus already delivered when planning the remaining days.
+
+IMPORTANT: Only prescribe workouts from the AVAILABLE WORKOUTS list. Do NOT prescribe anything from the FORBIDDEN list.
+IMPORTANT: You are replanning because an earlier system error corrupted some days. Make sure key 
+sessions (tempo runs, long runs, quality swim/bike sessions) are included if they were lost."""
+
+        prompt = f"""=== TRAINING CONTEXT ===
+{context_text}
+
+=== COACHING KNOWLEDGE ===
+{rag_context}
+
+=== {menu_text} ===
+
+=== ATHLETE CURRENT STATE ===
+{athlete_summary}
+
+=== WORK ALREADY COMPLETED THIS WEEK ===
+{completed_days_summary}
+
+=== YOUR COACHING TASK ===
+Generate training plans for ONLY these remaining days: {days_list}
+
+Account for the training already done. You must:
+1. Balance the remaining volume to hit the weekly target without overloading
+2. Include key quality sessions that may have been missed earlier in the week
+3. Follow hard/easy alternation relative to what was already done
+4. Use only workouts from the available menu
+5. For STRENGTH workouts: include the "muscle_groups" array
+
+CONSTRAINTS YOU MUST RESPECT:
+- Swimming ONLY on: {training_context.get('availability', {{}}).get('swim_days', 'any')}
+- Cycling on: {training_context.get('availability', {{}}).get('bike_days', 'any')}
+- Running on: {training_context.get('availability', {{}}).get('run_days', 'any')}
+- Strength on: {training_context.get('availability', {{}}).get('strength_days', 'any')}
+
+OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed above:
+{{
+  "days": {{
+{days_json_template}
+  }}
+}}
+
+Each day must have: "summary", "workouts" (array), "rationale", "coach_note".
+Each workout: "sport", "title", "steps" (array), "total_time", "hr_target", "muscle_groups" (for strength).
+Each step: "type" (warmup|main|recovery|cooldown), "duration" (MM:SS), "zone" (1-5), "description".
+
+Respond ONLY with the JSON block. Do not write introductory or concluding conversational text.
+"""
+
+        try:
+            content = chat_completion(
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt}
+                ],
+                json_mode=True
+            )
+            return json.loads(content)
+        except Exception as e:
+            print(f"Error generating remaining days plan: {e}")
+            # Return empty days as fallback
+            return {"days": {d: {"summary": "Error generating plan", "workouts": [], "rationale": str(e), "coach_note": "Please try again."} for d in days_to_plan}}
+
     def generate_weekly_review(self, compliance_data: dict, training_context: dict) -> dict:
         """
         Generate a weekly review — end-of-week coaching analysis.

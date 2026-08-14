@@ -437,20 +437,48 @@ struct TodayView: View {
             
             if let todayPlan = todayDayPlan {
                 let hasAdaptation = todayPlan.adaptation != nil && !(todayPlan.adaptation?.isEmpty ?? true)
-                let activeWorkouts = (hasAdaptation && preferOriginalProtocol)
-                    ? (todayPlan.originalWorkouts ?? todayPlan.workouts ?? [])
-                    : (todayPlan.workouts ?? [])
-                let isCurrentlyAdapted = hasAdaptation && !preferOriginalProtocol
+                let originalWorkouts = todayPlan.originalWorkouts ?? []
+                let activeWorkouts = todayPlan.workouts ?? []
                 
-                ProtocolCard(
-                    cardTitle: isCurrentlyAdapted ? "AI Adapted Protocol" : (preferOriginalProtocol ? "Original Blueprint (Active)" : "Original Protocol"),
-                    workouts: activeWorkouts,
-                    rationale: todayPlan.rationale,
-                    coachNote: todayPlan.coachNote,
-                    isAdapted: isCurrentlyAdapted,
-                    adaptationReason: isCurrentlyAdapted ? todayPlan.adaptation : nil,
-                    onTapCompare: hasAdaptation ? { showAdaptationSheet = true } : nil
-                )
+                if hasAdaptation && !originalWorkouts.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ProtocolCard(
+                                cardTitle: "AI Adapted Protocol",
+                                workouts: activeWorkouts,
+                                rationale: todayPlan.rationale,
+                                coachNote: todayPlan.coachNote,
+                                isAdapted: true,
+                                adaptationReason: todayPlan.adaptation,
+                                onTapCompare: { showAdaptationSheet = true }
+                            )
+                            .frame(width: UIScreen.main.bounds.width - 32)
+                            
+                            ProtocolCard(
+                                cardTitle: "Original Blueprint",
+                                workouts: originalWorkouts,
+                                rationale: nil,
+                                coachNote: nil,
+                                isAdapted: false,
+                                adaptationReason: nil,
+                                onTapCompare: nil
+                            )
+                            .frame(width: UIScreen.main.bounds.width - 32)
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.paging)
+                } else {
+                    ProtocolCard(
+                        cardTitle: "Original Protocol",
+                        workouts: activeWorkouts,
+                        rationale: todayPlan.rationale,
+                        coachNote: todayPlan.coachNote,
+                        isAdapted: false,
+                        adaptationReason: nil,
+                        onTapCompare: nil
+                    )
+                }
             } else {
                 emptyDayCard
             }

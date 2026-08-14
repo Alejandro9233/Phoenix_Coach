@@ -436,10 +436,167 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
     return get_weekly_plan(db)
 
 
+@app.post("/weekly-plan/replan-remaining")
+def replan_remaining_days(db: Session = Depends(get_db)):
+    """
+    Smart mid-week replan: lock completed days and only regenerate remaining days.
+    
+    Gathers actual activities from completed days, sends them as context to the AI coach,
+    and generates fresh plans only for today and future days.
+    """
+    from datetime import date, timedelta, datetime
+    from backend.models.database import WeeklyPlan, Activity, Athlete
+    from backend.agents.data_agent import DataAgent
+    from backend.agents.response_agent import ResponseAgent
+    from backend.services.periodization_engine import PeriodizationEngine
+    from backend.services.plan_normalizer import normalize_plan
+    
+    today = date.today()
+    start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+    
+    day_names_ordered = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    today_name = today.strftime("%A")
+    today_idx = day_names_ordered.index(today_name) if today_name in day_names_ordered else 0
+    
+    # Get the current plan
+    plan_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    
+    if not plan_record:
+        raise HTTPException(status_code=404, detail="No weekly plan found. Fetch /weekly-plan first.")
+    
+    plan_json = normalize_plan(plan_record.plan_json)
+    days_dict = plan_json.get("days", {})
+    
+    # Determine which days to lock and which to replan
+    # Lock everything before today; replan today + future
+    locked_days = day_names_ordered[:today_idx]
+    days_to_replan = day_names_ordered[today_idx:]
+    
+    # Get all activities this week for the completed days summary
+    week_activities = db.query(Activity).filter(
+        Activity.start_time >= datetime.combine(start_of_week, datetime.min.time()),
+        Activity.start_time <= datetime.combine(end_of_week, datetime.max.time()),
+    ).order_by(Activity.start_time).all()
+    
+    # Build the "what's been done" summary for the AI
+    summary_lines = []
+    total_minutes = 0
+    total_load = 0
+    
+    for day_name in locked_days:
+        day_date = start_of_week + timedelta(days=day_names_ordered.index(day_name))
+        day_acts = [a for a in week_activities if a.start_time and a.start_time.date() == day_date]
+        
+        if day_acts:
+            parts = []
+            for a in day_acts:
+                dur = round((a.duration_sec or 0) / 60)
+                dist = round((a.distance_m or 0) / 1000, 2) if a.distance_m else None
+                load = a.training_load or 0
+                total_minutes += dur
+                total_load += load
+                dist_str = f", {dist}km" if dist else ""
+                parts.append(f"{a.sport} {dur}min{dist_str} (load {load})")
+            summary_lines.append(f"{day_name}: {' + '.join(parts)}")
+        else:
+            planned = days_dict.get(day_name, {})
+            ws = planned.get("workouts", [])
+            if ws and ws[0].get("sport", "").lower() == "rest":
+                summary_lines.append(f"{day_name}: Rest day (as planned)")
+            else:
+                summary_lines.append(f"{day_name}: No activity recorded")
+    
+    # Also include today's activities if any
+    today_acts = [a for a in week_activities if a.start_time and a.start_time.date() == today]
+    if today_acts:
+        parts = []
+        for a in today_acts:
+            dur = round((a.duration_sec or 0) / 60)
+            dist = round((a.distance_m or 0) / 1000, 2) if a.distance_m else None
+            load = a.training_load or 0
+            total_minutes += dur
+            total_load += load
+            dist_str = f", {dist}km" if dist else ""
+            parts.append(f"{a.sport} {dur}min{dist_str} (load {load})")
+        summary_lines.append(f"{today_name} (today, already done): {' + '.join(parts)}")
+    
+    total_hours = round(total_minutes / 60, 1)
+    summary_lines.append(f"\nTotal so far: ~{total_hours} hours, total load {total_load}")
+    
+    completed_days_summary = "\n".join(summary_lines)
+    print(f"📋 Replanning remaining days: {days_to_replan}")
+    print(f"📊 Completed summary:\n{completed_days_summary}")
+    
+    # Get athlete profile
+    athlete = db.query(Athlete).first()
+    profile = {
+        "race_name": athlete.race_name,
+        "race_distance": athlete.race_distance,
+        "race_date": str(athlete.race_date) if athlete.race_date else None,
+        "weekly_hours_target": athlete.weekly_hours_target or 8.0,
+        "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
+        "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+        "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
+        "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri"
+    } if athlete else {}
+    
+    # Get training context and athlete summary
+    engine = PeriodizationEngine()
+    training_context = engine.compute_context(db)
+    
+    data_agent = DataAgent(db)
+    athlete_summary = data_agent.summarize()
+    
+    # Generate only the remaining days
+    response_agent = ResponseAgent()
+    new_days_result = response_agent.generate_remaining_days(
+        athlete_summary=athlete_summary,
+        profile=profile,
+        training_context=training_context,
+        completed_days_summary=completed_days_summary,
+        days_to_plan=days_to_replan
+    )
+    
+    new_days = new_days_result.get("days", {})
+    
+    # Merge: keep locked days, replace remaining days
+    for day_name in days_to_replan:
+        if day_name in new_days:
+            # Clear any stale adaptation data from the replanned days
+            new_day = new_days[day_name]
+            new_day.pop("adaptation", None)
+            new_day.pop("original_workouts", None)
+            days_dict[day_name] = new_day
+    
+    plan_json["days"] = days_dict
+    
+    # Re-normalize and save
+    plan_json = normalize_plan(plan_json)
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    plan_record.plan_json = plan_json
+    plan_record.last_adapted = None  # Reset adaptation flag since we replanned
+    flag_modified(plan_record, "plan_json")
+    db.commit()
+    
+    print(f"✅ Replanned {len(days_to_replan)} days: {days_to_replan}")
+    
+    return {
+        "status": "replanned",
+        "locked_days": locked_days,
+        "replanned_days": days_to_replan,
+        "completed_summary": completed_days_summary,
+        "plan": plan_json
+    }
+
+
 @app.post("/weekly-plan/adapt-today")
 def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
-    from datetime import timedelta, datetime
+    from datetime import date, timedelta, datetime
     from backend.utils.timezone import get_local_now, get_local_today
     from backend.models.database import WeeklyPlan, Activity
     from backend.agents.data_agent import DataAgent
@@ -453,6 +610,31 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
     if not plan_record:
         raise HTTPException(status_code=404, detail="Weekly plan not found for this week. Please fetch /weekly-plan first.")
+    
+    # --- Idempotency guard: prevent double adaptation on the same day ---
+    if plan_record.last_adapted:
+        last_adapted_date = plan_record.last_adapted.date() if hasattr(plan_record.last_adapted, 'date') else plan_record.last_adapted
+        if last_adapted_date == today:
+            # Already adapted today — return the existing adapted workout instead of re-adapting
+            from backend.services.plan_normalizer import normalize_plan
+            existing_plan = normalize_plan(plan_record.plan_json)
+            existing_day = existing_plan.get("days", {}).get(today_day_name, {})
+            print(f"⚠️ Idempotency guard: already adapted today ({today}). Returning existing adaptation.")
+            return existing_day
+    
+    # --- Staleness guard: block adaptation if recovery data is not from today ---
+    from backend.models.database import RecoverySnapshot
+    is_simulated = body and any(body.get(k) for k in ("hrv", "rhr", "soreness"))
+    if not is_simulated:
+        latest_snap = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).first()
+        if not latest_snap:
+            raise HTTPException(status_code=409, detail="Cannot adapt: no recovery data available. Run a sync first.")
+        snap_date = latest_snap.date if isinstance(latest_snap.date, date) else latest_snap.date.date() if hasattr(latest_snap.date, 'date') else latest_snap.date
+        if snap_date != today:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot adapt: recovery data is stale (last snapshot: {snap_date}, today: {today}). Run a sync first."
+            )
         
     from backend.services.plan_normalizer import normalize_plan
     plan_json = normalize_plan(plan_record.plan_json)
@@ -648,11 +830,26 @@ async def smart_refresh(db: Session = Depends(get_db)):
     # 2. Get latest recovery snapshot
     latest = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).first()
 
-    # 3. Deterministic recovery evaluation
+    # --- Staleness guard: skip adaptation if recovery data is not from today ---
+    from datetime import date as date_type
+    recovery_data_stale = False
+    stale_reason = None
+    if latest:
+        snap_date = latest.date if isinstance(latest.date, date_type) else latest.date.date() if hasattr(latest.date, 'date') else latest.date
+        today_date = date_type.today()
+        if snap_date != today_date:
+            recovery_data_stale = True
+            stale_reason = f"Latest snapshot is from {snap_date}, not today ({today_date})"
+            print(f"⚠️ Staleness guard: {stale_reason}. Skipping adaptation.")
+    else:
+        recovery_data_stale = True
+        stale_reason = "No recovery snapshots found"
+
+    # 3. Deterministic recovery evaluation (only if data is fresh)
     needs_adaptation = False
     adaptation_reasons = []
 
-    if latest:
+    if latest and not recovery_data_stale:
         athlete = db.query(Athlete).first()
         # HRV check
         if latest.hrv_ms and athlete and athlete.hrv_baseline:
@@ -710,6 +907,8 @@ async def smart_refresh(db: Session = Depends(get_db)):
         "sync_status": sync_status,
         "sync_message": sync_message,
         "recovery": recovery_summary,
+        "recovery_data_stale": recovery_data_stale,
+        "stale_reason": stale_reason,
         "adaptation": {
             "needed": needs_adaptation,
             "adapted": adapted,
