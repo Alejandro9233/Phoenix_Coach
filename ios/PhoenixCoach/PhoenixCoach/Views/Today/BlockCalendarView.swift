@@ -839,6 +839,9 @@ struct WeeklyWorkoutsDetailSheet: View {
     // Tracks which workout rows are expanded
     @State private var expandedWorkouts: Set<UUID> = []
     
+    @State private var isReplanning = false
+    @State private var showReplanSuccess = false
+    
     // Sort workouts by day of week to ensure correct visual order
     private var sortedWorkouts: [CalendarWorkout] {
         guard let list = week.workouts else { return [] }
@@ -892,6 +895,44 @@ struct WeeklyWorkoutsDetailSheet: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
                         )
+                        
+                        if week.isCurrentWeek {
+                            Button {
+                                Task {
+                                    isReplanning = true
+                                    do {
+                                        _ = try await NetworkManager.shared.replanRemainingWeek()
+                                        NotificationCenter.default.post(name: NSNotification.Name("PlanUpdated"), object: nil)
+                                        showReplanSuccess = true
+                                    } catch {
+                                        print("Error replanning: \(error)")
+                                    }
+                                    isReplanning = false
+                                }
+                            } label: {
+                                HStack {
+                                    if isReplanning {
+                                        ProgressView()
+                                            .tint(.black)
+                                    } else {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                    }
+                                    Text("Replan Remaining Days")
+                                        .font(.system(size: 14, weight: .bold))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(DS.Colors.accent)
+                                .foregroundStyle(.black)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .disabled(isReplanning)
+                            .alert("Plan Regenerated", isPresented: $showReplanSuccess) {
+                                Button("OK", role: .cancel) { dismiss() }
+                            } message: {
+                                Text("The remaining days have been smartly replanned to adapt to what you've already done.")
+                            }
+                        }
                         
                         // Detailed workouts list
                         if week.hasPlan, !sortedWorkouts.isEmpty {

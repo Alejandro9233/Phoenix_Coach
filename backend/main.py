@@ -521,7 +521,7 @@ def replan_remaining_days(db: Session = Depends(get_db)):
             total_load += load
             dist_str = f", {dist}km" if dist else ""
             parts.append(f"{a.sport} {dur}min{dist_str} (load {load})")
-        summary_lines.append(f"{today_name} (today, already done): {' + '.join(parts)}")
+        summary_lines.append(f"{today_name} (today, partially completed): {' + '.join(parts)}")
     
     total_hours = round(total_minutes / 60, 1)
     summary_lines.append(f"\nTotal so far: ~{total_hours} hours, total load {total_load}")

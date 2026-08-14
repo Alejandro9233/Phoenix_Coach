@@ -413,6 +413,24 @@ class NetworkManager: ObservableObject {
         return try decoder.decode(WeeklyPlanResponse.self, from: data)
     }
     
+    struct ReplanResponseWrapper: Codable {
+        let plan: WeeklyPlanResponse
+    }
+    
+    func replanRemainingWeek() async throws -> WeeklyPlanResponse {
+        guard let url = URL(string: "\(baseURL)/weekly-plan/replan-remaining") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        let wrapper = try decoder.decode(ReplanResponseWrapper.self, from: data)
+        return wrapper.plan
+    }
+    
     // MARK: - Training Context
     
     func fetchTrainingContext() async throws -> TrainingContext {
