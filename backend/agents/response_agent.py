@@ -617,10 +617,10 @@ Account for the training already done. You must:
 5. For STRENGTH workouts: include the "muscle_groups" array
 
 CONSTRAINTS YOU MUST RESPECT:
-- Swimming ONLY on: {training_context.get('availability', {{}}).get('swim_days', 'any')}
-- Cycling on: {training_context.get('availability', {{}}).get('bike_days', 'any')}
-- Running on: {training_context.get('availability', {{}}).get('run_days', 'any')}
-- Strength on: {training_context.get('availability', {{}}).get('strength_days', 'any')}
+- Swimming ONLY on: {training_context.get('availability', dict()).get('swim_days', 'any')}
+- Cycling on: {training_context.get('availability', dict()).get('bike_days', 'any')}
+- Running on: {training_context.get('availability', dict()).get('run_days', 'any')}
+- Strength on: {training_context.get('availability', dict()).get('strength_days', 'any')}
 
 OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed above:
 {{
