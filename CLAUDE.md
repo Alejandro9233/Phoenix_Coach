@@ -1,0 +1,68 @@
+# Phoenix Coach
+
+Personal AI triathlon/marathon coach. FastAPI backend on Render + SwiftUI iOS app.
+Scrapes a COROS watch, generates periodized weekly plans with an LLM.
+
+Design: **Python = GPS, LLM = Coach.** Python does the math that must be exact
+(periodization, volume ceilings, compliance). The LLM picks workouts inside
+those limits and writes the coaching notes.
+
+## Rules
+
+- Short, plain words. Lead with the answer. A 3-item list beats three paragraphs.
+- **`.env` `DATABASE_URL` is the production Render Postgres. Never test against it.**
+  `load_dotenv(override=True)` in main.py overrides any `DATABASE_URL` passed on
+  the command line — neutralize `dotenv.load_dotenv` first, then assert the URL
+  is sqlite before touching anything.
+- Dates go through `get_local_today()`, never `date.today()`. Servers run in UTC,
+  which flips the date at 5pm Hermosillo time.
+- Don't set `TIMEZONE` in `.env` or on Render. It overrides the phone's reported
+  timezone and breaks travel.
+- Commits go straight to `main` on this repo.
+- The LLM never decides volume. Wrong mileage in a plan = bug in
+  `periodization_engine.py` or the context injection, not the prompt.
+
+## Don't re-add these — removed on purpose
+
+- **On-device MLX chat** (`LocalLLMManager.swift`), deleted 2026-07-27. Chat is
+  backend-only SSE. There is no offline path, by choice.
+- **`frontend/`** web UI — replaced by the iOS app.
+- **Root `phoenix_coach.db`** — no SQLite snapshot in the repo. Use `scripts/rebuild_db.py`.
+
+## Commands
+
+```bash
+# Backend (local dev, port 8001)
+PYTHONPATH=. ./venv/bin/python3 backend/main.py
+
+# iOS build — simulators here are iPhone 17 series, not 15
+cd ios/PhoenixCoach && xcodebuild build -project PhoenixCoach.xcodeproj \
+  -scheme PhoenixCoach -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+
+# COROS scraper health check
+PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
+```
+
+## Where things live
+
+- `backend/main.py` — all endpoints. `grep -n '^@app\.' backend/main.py` to list them.
+- `backend/models/database.py` — all tables. `grep -n '__tablename__'` to list them.
+- `backend/services/periodization_engine.py` — phases, volume targets. Docstring has
+  the ceilings and why the distance profiles exist.
+- `backend/agents/` — `data_agent` summarizes state, `response_agent` holds prompts
+- `ios/PhoenixCoach/` — 5 tabs: Today, Coach, Journal, Recent, Profile.
+  Tab names don't match filenames: **Journal** = `Views/Dashboard/DashboardView.swift`,
+  **Recent** = `Views/Feedback/FeedbackView.swift`.
+- `docs/DEPLOY.md` — Render env vars, free-tier limits, rollback. Read before deploying.
+
+## Gotchas
+
+- **Render cold start**: free tier sleeps after 15 min; first request takes 30-60s.
+  Expected — iOS handles it with a 180s timeout. Don't "fix" it.
+- **COROS scraping fails** → check auth first, not the parser. Login breaks on
+  auto-redirects. Run `scripts/scraper_health_check.py`.
+- **No migration framework** — `main.py` does `ALTER TABLE` on startup. New columns
+  must be nullable.
+- **uvicorn buffers logs** when started non-interactively. Missing output ≠ didn't run.
+- Tests use in-memory SQLite with a `get_db` override, so they're safe to run on a
+  machine holding production credentials: `PYTHONPATH=. ./venv/bin/pytest backend/tests/`

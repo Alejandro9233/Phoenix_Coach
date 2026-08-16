@@ -13,6 +13,24 @@ Supports multiple race distances:
 - Running: 5k, 10k, Half Marathon, Marathon
 - Triathlon: Sprint, Olympic, 70.3, Ironman (stubbed)
 - Unknown distances fall back to foundation-only training.
+
+Volume ceilings by distance (the numbers the LLM is not allowed to exceed):
+
+    5k / 10k     25-35 km/wk,  5-7 h/wk   Speed Build -> Taper + Race
+                 Enables VO2max intervals, tempo, reps.
+                 Forbids marathon-pace long runs and any run over 15 km.
+    Marathon     40-55 km/wk, 10-11 h/wk  Foundation -> Base -> Build -> Peak -> Taper
+                 Heavy on marathon-pace long runs and aerobic volume.
+    Sprint/Oly   dynamic, balances swim/bike/run plus strength.
+    Unknown      FOUNDATION_ONLY_PROFILE (safety fallback).
+
+WHY the distance profiles exist: a 5k goal used to be forced into marathon volume,
+which confused the coach into emitting safe-fallback rest weeks. If a generated plan
+comes back with wrong mileage, the bug is HERE or in the context injection — never in
+the prompt. The LLM does not choose volume.
+
+Sport availability (swim_days, bike_days, run_days, strength_days) is enforced in this
+file, not in the prompt. The LLM cannot schedule a swim on a non-swim day.
 """
 from datetime import date, datetime, timedelta
 from typing import Optional

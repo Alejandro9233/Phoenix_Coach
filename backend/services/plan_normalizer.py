@@ -1,6 +1,12 @@
 """
 Plan Normalizer — Converts diverse LLM weekly plan outputs into a canonical JSON format
 compatible with the backend compliance engine and the iOS client Swift models.
+
+KEEP THIS GUARD: the LLM intermittently returns `weekly_review` as a nested dict instead
+of a string, which silently crashed the iOS Decodable pipeline — the app showed no plan
+and no error. This module flattens that case to a markdown string before it ships to the
+client. Any refactor here must preserve it, and the iOS side must keep treating
+`weekly_review` as string-or-null.
 """
 import re
 import json

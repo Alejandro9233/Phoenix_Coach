@@ -38,3 +38,6 @@ wheels/
 
 # Vector DB
 chroma_db/
+
+# Session state (volatile, not shared)
+.claude/restart-brief.md

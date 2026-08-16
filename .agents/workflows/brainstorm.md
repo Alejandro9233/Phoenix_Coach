@@ -9,13 +9,10 @@ to the King — never to act unilaterally on the codebase.
 
 ## Step 1 — Scan for opportunities
 Look across three sources:
-1. **The documented backlog** — Section 11 of the project handoff
-   (Capturing Activities, scraper reliability, on-device chat quality,
-   soreness/injury integration, compliance scoring, Apple Watch/HealthKit,
-   multi-athlete support).
-2. **Known placeholders in the codebase** — e.g. `DashboardView.swift`
-   (Journal tab is currently an empty `ContentUnavailableView`), any TODO
-   comments, any stubbed/partial endpoints in `main.py`.
+1. **The documented backlog** — `docs/TODO.md`.
+2. **Known gaps in the codebase** — TODO comments, stubbed or partial endpoints in
+   `main.py`, and untested high-risk logic (`periodization_engine.py`,
+   `plan_normalizer.py` currently have no tests).
 3. **Gaps between backend and iOS** — endpoints that exist but aren't
    fully surfaced in the UI, or iOS views that call endpoints that don't
    exist yet.

@@ -2,7 +2,7 @@
 
 ## Project context
 - Core logic: Python (FastAPI) for the backend, iOS (SwiftUI) for the frontend mobile app (`PhoenixCoach`).
-- Local dev: backend runs at `http://localhost:8000` (typically `uvicorn backend.main:app --reload` or `uvicorn main:app`).
+- Local dev: backend runs at `http://localhost:8001` (typically `PYTHONPATH=. ./venv/bin/python3 backend/main.py`).
 - Project root: `/Users/alex/Documents/Code/Phoenix_Project`
 
 ## Environment

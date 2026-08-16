@@ -1,0 +1,73 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(//Users/alex/Documents/Code/Phoenix_Project/.env)",
+      "Read(**/.env)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.p12)",
+      "Read(**/id_rsa*)",
+      "Read(//Users/alex/.ssh/**)",
+      "Bash(cat .env*)",
+      "Bash(cat ~/.ssh/*)",
+      "Bash(rm -rf *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean *)"
+    ],
+    "ask": [
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git add*)",
+      "Bash(git checkout*)",
+      "Bash(git switch*)",
+      "Bash(git merge*)",
+      "Bash(git rebase*)",
+      "Bash(git restore*)",
+      "Bash(git stash*)",
+      "Bash(git reset*)",
+      "Bash(git tag*)",
+      "Bash(gh *)",
+      "Bash(rm *)",
+      "Bash(mv *)",
+      "Bash(trash *)",
+      "Edit(./.env)",
+      "Write(./.env)"
+    ],
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch)",
+      "Bash(git blame*)",
+      "Bash(git remote -v)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(which *)",
+      "Bash(file *)",
+      "Bash(sed -n *)",
+      "Bash(jq *)",
+      "Bash(mkdir *)",
+      "Bash(touch *)",
+      "Bash(./venv/bin/python3 *)",
+      "Bash(PYTHONPATH=. ./venv/bin/python3 *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(xcodebuild *)",
+      "Bash(xcrun *)",
+      "Bash(curl -s https://phoenix-coach.onrender.com/*)",
+      "Bash(curl https://phoenix-coach.onrender.com/*)"
+    ],
+    "additionalDirectories": [
+      "/Users/alex/Documents/Code/Phoenix_Project"
+    ]
+  }
+}

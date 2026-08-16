@@ -37,8 +37,7 @@ Given the bug/change list provided as $ARGUMENTS:
 ## Step 2 — Backend fixes
 For items categorized BACKEND:
 1. Write/update a test that calls the relevant endpoint (curl or pytest) and
-   fails before the fix, passes after. Reference the "Quick Reference" curl
-   commands in the project handoff as a starting point.
+   fails before the fix, passes after. See `CLAUDE.md` for run/test commands.
 2. Do not mark complete without the passing test output attached.
 // turbo
 3. Run the backend locally (`PYTHONPATH=. python3 backend/main.py`) to confirm
