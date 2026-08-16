@@ -348,6 +348,11 @@ class NetworkManager: ObservableObject {
         guard let url = URL(string: "\(baseURL)/athlete/profile") else {
             throw NetworkError.invalidURL
         }
+        // Always stamp the device's current timezone so the backend knows what
+        // "today" means for this athlete, wherever they happen to be.
+        var profile = profile
+        profile.timezone = TimeZone.current.identifier
+
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -355,6 +360,26 @@ class NetworkManager: ObservableObject {
         let (_, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw NetworkError.serverError
+        }
+    }
+
+    /// Push just the device timezone. Called on launch and whenever the app comes
+    /// back to the foreground, so flying somewhere fixes dates without any user action.
+    /// Silent by design — never surface a failure for this.
+    func syncDeviceTimezone() async {
+        let identifier = TimeZone.current.identifier
+        guard UserDefaults.standard.string(forKey: "last_synced_timezone") != identifier else { return }
+        guard let url = URL(string: "\(baseURL)/athlete/profile") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["timezone": identifier])
+        request.timeoutInterval = 15
+
+        if let (_, response) = try? await session.data(for: request),
+           let http = response as? HTTPURLResponse, http.statusCode == 200 {
+            UserDefaults.standard.set(identifier, forKey: "last_synced_timezone")
         }
     }
     

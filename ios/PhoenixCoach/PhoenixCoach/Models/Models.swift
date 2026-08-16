@@ -302,9 +302,12 @@ struct AthleteProfile: Codable {
     var strengthDays: String?
     var targetFinishTime: String?
     var trainingStartDate: String?
-    
+    /// IANA identifier for the device's current timezone, e.g. "America/Hermosillo".
+    /// Stamped automatically on save — the backend uses it to decide what "today" is.
+    var timezone: String?
+
     enum CodingKeys: String, CodingKey {
-        case name, age
+        case name, age, timezone
         case weightKg = "weight_kg"
         case raceName = "race_name"
         case raceType = "race_type"

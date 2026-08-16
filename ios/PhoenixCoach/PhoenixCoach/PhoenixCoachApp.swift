@@ -10,11 +10,14 @@ struct PhoenixCoachApp: App {
                 .preferredColorScheme(.dark)
                 .task {
                     NotificationManager.shared.requestPermission()
+                    await NetworkManager.shared.syncDeviceTimezone()
                 }
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
-                // Could refresh notifications here
+                // Catches travel: returning to the app from a new timezone
+                // re-points the backend's idea of "today".
+                Task { await NetworkManager.shared.syncDeviceTimezone() }
             }
         }
     }

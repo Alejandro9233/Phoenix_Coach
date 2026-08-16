@@ -31,6 +31,7 @@ class Athlete(Base):
     strength_days = Column(String, default="mon,wed,fri")
     training_start_date = Column(Date, nullable=True)  # Anchors 3:1 build/recovery cycle
     target_finish_time = Column(String, nullable=True)  # "3:45:00" (HH:MM:SS)
+    timezone = Column(String, nullable=True)  # IANA id reported by the phone, e.g. "America/Hermosillo"
     
     # COROS enriched fields
     cycle_power_zones = Column(JSON, nullable=True)

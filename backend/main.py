@@ -13,7 +13,9 @@ from backend.models.database import (
 )
 from backend.services.fit_importer import parse_fit_file
 from backend.services.coros_scraper import CorosScraper
-from backend.utils.timezone import get_local_today
+from backend.utils.timezone import (
+    get_local_today, get_timezone_name, is_valid_timezone, set_athlete_timezone,
+)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
@@ -29,6 +31,27 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create tables
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_columns():
+    """Add columns introduced after a table was first created.
+
+    create_all() only creates missing *tables*, never missing columns, so an
+    existing deployment would keep the old schema. Plain ADD COLUMN works on
+    both SQLite and PostgreSQL.
+    """
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if "athletes" not in inspector.get_table_names():
+        return
+    existing = {c["name"] for c in inspector.get_columns("athletes")}
+    if "timezone" not in existing:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE athletes ADD COLUMN timezone VARCHAR"))
+        print("✅ Migration: added athletes.timezone")
+
+
+_ensure_columns()
 
 # --- Singleton instances ---
 _kb_instance = None
@@ -65,6 +88,16 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         athlete = db.query(Athlete).first()
+
+        # Restore the athlete's last known timezone so dates are correct even
+        # before the phone checks in after a restart.
+        if athlete and athlete.timezone:
+            if set_athlete_timezone(athlete.timezone):
+                print(f"✅ Athlete timezone restored: {athlete.timezone}")
+            else:
+                print(f"⚠️ Stored timezone '{athlete.timezone}' is invalid — using default.")
+        print(f"🕒 Active timezone: {get_timezone_name()} (today = {get_local_today()})")
+
         if athlete and athlete.training_start_date is None:
             # Query the earliest activity
             earliest_act = db.query(Activity).order_by(Activity.start_time.asc()).first()
@@ -157,6 +190,8 @@ def get_athlete_profile(db: Session = Depends(get_db)):
         "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri",
         "target_finish_time": athlete.target_finish_time,
         "training_start_date": str(athlete.training_start_date) if athlete.training_start_date else None,
+        "timezone": athlete.timezone,
+        "active_timezone": get_timezone_name(),
     }
 
 
@@ -194,7 +229,20 @@ def update_athlete_profile(body: dict, db: Session = Depends(get_db)):
             athlete.training_start_date = date_type.fromisoformat(tsd)
         else:
             athlete.training_start_date = None
-    
+
+    # The phone reports its current timezone, so travelling updates this on its
+    # own. Ignore garbage rather than 400-ing — this rides along with unrelated
+    # profile saves and must never block them.
+    if "timezone" in body:
+        tz = body["timezone"]
+        if tz and is_valid_timezone(tz):
+            if athlete.timezone != tz:
+                print(f"🕒 Timezone changed: {athlete.timezone} → {tz}")
+            athlete.timezone = tz
+            set_athlete_timezone(tz)
+        elif tz:
+            print(f"⚠️ Ignoring invalid timezone from client: {tz!r}")
+
     db.commit()
     db.refresh(athlete)
     print(f"Profile updated: {athlete.name}, race={athlete.race_name} on {athlete.race_date}, start={athlete.training_start_date}")
