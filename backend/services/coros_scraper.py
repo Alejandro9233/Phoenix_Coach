@@ -22,72 +22,112 @@ SPORT_CODE_MAP = {
 
 
 class CorosScraper:
+    # COROS keeps the `#/login` hash in the URL even after a *successful* login, so the
+    # URL can never be used to judge auth state. The reliable signal is DOM-based:
+    # the app shell has mounted and the password field is gone. Verified against the
+    # live site — the login page has no `.app-container`, and the logged-in dash-board
+    # has no `.arco-layout-sider` / `.admin-card-box` (those live on other views).
+    LOGGED_IN_JS = """() => !!document.querySelector('.app-container')
+                            && !document.querySelector('input[type="password"]')"""
+
     def __init__(self):
         self.email = os.getenv("COROS_EMAIL")
         self.password = os.getenv("COROS_PASSWORD")
         self.base_url = "https://t.coros.com"
-        
+
+    async def _login_error_text(self, page):
+        """Best-effort read of whatever COROS is complaining about on the login form."""
+        for selector in ('.arco-form-item-error-help', '.arco-message', '.arco-notice-content'):
+            try:
+                messages = [t.strip() for t in await page.locator(selector).all_text_contents()]
+                messages = [t for t in messages if t]
+                if messages:
+                    return "; ".join(messages)
+            except Exception:
+                continue
+        return None
+
+    async def _is_logged_in(self, page, timeout=5000):
+        """True once the app shell has mounted and the login form is gone."""
+        try:
+            await page.wait_for_function(self.LOGGED_IN_JS, timeout=timeout)
+            return True
+        except Exception:
+            return False
+
+    async def _check_box(self, page, label):
+        """Click an arco checkbox and verify it actually took."""
+        checkbox = page.locator(f'label.arco-checkbox:has-text("{label}")')
+        for attempt in range(3):
+            try:
+                await checkbox.click(timeout=5000)
+            except Exception as e:
+                print(f"  Warning: Could not click '{label}' (attempt {attempt + 1}): {e}")
+                continue
+            # arco marks the checked state on the label, not the hidden input
+            try:
+                classes = await checkbox.get_attribute("class", timeout=2000) or ""
+                if "arco-checkbox-checked" in classes:
+                    print(f"  '{label}' checked.")
+                    return True
+            except Exception:
+                pass
+            await page.wait_for_timeout(500)
+        print(f"  Warning: '{label}' did not register as checked.")
+        return False
+
     async def login(self, page):
         """Logs into COROS Training Hub."""
         print(f"Logging into COROS as {self.email}...")
+        if not self.email or not self.password:
+            raise Exception("COROS Login Failed: COROS_EMAIL / COROS_PASSWORD are not set")
+
         await page.goto(f"{self.base_url}/admin/views/dash-board#/login")
-        
-        # Wait for either the login form OR the dashboard to load
+
+        # A remembered session lands us straight on the dashboard, skipping the form.
+        if await self._is_logged_in(page):
+            print("  Dashboard detected right away. Already logged in!")
+            return
+
+        print("  Waiting for login form...")
         try:
-            print("  Waiting for login form or dashboard...")
-            await page.wait_for_selector('input[type="text"], .app-container, .arco-layout-sider', timeout=15000)
-            
-            # Check if we are already logged in (dashboard is visible and no login form)
-            is_login_form_visible = await page.locator('input[type="text"]').is_visible()
-            if not is_login_form_visible:
-                print("  Dashboard detected right away. Already logged in!")
-                return
+            await page.wait_for_selector('input[type="text"]', timeout=15000)
         except Exception as e:
-            print(f"  Warning: Neither login form nor dashboard detected initially: {e}")
-            
+            raise Exception(
+                f"COROS Login Failed: login form never rendered at {page.url}"
+            ) from e
+
         print("  Login form detected. Filling credentials...")
         await page.fill('input[type="text"]', self.email)
         await page.fill('input[type="password"]', self.password)
-        
-        # Click the checkboxes (Remember me and Privacy Policy)
-        print("  Checking 'Remember me'...")
-        try:
-            await page.click('label.arco-checkbox:has-text("Remember me")', timeout=5000)
-        except Exception as e:
-            print(f"  Warning: Could not click 'Remember me': {e}")
 
-        print("  Checking 'Privacy Policy'...")
-        try:
-            await page.click('label.arco-checkbox:has-text("Privacy Policy")', timeout=5000)
-        except Exception as e:
-            print(f"  Warning: Could not click 'Privacy Policy': {e}")
-            
-        # Give UI a moment to settle
-        await page.wait_for_timeout(1000)
+        # Verify the consent boxes actually took rather than sleeping a fixed 1s and
+        # hoping. Not fatal on its own — the dashboard check below is the real verdict.
+        await self._check_box(page, "Remember me")
+        await self._check_box(page, "Privacy Policy")
 
-        # Click login button
         print("  Clicking Login button...")
         await page.click('button:has-text("Login")')
-        
-        # Wait for dashboard to load
+
         print("  Waiting for dashboard to appear...")
-        try:
-            # Wait for the main app container or sidebar
-            await page.wait_for_selector('.app-container, .arco-layout-sider', timeout=30000)
-            
-            # Check for login error messages just in case
-            error_msg = await page.locator('.arco-form-item-error-help').all_text_contents()
-            if error_msg:
-                print(f"  ❌ Login Failed. Page says: {error_msg}")
-                raise Exception(f"COROS Login Failed: {error_msg}")
-                
+        # Render cold starts are slow; 30s was tight enough that a merely-slow login
+        # got reported as a failure. Judge on the DOM, never on the URL.
+        if await self._is_logged_in(page, timeout=60000):
             print("  Dashboard detected.")
-        except Exception as e:
-            print(f"  Warning: Dashboard element not detected within 30s. Current URL: {page.url}")
-            if "login" in page.url.lower():
-                raise e
-        
-        print("  Login successful.")
+            print("  Login successful.")
+            return
+
+        reason = await self._login_error_text(page)
+        if reason:
+            raise Exception(f"COROS Login Failed: {reason}")
+        if await page.locator('input[type="password"]').count():
+            raise Exception(
+                f"COROS Login Failed: still on the login form after 60s at {page.url} "
+                "with no error message — likely rate limiting or rejected credentials"
+            )
+        raise Exception(
+            f"COROS Login Failed: app shell did not mount within 60s at {page.url}"
+        )
 
     async def scrape_all(self):
         """Main entry point: login → EvoLab metrics → Activity list → return."""
@@ -183,9 +223,17 @@ class CorosScraper:
                 print(f"\n✅ Scrape complete: {len(captured_data['activities'])} activities, {len(captured_data['evolab'])} EvoLab endpoints")
                 return captured_data
             except Exception as e:
-                print(f"Error during scrape: {e}")
-                await page.screenshot(path="scrape_error.png")
-                print("Error screenshot saved as scrape_error.png")
+                # Render's filesystem is ephemeral, so a screenshot there is write-only
+                # debugging. Always log the URL — that survives into the app's error text.
+                print(f"Error during scrape at {page.url}: {e}")
+                try:
+                    shot_dir = os.getenv("SCRAPER_DEBUG_DIR")
+                    if shot_dir:
+                        shot_path = os.path.join(shot_dir, "scrape_error.png")
+                        await page.screenshot(path=shot_path)
+                        print(f"Error screenshot saved to {shot_path}")
+                except Exception as shot_err:
+                    print(f"  (could not save error screenshot: {shot_err})")
                 raise e
             finally:
                 await browser.close()
