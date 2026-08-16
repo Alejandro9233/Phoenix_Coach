@@ -21,6 +21,11 @@ those limits and writes the coaching notes.
 - Commits go straight to `main` on this repo.
 - The LLM never decides volume. Wrong mileage in a plan = bug in
   `periodization_engine.py` or the context injection, not the prompt.
+- **A constraint that lives only in a prompt is a suggestion.** Sport availability
+  and injuries are enforced in `constraint_enforcer.py`, which strips violating
+  workouts *after* generation. Every path that writes `plan_json` must run
+  `enforce_constraints` before persisting. Never "fix" a violated constraint by
+  rewording the prompt.
 
 ## Don't re-add these — removed on purpose
 
@@ -49,6 +54,11 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
 - `backend/models/database.py` — all tables. `grep -n '__tablename__'` to list them.
 - `backend/services/periodization_engine.py` — phases, volume targets. Docstring has
   the ceilings and why the distance profiles exist.
+- `backend/services/constraint_enforcer.py` — the hard gate. Strips workouts that
+  violate availability or an active injury. Read its docstring before touching
+  anything that generates a plan.
+- `backend/services/issue_triage.py` — "my calf is shot" → plan change. Detect in
+  chat, propose, apply only on confirm. Docstring has the three-step shape.
 - `backend/agents/` — `data_agent` summarizes state, `response_agent` holds prompts
 - `ios/PhoenixCoach/` — 5 tabs: Today, Coach, Journal, Recent, Profile.
   Tab names don't match filenames: **Journal** = `Views/Dashboard/DashboardView.swift`,
@@ -61,8 +71,15 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
   Expected — iOS handles it with a 180s timeout. Don't "fix" it.
 - **COROS scraping fails** → check auth first, not the parser. Login breaks on
   auto-redirects. Run `scripts/scraper_health_check.py`.
-- **No migration framework** — `main.py` does `ALTER TABLE` on startup. New columns
-  must be nullable.
+- **No migration framework** — `main.py` does `ALTER TABLE` on startup in
+  `_ensure_columns()`. New columns must be nullable.
+- **iOS notification toggles**: `@AppStorage("x") = true` does NOT write that default
+  to UserDefaults. A plain `UserDefaults.bool(forKey:)` read returns `false` until the
+  user flips the switch. `NotificationManager.registerDefaults()` seeds them; don't
+  add a toggle without adding it to the `Toggle` enum.
+- **Plan day keys are full English names** (`"Sunday"`), from `strftime("%A")`. iOS
+  must use a `en_US_POSIX` `"EEEE"` formatter — `shortWeekdaySymbols` yields `"sun"`
+  and silently misses, and a Spanish phone yields `"domingo"`.
 - **uvicorn buffers logs** when started non-interactively. Missing output ≠ didn't run.
 - Tests use in-memory SQLite with a `get_db` override, so they're safe to run on a
   machine holding production credentials: `PYTHONPATH=. ./venv/bin/pytest backend/tests/`

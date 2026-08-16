@@ -42,13 +42,21 @@ def _ensure_columns():
     """
     from sqlalchemy import inspect, text
     inspector = inspect(engine)
-    if "athletes" not in inspector.get_table_names():
-        return
-    existing = {c["name"] for c in inspector.get_columns("athletes")}
-    if "timezone" not in existing:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE athletes ADD COLUMN timezone VARCHAR"))
-        print("✅ Migration: added athletes.timezone")
+    tables = set(inspector.get_table_names())
+
+    if "athletes" in tables:
+        existing = {c["name"] for c in inspector.get_columns("athletes")}
+        if "timezone" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE athletes ADD COLUMN timezone VARCHAR"))
+            print("✅ Migration: added athletes.timezone")
+
+    if "injury_logs" in tables:
+        existing = {c["name"] for c in inspector.get_columns("injury_logs")}
+        if "expected_recovery_date" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE injury_logs ADD COLUMN expected_recovery_date DATE"))
+            print("✅ Migration: added injury_logs.expected_recovery_date")
 
 
 _ensure_columns()
@@ -263,7 +271,8 @@ def get_athlete_injuries(db: Session = Depends(get_db)):
             "status": inj.status,
             "severity": inj.severity,
             "notes": inj.notes,
-            "affected_sports": inj.affected_sports
+            "affected_sports": inj.affected_sports,
+            "expected_recovery_date": str(inj.expected_recovery_date) if inj.expected_recovery_date else None,
         } for inj in injuries
     ]
 
@@ -283,7 +292,12 @@ def create_athlete_injury(body: dict, db: Session = Depends(get_db)):
         status=body.get("status", "Active"),
         severity=body.get("severity"),
         notes=body.get("notes"),
-        affected_sports=body.get("affected_sports")
+        affected_sports=body.get("affected_sports"),
+        # Optional. NULL means the injury blocks training until resolved by hand.
+        expected_recovery_date=(
+            date.fromisoformat(body["expected_recovery_date"])
+            if body.get("expected_recovery_date") else None
+        ),
     )
     db.add(injury)
     db.commit()
@@ -300,9 +314,67 @@ def update_athlete_injury(injury_id: int, body: dict, db: Session = Depends(get_
     for field in ["status", "severity", "notes", "affected_sports", "body_part"]:
         if field in body:
             setattr(injury, field, body[field])
-            
+
+    if "expected_recovery_date" in body:
+        from datetime import date as date_type
+        erd = body["expected_recovery_date"]
+        injury.expected_recovery_date = date_type.fromisoformat(erd) if erd else None
+
     db.commit()
     return {"status": "ok", "message": "Injury updated"}
+
+
+@app.post("/coach/issue/preview")
+def preview_issue(body: dict, db: Session = Depends(get_db)):
+    """
+    Turn free text ("my right calf is shot") into a proposed plan change.
+
+    Read-only — nothing is written until POST /coach/issue/apply. This exists as
+    its own endpoint so the iOS app can re-run a proposal after the athlete edits
+    the severity or duration on the confirmation card, without re-sending the
+    whole conversation through chat.
+    """
+    from backend.services.issue_triage import build_proposal, extract_issue
+
+    message = (body or {}).get("message", "")
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    # An explicitly supplied issue skips extraction — that's the "athlete edited
+    # the card" path, where the structured values are already known.
+    issue = (body or {}).get("issue") or extract_issue(message)
+    if not issue:
+        return {"detected": False}
+
+    proposal = build_proposal(db, issue)
+    if not proposal:
+        return {"detected": False, "reason": "Nothing in this week's remaining plan is affected."}
+
+    return {"detected": True, "proposal": proposal}
+
+
+@app.post("/coach/issue/apply")
+def apply_issue_endpoint(body: dict, db: Session = Depends(get_db)):
+    """
+    Commit a confirmed issue: log the injury and rebuild the affected days.
+
+    Body: `{"issue": {...}, "choices": {"Thursday": "swap", "Saturday": "rest"}}`
+    """
+    from backend.services.issue_triage import apply_issue
+
+    issue = (body or {}).get("issue")
+    if not issue:
+        raise HTTPException(status_code=400, detail="issue is required")
+
+    choices = (body or {}).get("choices") or {}
+    if not isinstance(choices, dict):
+        raise HTTPException(status_code=400, detail="choices must be a map of day → 'swap'|'rest'")
+
+    try:
+        return apply_issue(db, issue, choices)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 
 @app.post("/sync")
 async def sync_data(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -452,7 +524,20 @@ def get_weekly_plan(db: Session = Depends(get_db)):
     # Normalize the generated plan
     from backend.services.plan_normalizer import normalize_plan
     new_plan_json = normalize_plan(new_plan_json)
-            
+
+    # Hard gate: the prompt asks the LLM to respect availability and injuries,
+    # but only this strips what it emits anyway. Never persist an unenforced plan.
+    from backend.services.constraint_enforcer import enforce_constraints, get_active_injuries
+    new_plan_json, violations = enforce_constraints(
+        new_plan_json,
+        availability=training_context.get("availability", {}),
+        active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+    )
+    if violations:
+        print(f"🚧 Stripped {len(violations)} constraint violation(s) from the new plan:")
+        for v in violations:
+            print(f"   - {v['day']}: {v['title']} — {v['reason']}")
+
     # Save to database
     new_record = WeeklyPlan(
         week_start=start_of_week,
@@ -621,23 +706,42 @@ def replan_remaining_days(db: Session = Depends(get_db)):
             days_dict[day_name] = new_day
     
     plan_json["days"] = days_dict
-    
+
     # Re-normalize and save
     plan_json = normalize_plan(plan_json)
-    
+
+    # Hard gate, scoped to the replanned days only — enforcing the locked days
+    # would rewrite history the athlete already trained.
+    #
+    # This is the fix for: change strength_days in Profile, hit replan, and the
+    # strength session stays put. The prompt carried the new availability, the
+    # LLM ignored it, and nothing checked.
+    from backend.services.constraint_enforcer import enforce_constraints, get_active_injuries
+    plan_json, violations = enforce_constraints(
+        plan_json,
+        availability=training_context.get("availability", {}),
+        active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+        days=days_to_replan,
+    )
+    if violations:
+        print(f"🚧 Stripped {len(violations)} constraint violation(s) from the replan:")
+        for v in violations:
+            print(f"   - {v['day']}: {v['title']} — {v['reason']}")
+
     from sqlalchemy.orm.attributes import flag_modified
     plan_record.plan_json = plan_json
     plan_record.last_adapted = None  # Reset adaptation flag since we replanned
     flag_modified(plan_record, "plan_json")
     db.commit()
-    
+
     print(f"✅ Replanned {len(days_to_replan)} days: {days_to_replan}")
-    
+
     return {
         "status": "replanned",
         "locked_days": locked_days,
         "replanned_days": days_to_replan,
         "completed_summary": completed_days_summary,
+        "violations": violations,
         "plan": plan_json
     }
 
@@ -767,7 +871,24 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     else:
         adapted_day["original_workouts"] = planned_workout_day["original_workouts"]
     plan_json["days"][today_day_name] = adapted_day
-    
+
+    # Hard gate today only. Adaptation can swap the sport entirely (a hard run
+    # downgraded to an easy spin), so it can invent a violation the original
+    # plan didn't have.
+    from backend.services.constraint_enforcer import enforce_constraints, get_active_injuries
+    athlete_row = db.query(Athlete).first()
+    plan_json, violations = enforce_constraints(
+        plan_json,
+        availability=training_context.get("availability", {}),
+        active_injuries=get_active_injuries(db, athlete_row.id) if athlete_row else [],
+        days=[today_day_name],
+    )
+    adapted_day = plan_json["days"][today_day_name]
+    if violations:
+        print(f"🚧 Stripped {len(violations)} constraint violation(s) from today's adaptation:")
+        for v in violations:
+            print(f"   - {v['day']}: {v['title']} — {v['reason']}")
+
     # We must explicitly flag the JSON as modified for SQLAlchemy to update it
     from sqlalchemy.orm.attributes import flag_modified
     plan_record.plan_json = plan_json
@@ -1139,11 +1260,44 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
     system_prompt = _build_chat_context(db, summary, rag_context)
 
     messages = [{"role": "system", "content": system_prompt}]
-    
+
     # Fetch history
     history = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
     for h in history:
         messages.append({"role": h.role, "content": h.content})
+
+    # Issue triage: does this message report soreness or an injury worth a plan
+    # change? The keyword gate is pure Python so ordinary chat costs nothing
+    # extra; only a likely hit pays for the extraction call. The proposal rides
+    # out on the same stream — no second round trip on a cold-start-prone tier.
+    proposal = None
+    try:
+        from backend.services.issue_triage import build_proposal, extract_issue, looks_like_issue
+        if looks_like_issue(message):
+            issue = extract_issue(message)
+            if issue:
+                proposal = build_proposal(db, issue)
+    except Exception as e:
+        # Triage is an enhancement. Chat must still work if it breaks.
+        print(f"⚠️ Issue triage failed (continuing with normal chat): {e}")
+
+    if proposal:
+        # Keep the prose and the card from contradicting each other. The card
+        # owns the specifics; the reply is the human part around it.
+        affected = ", ".join(d["day"] for d in proposal["affected_days"])
+        messages.append({
+            "role": "system",
+            "content": (
+                "The athlete just reported a physical issue "
+                f"({proposal['issue']['body_part']}, severity "
+                f"{proposal['issue']['severity']}/10). A confirmation card is already "
+                f"being shown to them listing the affected days ({affected}) with "
+                "swap-or-rest options for each, so do NOT list those days or propose "
+                "specific replacement sessions yourself. Reply in two or three "
+                "sentences: acknowledge it, say briefly what you'd do about it and "
+                "why, and tell them to confirm the changes below."
+            ),
+        })
 
     async def event_stream():
         """Generator that yields SSE events with streamed tokens."""
@@ -1153,8 +1307,12 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
             async for token in chat_completion_stream(messages):
                 full_response += token
                 yield f"data: {json.dumps({'token': token})}\n\n"
+            # Emitted before [DONE] so the client can attach the confirmation
+            # card to this message. Clients that don't know the key ignore it.
+            if proposal:
+                yield f"data: {json.dumps({'proposal': proposal})}\n\n"
             yield "data: [DONE]\n\n"
-            
+
             # Save assistant response
             db_save = SessionLocal()
             try:

@@ -161,7 +161,7 @@ def normalize_workout(workout: dict) -> dict:
     if sport == "rest":
         steps = []
 
-    return {
+    normalized = {
         "sport": sport,
         "title": title,
         "steps": steps,
@@ -169,6 +169,15 @@ def normalize_workout(workout: dict) -> dict:
         "hr_target": hr_target,
         "muscle_groups": workout.get("muscle_groups", [])
     }
+
+    # Set by constraint_enforcer / issue_triage when a session is removed for an
+    # injury or an unavailable day. This rebuild drops unknown keys, so it has to
+    # be carried explicitly — otherwise the athlete sees a session vanish with no
+    # explanation, which is how the old silent-strip bugs looked.
+    if workout.get("enforced_reason"):
+        normalized["enforced_reason"] = workout["enforced_reason"]
+
+    return normalized
 
 def normalize_plan(plan_json: dict) -> dict:
     """
@@ -465,6 +474,10 @@ def normalize_plan(plan_json: dict) -> dict:
                 "rationale": rationale,
                 "coach_note": coach_note
             }
+            # Why a session was removed. Carried through the rebuild for the same
+            # reason as `enforced_reason` on the workout — see normalize_workout.
+            if day_data.get("enforcement_notes"):
+                normalized["days"][day_name]["enforcement_notes"] = day_data["enforcement_notes"]
         else:
             # Fallback if day_data is string or not dict
             normalized["days"][day_name] = {

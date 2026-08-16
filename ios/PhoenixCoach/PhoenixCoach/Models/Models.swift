@@ -172,11 +172,13 @@ struct WeeklyPlanStatusResponse: Codable {
     let weekSummary: WeekSummary?
     let days: [String: DayPlanWithActual]
     let weekProgress: WeekProgress?
-    
+    let weeksToRace: Int?
+
     enum CodingKeys: String, CodingKey {
         case weekSummary = "week_summary"
         case days
         case weekProgress = "week_progress"
+        case weeksToRace = "weeks_to_race"
     }
 }
 
@@ -441,9 +443,100 @@ struct ChatMessage: Identifiable {
     var content: String
     let timestamp: Date
     var isError: Bool = false
-    
+    /// Set when the backend detected an injury report in this exchange. Renders
+    /// a confirmation card under the reply. Nothing is written server-side until
+    /// the athlete confirms it.
+    var proposal: IssueProposal? = nil
+    /// Outcome text once the card has been acted on, so the card collapses to a
+    /// receipt instead of staying tappable forever.
+    var proposalOutcome: String? = nil
+
     enum Role {
         case user, coach
+    }
+}
+
+// MARK: - Injury / soreness triage (POST /coach/issue/preview, /coach/issue/apply)
+
+struct IssueProposal: Codable, Equatable {
+    let issue: ReportedIssue
+    let coachNote: String?
+    let affectedDays: [AffectedDay]
+    let windowEnd: String?
+
+    enum CodingKeys: String, CodingKey {
+        case issue
+        case coachNote = "coach_note"
+        case affectedDays = "affected_days"
+        case windowEnd = "window_end"
+    }
+}
+
+struct ReportedIssue: Codable, Equatable {
+    var bodyPart: String
+    var severity: Int
+    var affectedSports: [String]
+    var durationDays: Int
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case bodyPart = "body_part"
+        case severity
+        case affectedSports = "affected_sports"
+        case durationDays = "duration_days"
+        case notes
+    }
+}
+
+struct AffectedDay: Codable, Equatable, Identifiable {
+    let day: String
+    let date: String
+    let isToday: Bool
+    let blockedWorkouts: [BlockedWorkout]
+    let options: [IssueOption]
+    let recommendedOption: String
+
+    var id: String { day }
+
+    enum CodingKeys: String, CodingKey {
+        case day, date, options
+        case isToday = "is_today"
+        case blockedWorkouts = "blocked_workouts"
+        case recommendedOption = "recommended_option"
+    }
+}
+
+struct BlockedWorkout: Codable, Equatable {
+    let sport: String
+    let title: String
+    let totalTime: String?
+
+    enum CodingKeys: String, CodingKey {
+        case sport, title
+        case totalTime = "total_time"
+    }
+}
+
+struct IssueOption: Codable, Equatable, Identifiable {
+    let id: String
+    let sport: String
+    let label: String
+    let detail: String
+}
+
+struct IssueApplyResult: Codable {
+    let status: String
+    let injuryId: Int
+    let bodyPart: String
+    let restDays: [String]
+    let swappedDays: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case injuryId = "injury_id"
+        case bodyPart = "body_part"
+        case restDays = "rest_days"
+        case swappedDays = "swapped_days"
     }
 }
 

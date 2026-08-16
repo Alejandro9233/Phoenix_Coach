@@ -169,9 +169,21 @@ class NetworkManager: ObservableObject {
     
     // MARK: - Chat (Streaming via SSE)
     
-    /// Send a chat message and receive tokens as they stream from the LLM.
-    /// Returns an AsyncThrowingStream that yields token strings as they arrive.
-    func sendChatStream(message: String, sessionId: Int? = nil) -> AsyncThrowingStream<String, Error> {
+    private struct ProposalEnvelope: Codable {
+        let proposal: IssueProposal
+    }
+
+    /// One item on the chat SSE stream.
+    ///
+    /// The backend can append an injury-triage proposal after the last token
+    /// (see `issue_triage.py`), so the stream carries more than plain text.
+    enum ChatStreamEvent {
+        case token(String)
+        case proposal(IssueProposal)
+    }
+
+    /// Send a chat message and receive events as they stream from the LLM.
+    func sendChatStream(message: String, sessionId: Int? = nil) -> AsyncThrowingStream<ChatStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -201,15 +213,24 @@ class NetworkManager: ObservableObject {
                         // SSE format: "data: {json}" or "data: [DONE]"
                         guard line.hasPrefix("data: ") else { continue }
                         let payload = String(line.dropFirst(6))
-                        
+
                         if payload == "[DONE]" {
                             break
                         }
-                        
-                        if let data = payload.data(using: .utf8),
-                           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+
+                        guard let data = payload.data(using: .utf8) else { continue }
+
+                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                            let token = json["token"] as? String {
-                            continuation.yield(token)
+                            continuation.yield(.token(token))
+                            continue
+                        }
+
+                        // An injury-triage proposal, sent after the last token.
+                        // Decoding failure is non-fatal: the athlete still has
+                        // the coach's written reply, just no card.
+                        if let wrapper = try? JSONDecoder().decode(ProposalEnvelope.self, from: data) {
+                            continuation.yield(.proposal(wrapper.proposal))
                         }
                     }
                     
@@ -456,8 +477,61 @@ class NetworkManager: ObservableObject {
         return wrapper.plan
     }
     
+    // MARK: - Injury / soreness triage
+
+    /// Re-run a proposal after the athlete edits severity or duration on the card.
+    /// Read-only — the plan is untouched until `applyIssue`.
+    func previewIssue(issue: ReportedIssue) async throws -> IssueProposal? {
+        guard let url = URL(string: "\(baseURL)/coach/issue/preview") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(IssuePreviewRequest(message: issue.notes ?? "", issue: issue))
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode(IssuePreviewResponse.self, from: data).proposal
+    }
+
+    /// Commit the confirmed issue. This is the call that writes the injury and
+    /// rewrites the affected days.
+    func applyIssue(issue: ReportedIssue, choices: [String: String]) async throws -> IssueApplyResult {
+        guard let url = URL(string: "\(baseURL)/coach/issue/apply") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(IssueApplyRequest(issue: issue, choices: choices))
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode(IssueApplyResult.self, from: data)
+    }
+
+    private struct IssuePreviewRequest: Codable {
+        let message: String
+        let issue: ReportedIssue
+    }
+
+    private struct IssuePreviewResponse: Codable {
+        let detected: Bool
+        let proposal: IssueProposal?
+    }
+
+    private struct IssueApplyRequest: Codable {
+        let issue: ReportedIssue
+        let choices: [String: String]
+    }
+
     // MARK: - Training Context
-    
+
     func fetchTrainingContext() async throws -> TrainingContext {
         guard let url = URL(string: "\(baseURL)/training-context") else {
             throw NetworkError.invalidURL

@@ -192,11 +192,42 @@ struct CoachChatView: View {
                     .padding(.leading, 8)
                 }
                 
+                // Injury triage: the coach's prose is above, the actionable
+                // change is here. Nothing is written until Confirm.
+                if let proposal = message.proposal {
+                    IssueProposalCard(
+                        proposal: proposal,
+                        onConfirm: { issue, choices in
+                            Task { await applyIssue(issue: issue, choices: choices, messageId: message.id) }
+                        },
+                        onDismiss: {
+                            if let idx = messages.firstIndex(where: { $0.id == message.id }) {
+                                withAnimation(DS.Animation.normal) {
+                                    messages[idx].proposal = nil
+                                    messages[idx].proposalOutcome = "Not logged — plan unchanged."
+                                }
+                            }
+                        }
+                    )
+                    .padding(.top, 4)
+                }
+
+                if let outcome = message.proposalOutcome {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                        Text(outcome)
+                            .font(.caption)
+                    }
+                    .foregroundStyle(DS.Colors.outline)
+                    .padding(.top, 2)
+                }
+
                 Text(message.timestamp, style: .time)
                     .font(.caption2)
                     .foregroundStyle(DS.Colors.outline)
             }
-            
+
             if message.role == .coach { Spacer(minLength: 60) }
         }
     }
@@ -275,15 +306,21 @@ struct CoachChatView: View {
         do {
             let stream = try await network.sendChatStream(message: text, sessionId: currentSessionId)
             
-            for try await token in stream {
+            for try await event in stream {
                 await MainActor.run {
-                    if !isStreaming {
-                        isStreaming = true  // First token arrived — hide typing indicator
+                    switch event {
+                    case .token(let token):
+                        if !isStreaming {
+                            isStreaming = true  // First token arrived — hide typing indicator
+                        }
+                        messages[coachMsgIndex].content += token
+                    case .proposal(let proposal):
+                        // Arrives after the last token — see issue_triage.py.
+                        messages[coachMsgIndex].proposal = proposal
                     }
-                    messages[coachMsgIndex].content += token
                 }
             }
-            
+
             await MainActor.run {
                 isLoading = false
                 isStreaming = false
@@ -301,6 +338,46 @@ struct CoachChatView: View {
         }
     }
     
+    /// Commit a confirmed injury proposal, then tell the rest of the app the
+    /// plan moved so Today and the Block Calendar don't show stale sessions.
+    private func applyIssue(issue: ReportedIssue, choices: [String: String], messageId: UUID) async {
+        do {
+            let result = try await network.applyIssue(issue: issue, choices: choices)
+
+            var parts: [String] = []
+            if !result.swappedDays.isEmpty {
+                parts.append("swapped \(result.swappedDays.joined(separator: ", "))")
+            }
+            if !result.restDays.isEmpty {
+                parts.append("rested \(result.restDays.joined(separator: ", "))")
+            }
+            let detail = parts.isEmpty ? "plan updated" : parts.joined(separator: ", ")
+
+            await MainActor.run {
+                if let idx = messages.firstIndex(where: { $0.id == messageId }) {
+                    withAnimation(DS.Animation.normal) {
+                        messages[idx].proposal = nil
+                        messages[idx].proposalOutcome = "Logged \(result.bodyPart) — \(detail)."
+                    }
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                NotificationCenter.default.post(name: NSNotification.Name("PlanUpdated"), object: nil)
+            }
+        } catch {
+            await MainActor.run {
+                // Deliberately vague on whether the injury was written: the
+                // backend logs it before it rebuilds the plan, so a failure here
+                // can land on either side of that commit.
+                messages.append(ChatMessage(
+                    role: .coach,
+                    content: "I couldn't finish updating your plan. Check Profile → Injuries to see whether it was logged, then try again.",
+                    timestamp: Date(),
+                    isError: true
+                ))
+            }
+        }
+    }
+
     // MARK: - Session Management
     
     private func loadSessions() async {

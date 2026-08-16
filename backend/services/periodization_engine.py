@@ -29,8 +29,12 @@ which confused the coach into emitting safe-fallback rest weeks. If a generated 
 comes back with wrong mileage, the bug is HERE or in the context injection — never in
 the prompt. The LLM does not choose volume.
 
-Sport availability (swim_days, bike_days, run_days, strength_days) is enforced in this
-file, not in the prompt. The LLM cannot schedule a swim on a non-swim day.
+Sport availability (swim_days, bike_days, run_days, strength_days) is READ here into
+`context["availability"]` and enforced in `constraint_enforcer.py`, which strips
+violating workouts after generation. The prompt also states the constraint, but that
+is a hint — the enforcer is what actually holds. Do not trust the prompt alone; this
+docstring used to claim enforcement lived here and it did not, which shipped strength
+sessions onto non-strength days for months.
 """
 from datetime import date, datetime, timedelta
 from typing import Optional

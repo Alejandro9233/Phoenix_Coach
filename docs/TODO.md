@@ -13,10 +13,12 @@ Ideas and known gaps. Not a plan — nothing here is committed to.
 
 ## Medium
 
-- **Soreness & injuries into adaptation** — both are logged in the DB but aren't fully
-  wired into the adaptation prompt.
-- **Test coverage** — chat sessions, context injection, and ingestion are covered.
-  `periodization_engine.py` and `plan_normalizer.py`, the highest-risk logic, have none.
+- **Test coverage** — chat sessions, context injection, ingestion, constraint enforcement,
+  and issue triage are covered. `periodization_engine.py` and `plan_normalizer.py`, the
+  highest-risk logic, still have none.
+- **Injury auto-resolve** — `InjuryLog.status` never leaves "Active" on its own, so a
+  logged injury blocks its sports until edited by hand in Profile. `duration_days` is
+  captured at report time but only scopes the immediate replan; nothing expires the row.
 
 ## Low
 

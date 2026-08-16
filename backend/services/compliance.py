@@ -13,7 +13,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
-from backend.models.database import Activity, WeeklyPlan
+from backend.models.database import Activity, Athlete, WeeklyPlan
 from backend.utils.timezone import get_local_today
 
 
@@ -382,8 +382,17 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
         "compliance_score": compliance_score,
     }
 
+    # Whole weeks left until race day. Rides along here so the iOS Today tab can
+    # schedule the race-countdown notification without a second round trip —
+    # the free tier's cold start makes extra calls expensive.
+    weeks_to_race = None
+    athlete = db.query(Athlete).first()
+    if athlete and athlete.race_date:
+        weeks_to_race = max(0, (athlete.race_date - today).days // 7)
+
     return {
         "week_summary": plan_json.get("week_summary"),
         "days": enriched_days,
         "week_progress": week_progress,
+        "weeks_to_race": weeks_to_race,
     }

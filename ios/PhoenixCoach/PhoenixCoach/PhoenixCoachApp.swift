@@ -9,6 +9,7 @@ struct PhoenixCoachApp: App {
             ContentView()
                 .preferredColorScheme(.dark)
                 .task {
+                    NotificationManager.registerDefaults()
                     NotificationManager.shared.requestPermission()
                     await NetworkManager.shared.syncDeviceTimezone()
                 }

@@ -159,6 +159,11 @@ class InjuryLog(Base):
     severity = Column(Integer, nullable=True) # 1-10
     notes = Column(Text, nullable=True)
     affected_sports = Column(String, nullable=True) # comma-separated like "run,bike"
+    # When the athlete expects to be training normally again. Set from the
+    # duration they confirm on the chat triage card. Past this date the row stops
+    # counting as Active, so a 3-day calf niggle can't quietly ban running for
+    # the rest of the season. NULL = no expiry, resolve it by hand in Profile.
+    expected_recovery_date = Column(Date, nullable=True)
 
 class WeeklyPlan(Base):
     __tablename__ = "weekly_plans"
