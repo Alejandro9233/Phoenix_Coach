@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from backend.models.database import Activity, WeeklyPlan
+from backend.utils.timezone import get_local_today
 
 
 # Map sport strings to allow fuzzy matching between plan and actual
@@ -185,7 +186,7 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
     
     Also adds a "week_progress" key at the top level.
     """
-    today = date.today()
+    today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())  # Monday
     end_of_week = start_of_week + timedelta(days=6)  # Sunday
 

@@ -19,6 +19,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyPlan
+from backend.utils.timezone import get_local_today
 
 
 # ─── Shared workout menu building blocks ──────────────────────────────────────
@@ -1088,7 +1089,7 @@ class PeriodizationEngine:
         if not athlete:
             return self._empty_context("No athlete profile found")
 
-        today = date.today()
+        today = get_local_today()
 
         # Weeks to race
         if athlete.race_date:
@@ -1202,7 +1203,7 @@ class PeriodizationEngine:
                 "weeks": []
             }
             
-        today = date.today()
+        today = get_local_today()
         race_distance = athlete.race_distance or "Marathon"
         profile = self._get_profile(race_distance)
 
@@ -1580,7 +1581,7 @@ class PeriodizationEngine:
 
     def _get_last_week_summary(self, db: Session) -> dict:
         """Summarize last week's training for continuity."""
-        today = date.today()
+        today = get_local_today()
         # Last week = Monday to Sunday before the current week
         current_monday = today - timedelta(days=today.weekday())
         last_monday = current_monday - timedelta(days=7)
@@ -1665,7 +1666,7 @@ class PeriodizationEngine:
     def _empty_context(self, reason: str) -> dict:
         """Return a minimal context when data is unavailable."""
         return {
-            "current_date": date.today().isoformat(),
+            "current_date": get_local_today().isoformat(),
             "phase": "foundation",
             "phase_name": "Phase 1: Foundation",
             "phase_priorities": "Build consistency and aerobic base",

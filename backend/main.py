@@ -13,6 +13,7 @@ from backend.models.database import (
 )
 from backend.services.fit_importer import parse_fit_file
 from backend.services.coros_scraper import CorosScraper
+from backend.utils.timezone import get_local_today
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
@@ -73,7 +74,7 @@ async def lifespan(app: FastAPI):
                 print(f"✅ Set athlete training_start_date to earliest activity date: {athlete.training_start_date}")
             else:
                 # Fallback to 4 weeks ago
-                athlete.training_start_date = date.today() - timedelta(weeks=4)
+                athlete.training_start_date = get_local_today() - timedelta(weeks=4)
                 db.commit()
                 print(f"✅ Set athlete training_start_date to default (4 weeks ago): {athlete.training_start_date}")
     except Exception as e:
@@ -229,7 +230,7 @@ def create_athlete_injury(body: dict, db: Session = Depends(get_db)):
         
     injury = InjuryLog(
         athlete_id=athlete.id,
-        date_reported=date.fromisoformat(body["date_reported"]) if "date_reported" in body and body["date_reported"] else date.today(),
+        date_reported=date.fromisoformat(body["date_reported"]) if "date_reported" in body and body["date_reported"] else get_local_today(),
         body_part=body.get("body_part"),
         status=body.get("status", "Active"),
         severity=body.get("severity"),
@@ -340,7 +341,7 @@ def get_weekly_plan(db: Session = Depends(get_db)):
     from backend.agents.response_agent import ResponseAgent
     from backend.services.periodization_engine import PeriodizationEngine
     
-    today = date.today()
+    today = get_local_today()
     # Monday of the current week
     start_of_week = today - timedelta(days=today.weekday())
     
@@ -423,7 +424,7 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
     from datetime import date, timedelta
     from backend.models.database import WeeklyPlan
     
-    today = date.today()
+    today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
     
     # Delete existing plan for this week (overwrite)
@@ -451,7 +452,7 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     from backend.services.periodization_engine import PeriodizationEngine
     from backend.services.plan_normalizer import normalize_plan
     
-    today = date.today()
+    today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
     
@@ -836,7 +837,7 @@ async def smart_refresh(db: Session = Depends(get_db)):
     stale_reason = None
     if latest:
         snap_date = latest.date if isinstance(latest.date, date_type) else latest.date.date() if hasattr(latest.date, 'date') else latest.date
-        today_date = date_type.today()
+        today_date = get_local_today()
         if snap_date != today_date:
             recovery_data_stale = True
             stale_reason = f"Latest snapshot is from {snap_date}, not today ({today_date})"
