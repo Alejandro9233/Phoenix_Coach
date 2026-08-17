@@ -19,26 +19,19 @@ struct ContentView: View {
                 }
                 .tag(1)
             
-            DashboardView()
-                .tabItem {
-                    Image(systemName: "book.fill")
-                    Text("Journal")
-                }
-                .tag(2)
-            
             FeedbackView()
                 .tabItem {
                     Image(systemName: "clock.arrow.circlepath")
                     Text("Recent")
                 }
-                .tag(3)
-            
+                .tag(2)
+
             ProfileView()
                 .tabItem {
                     Image(systemName: "person.crop.circle.fill")
                     Text("Profile")
                 }
-                .tag(4)
+                .tag(3)
         }
         .tint(.white)
         .onChange(of: selectedTab) { _ in

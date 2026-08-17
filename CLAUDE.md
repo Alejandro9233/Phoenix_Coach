@@ -31,6 +31,15 @@ those limits and writes the coaching notes.
 
 - **On-device MLX chat** (`LocalLLMManager.swift`), deleted 2026-07-27. Chat is
   backend-only SSE. There is no offline path, by choice.
+- **Journal tab** (`Views/Dashboard/DashboardView.swift`, `FeedbackEntry`,
+  `NetworkManager.submitFeedback`), deleted 2026-08-16. RPE/motivation/soreness
+  sliders that were write-only — no endpoint ever read them back, no screen ever
+  showed one, and `sleep_quality` was posted but never even stored. Their sole
+  consumer was three lines of LLM context in `data_agent`. Chat + `issue_triage`
+  covers the same ground and actually changes the plan. The `POST /feedback`
+  endpoint and `athlete_feedback` table are intentionally still there — historical
+  rows predate the deletion and `data_agent` still reads them. Nothing writes new
+  ones.
 - **Local notifications** (`NotificationManager.swift`, Profile > Notifications
   toggles), deleted 2026-08-16. Two of the four fired on a 5-second timer from
   `TodayView` right after a refresh *you* triggered — a banner about work you were
@@ -66,9 +75,9 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
 - `backend/services/issue_triage.py` — "my calf is shot" → plan change. Detect in
   chat, propose, apply only on confirm. Docstring has the three-step shape.
 - `backend/agents/` — `data_agent` summarizes state, `response_agent` holds prompts
-- `ios/PhoenixCoach/` — 5 tabs: Today, Coach, Journal, Recent, Profile.
-  Tab names don't match filenames: **Journal** = `Views/Dashboard/DashboardView.swift`,
-  **Recent** = `Views/Feedback/FeedbackView.swift`.
+- `ios/PhoenixCoach/` — 4 tabs: Today, Coach, Recent, Profile.
+  **Recent** = `Views/Feedback/FeedbackView.swift` — the one tab whose name
+  doesn't match its filename.
 - `docs/DEPLOY.md` — Render env vars, free-tier limits, rollback. Read before deploying.
 
 ## Gotchas

@@ -290,19 +290,6 @@ class NetworkManager: ObservableObject {
     
     // MARK: - Feedback
     
-    func submitFeedback(_ feedback: FeedbackEntry) async throws {
-        guard let url = URL(string: "\(baseURL)/feedback") else {
-            throw NetworkError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(feedback)
-        let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw NetworkError.serverError
-        }
-    }
     
     // MARK: - Injuries
     

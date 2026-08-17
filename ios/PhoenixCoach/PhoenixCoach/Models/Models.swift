@@ -563,36 +563,6 @@ struct APIChatMessage: Codable, Identifiable {
     }
 }
 
-// MARK: - Feedback
-
-struct StrengthExercise: Codable, Identifiable {
-    var id = UUID()
-    var name: String = ""
-    var sets: Int = 3
-    var reps: Int = 10
-    var weightKg: Double?
-    
-    enum CodingKeys: String, CodingKey {
-        case name, sets, reps
-        case weightKg = "weight_kg"
-    }
-}
-
-struct FeedbackEntry: Codable {
-    var rpe: Int = 5
-    var motivation: Int = 3
-    var soreness: Int = 2
-    var sleepQuality: Int = 3
-    var notes: String = ""
-    var strengthExercises: [StrengthExercise] = []
-    
-    enum CodingKeys: String, CodingKey {
-        case rpe, motivation, soreness, notes
-        case sleepQuality = "sleep_quality"
-        case strengthExercises = "strength_exercises"
-    }
-}
-
 // MARK: - Pull to Refresh
 
 struct SyncResponse: Codable {
