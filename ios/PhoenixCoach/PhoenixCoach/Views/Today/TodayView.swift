@@ -29,9 +29,12 @@ struct TodayView: View {
     
     // Design system colors matching Quiet Performance HTML mockup
                                                    
+    /// Full English weekday name, matching the backend's plan day keys
+    /// (`strftime("%A")` → "Sunday"). `en_US_POSIX` is required: a Spanish
+    /// phone must not produce "domingo" and silently miss the lookup.
     private var todayDayName: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEEE"
         return formatter.string(from: Date())
     }
@@ -650,29 +653,11 @@ struct TodayView: View {
         }
     }
     
-    /// Full English weekday name, matching the backend's plan day keys.
-    static func backendDayName(for date: Date) -> String {
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.dateFormat = "EEEE"
-        return fmt.string(from: date)
-    }
-
     private func fetchPlanStatus() async {
         do {
             let status = try await network.fetchWeeklyPlanStatus()
             await MainActor.run {
                 self.planStatus = status
-                
-                // Plan days are keyed by full English weekday name ("Sunday"),
-                // matching the backend's strftime("%A"). Locale-independent —
-                // a Spanish phone must not produce "domingo" and miss.
-                let workoutTitle = status.days[Self.backendDayName(for: Date())]?.workouts?.first?.title
-                NotificationManager.shared.scheduleMorningReadiness(workoutTitle: workoutTitle)
-
-                if let weeks = status.weeksToRace {
-                    NotificationManager.shared.scheduleRaceCountdown(weeks: weeks)
-                }
             }
         } catch {
             print("Plan status fetch error: \(error)")
@@ -684,11 +669,6 @@ struct TodayView: View {
             let dash = try await network.fetchDashboard(forceRefresh: forceRefresh)
             await MainActor.run {
                 self.dashboard = dash
-                
-                // Trigger notification logic if applicable
-                if let ratio = dash.recovery.first?.loadRatio {
-                    NotificationManager.shared.triggerLoadAlert(loadRatio: ratio)
-                }
             }
         } catch {
             print("Dashboard fetch error: \(error)")
@@ -713,9 +693,6 @@ struct TodayView: View {
                 if response.syncStatus == "partial" {
                     self.scraperErrorMessage = response.syncMessage ?? "Data could not be scraped."
                     self.showScraperError = true
-                } else {
-                    // Fresh COROS data made it in and the coach has re-evaluated.
-                    NotificationManager.shared.triggerCoachAnalysisReady()
                 }
             }
         } catch {

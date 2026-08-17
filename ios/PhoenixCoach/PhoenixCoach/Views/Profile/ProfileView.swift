@@ -26,12 +26,6 @@ struct ProfileView: View {
     @State private var raceDateVal: Date = Date()
     @State private var trainingStartDateVal: Date = Date()
     
-    // Notification Preferences
-    @AppStorage("notifyMorningReadiness") private var notifyMorningReadiness: Bool = true
-    @AppStorage("notifyCoachAnalysis") private var notifyCoachAnalysis: Bool = true
-    @AppStorage("notifyLoadAlerts") private var notifyLoadAlerts: Bool = true
-    @AppStorage("notifyRaceCountdown") private var notifyRaceCountdown: Bool = true
-    
     // UI State
     @State private var hasTrainingStartDate = false
     @State private var targetHours = 3
@@ -125,10 +119,7 @@ struct ProfileView: View {
                             
                             // Weekly Constraints Availability Matrix Card
                             weeklyConstraintsSection
-                            
-                            // Notifications Section
-                            notificationsSection
-                            
+
                             // Injury Log Link
                             NavigationLink(destination: InjuryLogView()) {
                                 HStack {
@@ -695,43 +686,6 @@ struct ProfileView: View {
                     }
                 }
             }
-        }
-    }
-    
-    // MARK: - Notifications Section
-    
-    private var notificationsSection: some View {
-        VStack(spacing: 0) {
-            // Section Header
-            HStack {
-                Image(systemName: "bell.badge.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(DS.Colors.accent)
-                Text("NOTIFICATIONS")
-                    .font(.system(size: 12, weight: .heavy))
-                    .tracking(2.0)
-                    .foregroundStyle(DS.Colors.onSurface)
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 24)
-            .padding(.bottom, 16)
-            
-            VStack(spacing: 16) {
-                Toggle("Morning Readiness", isOn: $notifyMorningReadiness)
-                    .tint(DS.Colors.accent)
-                Toggle("Coach Analysis Ready", isOn: $notifyCoachAnalysis)
-                    .tint(DS.Colors.accent)
-                Toggle("Training Load Alerts", isOn: $notifyLoadAlerts)
-                    .tint(DS.Colors.accent)
-                Toggle("Race Countdown", isOn: $notifyRaceCountdown)
-                    .tint(DS.Colors.accent)
-            }
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(DS.Colors.primaryText)
-            .padding(20)
-            .frame(maxWidth: .infinity)
-            .glassCard()
         }
     }
     

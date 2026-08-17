@@ -31,6 +31,12 @@ those limits and writes the coaching notes.
 
 - **On-device MLX chat** (`LocalLLMManager.swift`), deleted 2026-07-27. Chat is
   backend-only SSE. There is no offline path, by choice.
+- **Local notifications** (`NotificationManager.swift`, Profile > Notifications
+  toggles), deleted 2026-08-16. Two of the four fired on a 5-second timer from
+  `TodayView` right after a refresh *you* triggered — a banner about work you were
+  already watching. The app has no push infrastructure and no notification
+  permission prompt, by choice. Anything worth telling the athlete belongs in the
+  UI they already have open.
 - **`frontend/`** web UI — replaced by the iOS app.
 - **Root `phoenix_coach.db`** — no SQLite snapshot in the repo. Use `scripts/rebuild_db.py`.
 
@@ -73,10 +79,6 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
   auto-redirects. Run `scripts/scraper_health_check.py`.
 - **No migration framework** — `main.py` does `ALTER TABLE` on startup in
   `_ensure_columns()`. New columns must be nullable.
-- **iOS notification toggles**: `@AppStorage("x") = true` does NOT write that default
-  to UserDefaults. A plain `UserDefaults.bool(forKey:)` read returns `false` until the
-  user flips the switch. `NotificationManager.registerDefaults()` seeds them; don't
-  add a toggle without adding it to the `Toggle` enum.
 - **Plan day keys are full English names** (`"Sunday"`), from `strftime("%A")`. iOS
   must use a `en_US_POSIX` `"EEEE"` formatter — `shortWeekdaySymbols` yields `"sun"`
   and silently misses, and a Spanish phone yields `"domingo"`.
