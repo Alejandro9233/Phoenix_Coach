@@ -90,8 +90,12 @@ class CorosScraper:
             return
 
         print("  Waiting for login form...")
+        # Same lesson as the dashboard wait below: on Render's cold CPU the login
+        # SPA can blow well past 15s. The 2026-08-17 morning failure was exactly
+        # this — the /login?lastUrl= redirect target renders the same form
+        # (verified locally), it just wasn't given time to.
         try:
-            await page.wait_for_selector('input[type="text"]', timeout=15000)
+            await page.wait_for_selector('input[type="text"]', timeout=60000)
         except Exception as e:
             raise Exception(
                 f"COROS Login Failed: login form never rendered at {page.url}"

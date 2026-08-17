@@ -15,6 +15,74 @@ struct TodayView: View {
     @State private var isLoading = false
     @State private var isSyncing = false
     @State private var syncMessage = ""
+    /// Start of the in-flight refresh, for the pill's elapsed-time counter.
+    @State private var syncStartedAt: Date?
+
+    // MARK: Two-tier pull
+    //
+    // Apple's `.refreshable` owns the gesture, the rubber-banding and the
+    // spinner — hand-rolled scroll physics is what makes custom pull-to-refresh
+    // feel cheap. What `.refreshable` does NOT do is wait for release: its
+    // closure fires the moment the drag crosses the *system's* activation
+    // distance, finger still down. Two designs died on that fact. Reading a
+    // latch inside the closure always saw the pre-threshold state, and the
+    // light tier the closure started set `isSyncing`, which made `handlePull`
+    // inert for the rest of the drag — so the deep tier could never arm, no
+    // matter how far the pull went. Two device tests, one cause.
+    //
+    // So the tiers are split by *when they are decided*:
+    //   - Light: `.refreshable` fires it mid-drag, exactly as the system wants.
+    //   - Deep: decided at the real release. `onScrollPhaseChange` reports the
+    //     finger lifting; if the drag is past `deepPullThreshold` at that
+    //     moment, the scrape runs — queued behind the same gesture's in-flight
+    //     light tier rather than racing it.
+    // A deep pull therefore does a cheap DB read it didn't strictly need
+    // before scraping. That's ~1s ahead of a 30-60s operation; accepted.
+    //
+    // Instrumentation: the distance must come from `onScrollGeometryChange`.
+    // A GeometryReader-preference probe (tried in a named space, then in
+    // `.global`) reads a frozen number on device — this ScrollView moves its
+    // content without re-running layout, so the probe fires once and never
+    // again. And the offset must be measured against a *frozen* baseline
+    // (offset at rest, re-anchored at idle), never against the live
+    // `contentInsets.top`: `.refreshable` grows that inset when it activates,
+    // which cancels the live-inset formula mid-drag — that was field
+    // failure #1, and freezing the baseline is the fix.
+
+    private enum SyncTier { case light, deep }
+
+    /// How far past the top the drag must reach to arm the deep sync.
+    /// Kept well under the native refresh control's resistance ceiling — a
+    /// threshold you physically cannot drag to never fires.
+    private let deepPullThreshold: CGFloat = 110
+    /// Slack before disarming, so a finger resting on the boundary doesn't
+    /// buzz repeatedly. Without this the haptics chatter and it feels broken.
+    private let deepPullHysteresis: CGFloat = 22
+
+    @State private var pullProgress: CGFloat = 0
+    @State private var deepSyncArmed = false
+    /// Which tier is running, while `isSyncing`. The light tier starts
+    /// mid-drag, so `handlePull` must keep measuring through it; a scrape or
+    /// the initial load makes pulls inert. `nil` when idle.
+    @State private var syncTier: SyncTier?
+    /// Finger on screen, per `onScrollPhaseChange`. Arming and disarming
+    /// require it — the settle animation after release replays falling
+    /// distances, and letting those trip the hysteresis would disarm the latch
+    /// in the gap before the release decision runs.
+    @State private var isDragging = false
+    /// Deep sync requested at release while the light tier was still running.
+    /// `endSync` consumes it.
+    @State private var pendingDeepSync = false
+    /// `contentOffset.y` when the list is at rest, captured on the first
+    /// geometry callback and re-anchored whenever the scroll view settles to
+    /// idle. Offsets are absolute, so this is what turns them into a drag
+    /// distance — and it is deliberately a snapshot, immune to `.refreshable`
+    /// growing the top inset mid-gesture.
+    @State private var pullBaseline: CGFloat?
+    @State private var lastOffsetY: CGFloat?
+    /// Live drag distance, shown in the pill while tuning. Set false to hide.
+    @State private var rawPull: CGFloat = 0
+    private let showPullDebug = false
     @State private var errorMessage: String?
     @State private var showConnectionSettings = false
     
@@ -78,22 +146,22 @@ struct TodayView: View {
     
     var body: some View {
         NavigationStack {
-            Group {
-                if let err = errorMessage, weeklyPlan == nil, dashboard == nil {
-                    ScrollView {
+            // One ScrollView, one .refreshable. The error and content states are
+            // branched *inside* it on purpose: when each state owned its own
+            // ScrollView, clearing `errorMessage` mid-refresh destroyed the very
+            // view whose `.refreshable` task was running, cancelling the sync.
+            ScrollView {
+                // The pill sits outside the branch and outside the dimming: it
+                // reports both refresh tiers and the error state, so it is the
+                // one thing that must stay legible while the rest fades.
+                VStack(spacing: 24) {
+                    statusPill
+
+                    if let err = errorMessage, weeklyPlan == nil, dashboard == nil {
                         errorView(err)
                             .frame(maxWidth: .infinity, minHeight: 400)
-                    }
-                    .refreshable {
-                        print("🔄 Pull-to-refresh triggered (error state)")
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        await performSmartRefresh()
-                    }
-                } else {
-                    ScrollView {
+                    } else {
                         VStack(spacing: 24) {
-                            statusPill
-                            
                             VStack(spacing: 12) {
                                 HStack(spacing: 12) {
                                     hrvCard
@@ -101,22 +169,54 @@ struct TodayView: View {
                                 }
                                 loadRatioCard
                             }
-                            
+
                             timelineLink
-                            
+
                             workoutProtocolSection
-                            
+
                             complianceSection
-                            
+
                             rationaleSection
                         }
-                        .padding()
                         .opacity(isSyncing ? 0.3 : 1.0)
                     }
-                    .refreshable {
-                        print("🔄 Pull-to-refresh triggered")
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        await performSmartRefresh()
+                }
+                .padding()
+            }
+            .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, offsetY in
+                handlePull(offsetY: offsetY)
+            }
+            .refreshable {
+                // Fires at the system's activation distance — mid-drag, finger
+                // still down, never at release. No release state can be read
+                // here, so this closure can only ever be the light tier. The
+                // deep tier is decided below, when the finger actually lifts.
+                print("🔄 Refresh control fired — DB refresh")
+                await refreshFromDatabase()
+            }
+            .onScrollPhaseChange { _, newPhase in
+                isDragging = newPhase == .tracking || newPhase == .interacting
+
+                // Re-anchor zero at true rest, so a rotation or bar-height
+                // change can't skew every later reading. Guarded on !isSyncing:
+                // idle-with-spinner-extended is also "idle", and anchoring to it
+                // would fold the spinner inset into every later distance.
+                if newPhase == .idle, !isSyncing, let restY = lastOffsetY {
+                    pullBaseline = restY
+                }
+
+                // The release decision. Armed can only be true if the drag
+                // went past `deepPullThreshold` and stayed there.
+                if !isDragging, deepSyncArmed {
+                    deepSyncArmed = false
+                    if isSyncing {
+                        // The same gesture's light tier is still running —
+                        // scrape when it finishes, don't race it.
+                        print("🔄 Deep pull released — scrape queued behind light refresh")
+                        pendingDeepSync = true
+                    } else {
+                        print("🔄 Deep pull released — COROS scrape")
+                        Task { await performSmartRefresh() }
                     }
                 }
             }
@@ -200,26 +300,139 @@ struct TodayView: View {
     
     // MARK: - UI Components
     
+    /// What the pill says. During a drag it previews what releasing will do, so
+    /// the deep tier is discovered by pulling rather than by being told.
+    private var pillText: String {
+        // Temporary tuning aid: the real drag distance against the threshold.
+        // Checked before `isSyncing` — the light tier starts mid-drag, and the
+        // whole point is to watch the number climb *through* it. Shown even at
+        // zero: a readout that hides itself at 0 looks identical to a probe
+        // that never fired. Flip `showPullDebug` off once the numbers are set.
+        if showPullDebug, isDragging || !isSyncing {
+            guard pullBaseline != nil else { return "PULL — NO BASELINE" }
+            return "PULL \(Int(rawPull)) / \(Int(deepPullThreshold))\(deepSyncArmed ? " ARMED" : "")"
+        }
+        // Armed outranks the sync message: with the light tier already running
+        // underneath, the pill's job is to say what release will do.
+        if deepSyncArmed { return "RELEASE TO SCRAPE COROS" }
+        if isSyncing { return syncMessage }
+        if pullProgress > 0.12 { return "KEEP PULLING TO SCRAPE COROS" }
+        return network.isConnected ? "Biometrics Synced" : "Connection Offline"
+    }
+
     private var statusPill: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(network.isConnected ? Color.green : Color.red)
-                .frame(width: 8, height: 8)
-            
-            Text(isSyncing ? syncMessage : (network.isConnected ? "Biometrics Synced" : "Connection Offline"))
+            if isSyncing {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(DS.Colors.accent)
+            } else {
+                Circle()
+                    .fill(deepSyncArmed ? DS.Colors.accent : (network.isConnected ? Color.green : Color.red))
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(deepSyncArmed ? 1.4 : 1.0)
+            }
+
+            Text(pillText)
                 .font(.system(size: 11, weight: .medium))
                 .tracking(1.1)
-                .foregroundStyle(DS.Colors.primaryText)
+                .foregroundStyle(deepSyncArmed ? DS.Colors.accent : DS.Colors.primaryText)
+
+            // A cold Render dyno takes 30-60s. Without a ticking number the pill
+            // looks frozen and indistinguishable from a hang, so count real
+            // elapsed time rather than faking staged progress messages.
+            if isSyncing, let started = syncStartedAt {
+                TimelineView(.periodic(from: started, by: 1)) { ctx in
+                    Text("\(max(0, Int(ctx.date.timeIntervalSince(started))))s")
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(DS.Colors.accent)
+                }
+            }
+
+            // Rotates 1:1 with the drag. Tying it to `pullProgress` rather than
+            // to a threshold is what makes the pull feel attached to the finger
+            // instead of snapping between two states.
+            if !isSyncing {
+                Image(systemName: deepSyncArmed ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(DS.Colors.accent.opacity(0.7 + pullProgress * 0.3))
+                    .rotationEffect(.degrees(Double(pullProgress) * 180))
+                    .scaleEffect(deepSyncArmed ? 1.25 : 1.0)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: isSyncing)
+        // Spring, not easeInOut: arming should feel like a detent clicking over.
+        .animation(.spring(response: 0.28, dampingFraction: 0.62), value: deepSyncArmed)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .overlay(
             Capsule()
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(
+                    deepSyncArmed
+                        ? DS.Colors.accent.opacity(0.9)
+                        : Color.white.opacity(0.1 + pullProgress * 0.35),
+                    lineWidth: deepSyncArmed ? 1.5 : 1
+                )
         )
         .accessibilityLabel(isSyncing ? "Syncing" : (network.isConnected ? "Biometrics Synced" : "Connection Offline"))
+        .accessibilityHint("Pull down to refresh, or pull further to scrape COROS")
+    }
+
+    /// Drives the pull readout and arms the deep tier.
+    ///
+    /// Haptics fire only on threshold *crossings*, never continuously — a buzz
+    /// on every scroll event is the single fastest way to make a gesture feel
+    /// broken. `deepPullHysteresis` keeps a finger hovering at the boundary from
+    /// rearming over and over.
+    private func handlePull(offsetY: CGFloat) {
+        lastOffsetY = offsetY
+
+        // First reading is the resting position — the list always lays out at
+        // the top — so it defines zero. Captured ahead of the sync guard below:
+        // the initial load holds `isSyncing` for the whole 30-60s cold start,
+        // and a baseline that isn't set until that ends is a baseline taken
+        // while the refresh control is still extended.
+        guard let baseline = pullBaseline else {
+            pullBaseline = offsetY
+            return
+        }
+
+        // A pull during a scrape or the initial load is deliberately inert — a
+        // second scrape queued behind the first is never what the athlete
+        // meant. The *light* tier is exempt, and not by choice: `.refreshable`
+        // starts it mid-drag, so going inert on it would throw away the rest
+        // of the drag and make the deep threshold unreachable — field failure
+        // number two. Clear the readout too, or the last drag distance is
+        // still sitting there when the sync ends and the pill flashes a stale
+        // number.
+        guard !isSyncing || syncTier == .light else {
+            if pullProgress != 0 { pullProgress = 0 }
+            if rawPull != 0 { rawPull = 0 }
+            return
+        }
+
+        // Dragging past the top pushes the offset *below* its resting value, so
+        // rest-minus-current is the pull distance. Scrolling down the list makes
+        // it negative — clamped to zero, which is what `max` is doing here.
+        // While the refresh spinner's inset is extended the reading skews high
+        // by about the spinner height; arming is finger-gated and a light sync
+        // lasts ~1s, so the skew is tolerated rather than tracked.
+        let pull = max(0, baseline - offsetY)
+        rawPull = pull
+        pullProgress = min(1, pull / deepPullThreshold)
+
+        // `isDragging` gates both transitions: only the finger arms, and only
+        // the finger disarms. Without it, the settle animation's falling
+        // values would disarm the latch before the release decision reads it.
+        if !deepSyncArmed, isDragging, pull >= deepPullThreshold {
+            deepSyncArmed = true
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        } else if deepSyncArmed, isDragging, pull < deepPullThreshold - deepPullHysteresis {
+            deepSyncArmed = false
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        }
     }
     
     private var hrvCard: some View {
@@ -598,42 +811,44 @@ struct TodayView: View {
         .glassCard()
     }
     
-    private var syncingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(DS.Colors.accent)
-                
-                Text(syncMessage)
-                    .font(.headline)
-                    .foregroundStyle(DS.Colors.primaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-            .padding(24)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
-        }
-    }
-    
     // MARK: - Logic & Network Helpers
     
-    private func loadInitialData() async {
+    /// Both refresh tiers and the initial load drive the status pill through
+    /// these, so the spinner, the message and the elapsed counter can never
+    /// disagree about whether a sync is running.
+    private func beginSync(_ message: String, tier: SyncTier) {
         isSyncing = true
-        syncMessage = "Loading training data..."
+        syncTier = tier
+        syncMessage = message
+        syncStartedAt = Date()
+        // Drop the drag readout so the pill switches cleanly to sync state.
+        pullProgress = 0
+    }
+
+    private func endSync(haptic: UIImpactFeedbackGenerator.FeedbackStyle? = nil) {
+        isSyncing = false
+        syncTier = nil
+        syncStartedAt = nil
+        if let haptic {
+            UIImpactFeedbackGenerator(style: haptic).impactOccurred()
+        }
+        // A deep pull released while this sync was running parked its request
+        // here rather than racing two syncs. Honor it now.
+        if pendingDeepSync {
+            pendingDeepSync = false
+            Task { await performSmartRefresh() }
+        }
+    }
+
+    private func loadInitialData() async {
+        // .deep so pulls stay inert for the whole cold start, same as a scrape.
+        beginSync("Loading training data...", tier: .deep)
+        // No forceRefresh here on purpose — the first load may use the client cache.
         async let dashTask: () = fetchDashboard()
         async let planTask: () = fetchWeeklyPlan()
         async let statusTask: () = fetchPlanStatus()
         _ = await (dashTask, planTask, statusTask)
-        isSyncing = false
+        endSync()
     }
     
     private func fetchWeeklyPlan() async {
@@ -675,45 +890,116 @@ struct TodayView: View {
         }
     }
     
+    /// Re-reads what the backend already holds in Postgres. No COROS scrape.
+    ///
+    /// This is the cheap tier — roughly a second — and it's what pull-to-refresh
+    /// runs. `forceRefresh: true` bypasses NetworkManager's 5-minute client-side
+    /// memory cache: an explicit pull should never hand back a cached copy, even
+    /// though the server work is only a row read.
+    private func refreshFromDatabase() async {
+        guard !isSyncing else { return }
+        beginSync("Refreshing data...", tier: .light)
+
+        await detachedFetch { await fetchAllFromBackend() }
+
+        await MainActor.run { self.endSync(haptic: .light) }
+    }
+
+    /// Runs network work outside the caller's cancellation scope.
+    ///
+    /// `.refreshable` runs its closure as a *structured child* of SwiftUI's
+    /// refresh task and cancels it the moment the refresh control retracts.
+    /// Cancellation propagates straight into `URLSession`, failing every
+    /// in-flight request with `NSURLErrorCancelled` (-999) — so the pull looks
+    /// like it succeeded while having fetched nothing. This is the same failure
+    /// the `Task.sleep` removal exposed: killing the sleeps stopped the silent
+    /// swallow, but the cancellation just moved downstream into the HTTP calls.
+    ///
+    /// An unstructured `Task` does not inherit cancellation, so the fetch runs
+    /// to completion regardless. Awaiting `.value` on a non-throwing task has no
+    /// cancellation throw point, so the caller still waits for the real result.
+    /// The pill's own spinner and elapsed counter — not the refresh control —
+    /// are what tell the athlete a sync is still running.
+    private func detachedFetch(_ body: @escaping () async -> Void) async {
+        await Task { await body() }.value
+    }
+
+    /// Starts the deep refresh as a *backend job*, polls it, then re-reads
+    /// everything once. The scrape runs server-side: the phone no longer holds
+    /// a minutes-long HTTP request open, and closing the app mid-scrape no
+    /// longer kills it — the data is simply there on the next open.
+    ///
+    /// The expensive tier — 30-90s, more on a cold dyno. Reached by the
+    /// release decision in `onScrollPhaseChange` (never by `.refreshable`,
+    /// which fires mid-drag), by `endSync` draining `pendingDeepSync`, and by
+    /// the toolbar button.
+    ///
+    /// Every await in here must stay inside `detachedFetch`. Under
+    /// `.refreshable` this function runs as a structured child of SwiftUI's
+    /// refresh task, where cancellation makes a bare `URLSession` call die
+    /// with -999 and a bare `Task.sleep` throw `CancellationError` — both
+    /// swallowed by catches, silently skipping the scrape. Inside
+    /// `detachedFetch`'s unstructured Task no cancellation ever arrives, which
+    /// is what makes the poll loop's sleep safe *there and only there*.
     private func performSmartRefresh() async {
-        isSyncing = true
-        syncMessage = "Connecting to backend..."
-        errorMessage = nil
-        
-        // Step 1: Try COROS sync (best-effort — don't block data refresh if this fails)
-        do {
-            try await Task.sleep(nanoseconds: 800_000_000)
-            await MainActor.run { self.syncMessage = "Scraping COROS web..." }
-            try await Task.sleep(nanoseconds: 1_200_000_000)
-            await MainActor.run { self.syncMessage = "Analyzing Data..." }
-            
-            let response = try await network.smartRefresh()
-            await MainActor.run {
-                self.refreshResponse = response
-                if response.syncStatus == "partial" {
-                    self.scraperErrorMessage = response.syncMessage ?? "Data could not be scraped."
-                    self.showScraperError = true
+        guard !isSyncing else { return }
+        beginSync("Starting deep sync...", tier: .deep)
+
+        await detachedFetch {
+            do {
+                var status = try await network.startSmartRefresh()
+
+                // Poll until the job settles. The generous deadline is for the
+                // phone's patience, not the job's — on timeout the job keeps
+                // running server-side and a later refresh picks up its result.
+                let deadline = Date().addingTimeInterval(300)
+                while status.state == "running", Date() < deadline {
+                    try await Task.sleep(for: .seconds(2))
+                    status = try await network.smartRefreshStatus()
+                    if !status.stage.isEmpty {
+                        await MainActor.run { self.syncMessage = status.stage }
+                    }
                 }
+
+                await MainActor.run {
+                    switch status.state {
+                    case "done":
+                        if let result = status.result {
+                            self.refreshResponse = result
+                            if result.syncStatus == "partial" {
+                                let msg = result.syncMessage
+                                self.scraperErrorMessage = msg.isEmpty ? "Data could not be scraped." : msg
+                                self.showScraperError = true
+                            }
+                        }
+                    case "error":
+                        self.scraperErrorMessage = status.error ?? "Deep sync failed."
+                        self.showScraperError = true
+                    default:
+                        // Deadline hit, or the dyno restarted and lost the job.
+                        self.scraperErrorMessage = "Still syncing on the server. Pull to refresh in a minute."
+                        self.showScraperError = true
+                    }
+                }
+            } catch {
+                print("Smart refresh job error (non-fatal): \(error)")
+                // Don't abort — still fetch latest data below
             }
-        } catch {
-            print("Smart refresh sync error (non-fatal): \(error)")
-            // Don't abort — still fetch latest data below
+
+            // Always re-read from the backend, whatever the job did.
+            await MainActor.run { self.syncMessage = "Refreshing data..." }
+            await fetchAllFromBackend()
         }
-        
-        // Step 2: Always refresh all data from backend
-        await MainActor.run { self.syncMessage = "Refreshing data..." }
-        
+
+        await MainActor.run { self.endSync(haptic: .medium) }
+    }
+
+    /// The three plain reads both refresh tiers end with.
+    private func fetchAllFromBackend() async {
         async let dashTask: () = fetchDashboard(forceRefresh: true)
         async let planTask: () = fetchWeeklyPlan()
         async let statusTask: () = fetchPlanStatus()
         _ = await (dashTask, planTask, statusTask)
-        
-        await MainActor.run {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.isSyncing = false
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            }
-        }
     }
     
     private func loadRatioLabel(for ratio: Double?) -> String {

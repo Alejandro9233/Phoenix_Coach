@@ -123,16 +123,26 @@ class NetworkManager: ObservableObject {
         return try decoder.decode(SyncResponse.self, from: data)
     }
     
-    /// Smart Refresh: scrape → ingest → evaluate recovery → auto-adapt if needed.
-    /// Replaces the old pull-to-refresh + adapt-today flow with a single action.
-    func smartRefresh() async throws -> SmartRefreshResponse {
-        guard let url = URL(string: "\(baseURL)/smart-refresh") else {
+    /// Kicks off the deep refresh as a backend job and returns immediately.
+    /// Joins the running job if one already exists. Poll smartRefreshStatus()
+    /// until `state` is "done" or "error"; the job finishes server-side even
+    /// if the app closes mid-scrape.
+    func startSmartRefresh() async throws -> RefreshJobStatus {
+        guard let url = URL(string: "\(baseURL)/smart-refresh/start") else {
             throw NetworkError.invalidURL
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         let (data, _) = try await session.data(for: request)
-        return try decoder.decode(SmartRefreshResponse.self, from: data)
+        return try decoder.decode(RefreshJobStatus.self, from: data)
+    }
+
+    func smartRefreshStatus() async throws -> RefreshJobStatus {
+        guard let url = URL(string: "\(baseURL)/smart-refresh/status") else {
+            throw NetworkError.invalidURL
+        }
+        let (data, _) = try await session.data(from: url)
+        return try decoder.decode(RefreshJobStatus.self, from: data)
     }
     
     // MARK: - Dashboard

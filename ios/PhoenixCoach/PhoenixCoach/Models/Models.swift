@@ -620,6 +620,15 @@ struct AdaptationResult: Codable {
     let reasons: [String]
 }
 
+/// State of the backend's deep-refresh job (/smart-refresh/start + /status).
+/// `result` is present once `state == "done"`.
+struct RefreshJobStatus: Codable {
+    let state: String  // idle | running | done | error
+    let stage: String
+    let result: SmartRefreshResponse?
+    let error: String?
+}
+
 
 // MARK: - Context Builder
 

@@ -977,15 +977,28 @@ def _load_ratio_label(ratio):
 async def smart_refresh(db: Session = Depends(get_db)):
     """
     Single morning action: scrape → ingest → evaluate recovery → auto-adapt if needed.
-    Returns recovery status and adaptation info.
+    Synchronous form — the caller holds the connection for the whole scrape.
+    The iOS deep pull uses /smart-refresh/start + /smart-refresh/status instead.
     """
+    return await _run_smart_refresh(db)
+
+
+async def _run_smart_refresh(db: Session, progress=None):
+    """Scrape → ingest → evaluate recovery → auto-adapt. Shared by the
+    synchronous endpoint above and the background job below. `progress`
+    receives human-readable stage strings for the phone's status pill."""
     from backend.services.ingestion_service import IngestionService
+
+    def report(stage):
+        if progress:
+            progress(stage)
 
     sync_status = "ok"
     sync_message = ""
 
     # 1. Scrape COROS
     try:
+        report("Scraping COROS...")
         scraper = CorosScraper()
         data = await scraper.scrape_all()
         with open("coros_scraped_data.json", "w") as f:
@@ -998,6 +1011,7 @@ async def smart_refresh(db: Session = Depends(get_db)):
         sync_message = f"Scraper error: {str(e)}. Using cached data."
 
     # 2. Get latest recovery snapshot
+    report("Evaluating recovery...")
     latest = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).first()
 
     # --- Staleness guard: skip adaptation if recovery data is not from today ---
@@ -1053,6 +1067,7 @@ async def smart_refresh(db: Session = Depends(get_db)):
     adapted = False
     if needs_adaptation:
         try:
+            report("Adapting today's plan...")
             adapt_today_workout(body=None, db=db)
             adapted = True
             print(f"🔄 Auto-adapted today's workout. Reasons: {adaptation_reasons}")
@@ -1085,6 +1100,68 @@ async def smart_refresh(db: Session = Depends(get_db)):
             "reasons": adaptation_reasons
         }
     }
+
+
+# --- Deep refresh as a background job ----------------------------------------
+#
+# The scrape takes 30-90s (plus a cold start); holding an HTTP connection open
+# that long from a phone is fragile and forces the athlete to watch it. So the
+# deep pull POSTs /smart-refresh/start (returns immediately) and polls
+# /smart-refresh/status until the job settles. The scrape finishes even if the
+# app is closed mid-way — the data is simply there on the next open.
+#
+# One athlete, one job: module-level state, no job IDs. In-memory on purpose —
+# if the dyno restarts mid-job the job dies with it, status reverts to idle,
+# and the phone's poll loop gives up gracefully. FastAPI runs one event loop,
+# and the check-and-set in /start has no await between check and set, so no
+# lock is needed.
+
+_refresh_job = {
+    "state": "idle",  # idle | running | done | error
+    "stage": "",
+    "result": None,   # /smart-refresh payload once done
+    "error": None,
+}
+
+
+def _refresh_job_status():
+    return {
+        "state": _refresh_job["state"],
+        "stage": _refresh_job["stage"],
+        "result": _refresh_job["result"],
+        "error": _refresh_job["error"],
+    }
+
+
+async def _smart_refresh_job():
+    # The request's session can't outlive its request — the job needs its own.
+    db = SessionLocal()
+    try:
+        def set_stage(stage):
+            _refresh_job["stage"] = stage
+
+        result = await _run_smart_refresh(db, progress=set_stage)
+        _refresh_job.update(state="done", stage="", result=result)
+    except Exception as e:
+        print(f"⚠️ Smart-refresh job failed: {e}")
+        _refresh_job.update(state="error", stage="", error=str(e))
+    finally:
+        db.close()
+
+
+@app.post("/smart-refresh/start")
+async def smart_refresh_start():
+    """Kick off a deep refresh; joins the running job if one exists."""
+    if _refresh_job["state"] != "running":
+        _refresh_job.update(state="running", stage="Starting...", result=None, error=None)
+        asyncio.create_task(_smart_refresh_job())
+    return _refresh_job_status()
+
+
+@app.get("/smart-refresh/status")
+async def smart_refresh_status():
+    return _refresh_job_status()
+
 
 def _strip_think_tags(text: str) -> str:
     """Remove <think>...</think> blocks from Qwen3 output."""
