@@ -19,6 +19,8 @@ those limits and writes the coaching notes.
 - Don't set `TIMEZONE` in `.env` or on Render. It overrides the phone's reported
   timezone and breaks travel.
 - Commits go straight to `main` on this repo.
+- **Never add a `Co-Authored-By:` trailer to commits.** No Claude/AI attribution
+  lines, no `Generated with` footers. Commit messages end at the body.
 - The LLM never decides volume. Wrong mileage in a plan = bug in
   `periodization_engine.py` or the context injection, not the prompt.
 - **A constraint that lives only in a prompt is a suggestion.** Sport availability
