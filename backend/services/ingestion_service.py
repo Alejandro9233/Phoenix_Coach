@@ -17,14 +17,16 @@ class IngestionService:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def ingest_coros_data(self, json_path):
-        """Parses the COROS scrape JSON and populates the database."""
-        if not Path(json_path).exists():
-            print(f"Error: {json_path} not found.")
-            return
-
-        with open(json_path, 'r') as f:
-            data = json.load(f)
+    def ingest_coros_data(self, data):
+        """Populates the database from a COROS scrape — either the dict
+        returned by CorosScraper.scrape_all or a path to its JSON dump
+        (rebuild_db.py and the tests pass files)."""
+        if isinstance(data, (str, Path)):
+            if not Path(data).exists():
+                print(f"Error: {data} not found.")
+                return
+            with open(data, 'r') as f:
+                data = json.load(f)
 
         session = self.Session()
         try:

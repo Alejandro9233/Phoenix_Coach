@@ -931,15 +931,16 @@ async def pull_to_refresh(db: Session = Depends(get_db)):
     try:
         scraper = CorosScraper()
         data = await scraper.scrape_all()
-        
-        # Save scraped data
-        with open("coros_scraped_data.json", "w") as f:
-            json.dump(data, f, indent=2)
-        
+
         # 2. Ingest into database
         service = IngestionService()
-        service.ingest_coros_data("coros_scraped_data.json")
-        sync_message = "COROS data synced successfully."
+        service.ingest_coros_data(data)
+        missing = data.get("missing") or []
+        if missing:
+            sync_status = "partial"
+            sync_message = f"Synced, but missing: {', '.join(missing)}."
+        else:
+            sync_message = "COROS data synced successfully."
     except Exception as e:
         sync_status = "partial"
         sync_message = f"Scraper error: {str(e)}. Using cached data."
@@ -1008,11 +1009,17 @@ async def _run_smart_refresh(db: Session, progress=None):
         report("Scraping COROS...")
         scraper = CorosScraper()
         data = await scraper.scrape_all()
-        with open("coros_scraped_data.json", "w") as f:
-            json.dump(data, f, indent=2)
         service = IngestionService()
-        service.ingest_coros_data("coros_scraped_data.json")
-        sync_message = "Biometrics synced."
+        service.ingest_coros_data(data)
+        # A scrape can finish without the payloads ingestion needs (cold CPU,
+        # COROS hiccup). Say so instead of claiming a clean sync — the phone
+        # shows this string.
+        missing = data.get("missing") or []
+        if missing:
+            sync_status = "partial"
+            sync_message = f"Synced, but missing: {', '.join(missing)}."
+        else:
+            sync_message = "Biometrics synced."
     except Exception as e:
         sync_status = "partial"
         sync_message = f"Scraper error: {str(e)}. Using cached data."

@@ -133,12 +133,44 @@ class CorosScraper:
             f"COROS Login Failed: app shell did not mount within 60s at {page.url}"
         )
 
+    # The payloads ingestion actually reads (see IngestionService.ingest_coros_data).
+    # Everything else the sniffer catches is a bonus; a scrape that finishes
+    # without one of these must say so instead of reporting success.
+    def _missing(self, captured_data):
+        missing = []
+        if not captured_data["activities"]:
+            missing.append("activities")
+        if "analyse_query" not in captured_data["evolab"]:
+            missing.append("recovery metrics (analyse_query)")
+        if "dashboard_query" not in captured_data["evolab"]:
+            missing.append("HRV baseline (dashboard_query)")
+        if not any(k.endswith("_profile") for k in captured_data["evolab"]):
+            missing.append("profile")
+        return missing
+
+    async def _settle(self, page, what, predicate, timeout_s=60, grace_ms=2000):
+        """Wait until the response sniffer satisfies `predicate`, then a short
+        grace for whatever is still in flight. The deadline exists for Render's
+        cold CPU; a warm run returns in a couple of seconds. Not fatal on
+        timeout — the missing-payload check at the end is the real verdict."""
+        waited = 0
+        while not predicate():
+            if waited >= timeout_s * 1000:
+                print(f"  Warning: gave up waiting for {what} after {timeout_s}s.")
+                return False
+            await page.wait_for_timeout(250)
+            waited += 250
+        print(f"  {what} captured.")
+        await page.wait_for_timeout(grace_ms)
+        return True
+
     async def scrape_all(self):
         """Main entry point: login → EvoLab metrics → Activity list → return."""
         captured_data = {
             "activities": [],
             "evolab": {}
         }
+        capture_counts = {"activity_lists": 0}
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -165,6 +197,7 @@ class CorosScraper:
                         
                         if activity_list and len(activity_list) > 0:
                             captured_data["activities"] = activity_list
+                            capture_counts["activity_lists"] += 1
                             print(f"    -> SUCCESS: Captured {len(captured_data['activities'])} activities")
                         
                         if any(k in url.lower() for k in ["health", "evolab", "metric", "fitness", "sport", "analyse", "dashboard"]):
@@ -177,54 +210,52 @@ class CorosScraper:
                             endpoint = url.split("coros.com/")[-1].split("?")[0].replace("/", "_") + "_profile"
                             captured_data["evolab"][endpoint] = json_data
                             print(f"    -> Captured Profile data for: {endpoint}")
-                            
-                            if "analyse_query" in endpoint:
-                                with open("analyse_debug.json", "w") as f:
-                                    import json
-                                    json.dump(data, f, indent=2)
-                                    
+
                     except Exception as e:
-                        pass
+                        print(f"    -> Skipped a payload from {url}: {e}")
 
             page.on("response", handle_response)
             
             try:
-                # 1. Login
+                # Navigate by URL and wait on the *sniffed data*, never on tab
+                # clicks, DOM selectors, or fixed sleeps. Capture is passive
+                # response-sniffing, so a navigation only has to make the page
+                # fire its API calls — the payload landing is the one readiness
+                # signal that can't lie. The old clock-based waits both wasted
+                # ~36s on warm runs and were still too short on Render's cold
+                # CPU (2026-08-18: tab clicks outlived their 10s timeouts and
+                # analyse_query was lost to a 30s content wait).
+
+                # 1. Login lands on the dashboard, which fires dashboard_query
+                # (HRV baseline) and a recent-activity list on its own.
                 await self.login(page)
-                await page.wait_for_timeout(3000)
-                
-                # 2. Navigate to Data Analysis (EvoLab) page
+                await self._settle(page, "dashboard_query",
+                                   lambda: "dashboard_query" in captured_data["evolab"],
+                                   timeout_s=30)
+
+                # 2. Data Analysis page — analyse_query feeds every recovery
+                # snapshot; without it the day's HRV/RHR/fatigue never lands.
                 print("Navigating to EvoLab metrics...")
-                try:
-                    print("  Clicking 'EvoLab Metrics' tab...")
-                    await page.click('div.arco-tabs-tab:has-text("EvoLab Metrics")', timeout=10000)
-                except Exception as e:
-                    print(f"  Tab click failed, trying direct URL: {e}")
-                    await page.goto(f"{self.base_url}/admin/views/data-analysis", wait_until="networkidle")
-                
-                print("  Waiting for EvoLab content...")
-                try:
-                    await page.wait_for_selector('.data-analysis-card-container, .admin-card-box', timeout=30000)
-                except Exception as e:
-                    print(f"  Warning: EvoLab content timeout, continuing anyway.")
-                await page.wait_for_timeout(8000)
-                
-                # 3. Navigate to Activity List page
+                await page.goto(f"{self.base_url}/admin/views/data-analysis", wait_until="load")
+                await self._settle(page, "analyse_query",
+                                   lambda: "analyse_query" in captured_data["evolab"])
+
+                # 3. Activity List page — wait for a list response that arrives
+                # *after* this navigation (last one wins in the sniffer). If the
+                # dashboard already supplied activities, this is just a top-up,
+                # so don't wait long for it.
                 print("Navigating to Activity List...")
-                try:
-                    print("  Clicking 'Activity List' tab...")
-                    await page.click('div.arco-tabs-tab:has-text("Activity List")', timeout=10000)
-                except Exception as e:
-                    print(f"  Tab click failed, trying direct URL: {e}")
-                    await page.goto(f"{self.base_url}/admin/views/dash-board#/personal/list", wait_until="networkidle")
-                
-                try:
-                    await page.wait_for_selector('.arco-table', timeout=20000)
-                except Exception as e:
-                    print(f"  Warning: .arco-table timeout, continuing anyway.")
-                await page.wait_for_timeout(5000)
-                
-                print(f"\n✅ Scrape complete: {len(captured_data['activities'])} activities, {len(captured_data['evolab'])} EvoLab endpoints")
+                lists_before = capture_counts["activity_lists"]
+                await page.goto(f"{self.base_url}/admin/views/dash-board#/personal/list", wait_until="load")
+                await self._settle(page, "activity list",
+                                   lambda: capture_counts["activity_lists"] > lists_before,
+                                   timeout_s=20 if captured_data["activities"] else 60)
+
+                captured_data["missing"] = self._missing(captured_data)
+                if captured_data["missing"]:
+                    print(f"\n⚠️ Scrape finished, but missing: {', '.join(captured_data['missing'])}")
+                else:
+                    print(f"\n✅ Scrape complete: {len(captured_data['activities'])} activities, {len(captured_data['evolab'])} EvoLab endpoints")
                 return captured_data
             except Exception as e:
                 # Render's filesystem is ephemeral, so a screenshot there is write-only
