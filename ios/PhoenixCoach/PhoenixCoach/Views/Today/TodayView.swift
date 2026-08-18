@@ -20,64 +20,91 @@ struct TodayView: View {
 
     // MARK: Two-tier pull
     //
-    // Apple's `.refreshable` owns the gesture, the rubber-banding and the
-    // spinner — hand-rolled scroll physics is what makes custom pull-to-refresh
-    // feel cheap. What `.refreshable` does NOT do is wait for release: its
-    // closure fires the moment the drag crosses the *system's* activation
-    // distance, finger still down. Two designs died on that fact. Reading a
-    // latch inside the closure always saw the pre-threshold state, and the
-    // light tier the closure started set `isSyncing`, which made `handlePull`
-    // inert for the rest of the drag — so the deep tier could never arm, no
-    // matter how far the pull went. Two device tests, one cause.
+    // A sync costs the athlete something — the light tier dims the screen, the
+    // deep one runs 30-90s — so the gesture is deliberately expensive to
+    // perform. Three things must all happen before anything fires:
     //
-    // So the tiers are split by *when they are decided*:
-    //   - Light: `.refreshable` fires it mid-drag, exactly as the system wants.
-    //   - Deep: decided at the real release. `onScrollPhaseChange` reports the
-    //     finger lifting; if the drag is past `deepPullThreshold` at that
-    //     moment, the scrape runs — queued behind the same gesture's in-flight
-    //     light tier rather than racing it.
-    // A deep pull therefore does a cheap DB read it didn't strictly need
-    // before scraping. That's ~1s ahead of a 30-60s operation; accepted.
+    //   1. drag past `lightPullThreshold`,
+    //   2. hold it there for `pullDwell`,
+    //   3. let go.
+    //
+    // Step 2 is what actually stops accidents. Distance alone never did: a
+    // stray swipe covers 60pt as easily as a deliberate one, and raising the
+    // number just made the deliberate pull tiring without making the stray one
+    // rarer. Time is the axis a careless gesture cannot cross — nobody holds a
+    // screen still for `pullDwell` by accident. Step 3 keeps the escape hatch:
+    // slide back up before releasing and nothing runs.
+    //
+    // Which tier fires is read at release from the distance: past
+    // `deepPullThreshold` scrapes COROS, otherwise it's the DB refresh. The
+    // deep tier does not pay a second hold — the first one already proved
+    // intent, and stacking two would double the gesture for no more proof.
+    //
+    // That rule is why `.refreshable` is gone. Apple's control owns a nice
+    // gesture, but its closure fires the moment the drag crosses the system's
+    // activation distance — finger down, no confirmation, no way to change
+    // your mind. At the top of this screen the only gesture that overscrolls
+    // is a downward swipe, so every stray one was a refresh: the content
+    // dimmed to 30% and a sync ran that nobody asked for. Two earlier designs
+    // also died on that same mid-drag firing (a latch read inside the closure
+    // always saw the pre-threshold state, and the light tier it started set
+    // `isSyncing`, which made `handlePull` inert for the rest of the drag so
+    // the deep tier could never arm). Deciding on release deletes that whole
+    // family of bugs rather than working around it.
+    //
+    // What that costs: no system spinner and no system rubber-band assist.
+    // `statusPill` was already the real progress indicator — it carries the
+    // message, the spinner and the elapsed counter — so what is lost is the
+    // duplicate, not the feedback. The ScrollView's own bounce still supplies
+    // the physics; none of it is hand-rolled.
     //
     // Instrumentation: the distance must come from `onScrollGeometryChange`.
     // A GeometryReader-preference probe (tried in a named space, then in
     // `.global`) reads a frozen number on device — this ScrollView moves its
     // content without re-running layout, so the probe fires once and never
-    // again. And the offset must be measured against a *frozen* baseline
-    // (offset at rest, re-anchored at idle), never against the live
-    // `contentInsets.top`: `.refreshable` grows that inset when it activates,
-    // which cancels the live-inset formula mid-drag — that was field
-    // failure #1, and freezing the baseline is the fix.
+    // again. The offset is still measured against a *frozen* baseline (offset
+    // at rest, re-anchored at idle) rather than a live inset. With
+    // `.refreshable` gone nothing grows the top inset mid-gesture any more,
+    // which also removes the ~spinner-height skew the old readings carried.
 
-    private enum SyncTier { case light, deep }
-
-    /// How far past the top the drag must reach to arm the deep sync.
-    /// Kept well under the native refresh control's resistance ceiling — a
-    /// threshold you physically cannot drag to never fires.
+    /// How far past the top the drag must reach before the hold starts timing.
+    /// Comfortable on purpose: `pullDwell` is what filters out accidents, so
+    /// this only has to clear the noise of a finger resting mid-scroll.
+    private let lightPullThreshold: CGFloat = 60
+    /// How far past the top the drag must reach to arm the COROS scrape.
+    /// Device-verified reachable back when the native refresh control's
+    /// resistance was still in the way; without it there is more headroom, not
+    /// less. A threshold you physically cannot drag to never fires.
     private let deepPullThreshold: CGFloat = 110
-    /// Slack before disarming, so a finger resting on the boundary doesn't
-    /// buzz repeatedly. Without this the haptics chatter and it feels broken.
-    private let deepPullHysteresis: CGFloat = 22
+    /// Slack before disarming, so a finger resting on a boundary doesn't buzz
+    /// repeatedly. Without this the haptics chatter and it feels broken.
+    private let pullHysteresis: CGFloat = 22
+    /// How long the drag must be held past `lightPullThreshold` before either
+    /// tier arms. The whole gesture rests on this number. Started at 2s;
+    /// device testing said that's longer than deliberateness needs.
+    private let pullDwell: TimeInterval = 1
 
-    @State private var pullProgress: CGFloat = 0
+    /// Fills 0→1 across `pullDwell` so the hold is visible while it is being
+    /// paid. Animated, not ticked: a held finger produces no scroll events, so
+    /// there is nothing to drive a frame-by-frame counter off.
+    @State private var dwellProgress: CGFloat = 0
+    /// The in-flight hold. Non-nil means the timer is running; it is also the
+    /// flag the pill reads to say "keep holding".
+    @State private var dwellTask: Task<Void, Never>?
+    /// What the release will run. Set only while the finger is down, consumed
+    /// only by the release decision. Deep outranks light.
+    @State private var lightSyncArmed = false
     @State private var deepSyncArmed = false
-    /// Which tier is running, while `isSyncing`. The light tier starts
-    /// mid-drag, so `handlePull` must keep measuring through it; a scrape or
-    /// the initial load makes pulls inert. `nil` when idle.
-    @State private var syncTier: SyncTier?
     /// Finger on screen, per `onScrollPhaseChange`. Arming and disarming
     /// require it — the settle animation after release replays falling
     /// distances, and letting those trip the hysteresis would disarm the latch
     /// in the gap before the release decision runs.
     @State private var isDragging = false
-    /// Deep sync requested at release while the light tier was still running.
-    /// `endSync` consumes it.
-    @State private var pendingDeepSync = false
     /// `contentOffset.y` when the list is at rest, captured on the first
     /// geometry callback and re-anchored whenever the scroll view settles to
     /// idle. Offsets are absolute, so this is what turns them into a drag
-    /// distance — and it is deliberately a snapshot, immune to `.refreshable`
-    /// growing the top inset mid-gesture.
+    /// distance — and it is deliberately a snapshot, so no later inset
+    /// change can bend a gesture already under way.
     @State private var pullBaseline: CGFloat?
     @State private var lastOffsetY: CGFloat?
     /// Live drag distance, shown in the pill while tuning. Set false to hide.
@@ -146,10 +173,12 @@ struct TodayView: View {
     
     var body: some View {
         NavigationStack {
-            // One ScrollView, one .refreshable. The error and content states are
-            // branched *inside* it on purpose: when each state owned its own
-            // ScrollView, clearing `errorMessage` mid-refresh destroyed the very
-            // view whose `.refreshable` task was running, cancelling the sync.
+            // One ScrollView. The error and content states are branched
+            // *inside* it on purpose: when each state owned its own ScrollView,
+            // clearing `errorMessage` mid-refresh destroyed the very view the
+            // gesture belonged to, taking the pull baseline and the armed latch
+            // with it — and, back when the refresh was structured, cancelling
+            // the sync outright.
             ScrollView {
                 // The pill sits outside the branch and outside the dimming: it
                 // reports both refresh tiers and the error state, so it is the
@@ -186,37 +215,35 @@ struct TodayView: View {
             .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, offsetY in
                 handlePull(offsetY: offsetY)
             }
-            .refreshable {
-                // Fires at the system's activation distance — mid-drag, finger
-                // still down, never at release. No release state can be read
-                // here, so this closure can only ever be the light tier. The
-                // deep tier is decided below, when the finger actually lifts.
-                print("🔄 Refresh control fired — DB refresh")
-                await refreshFromDatabase()
-            }
             .onScrollPhaseChange { _, newPhase in
                 isDragging = newPhase == .tracking || newPhase == .interacting
 
                 // Re-anchor zero at true rest, so a rotation or bar-height
-                // change can't skew every later reading. Guarded on !isSyncing:
-                // idle-with-spinner-extended is also "idle", and anchoring to it
-                // would fold the spinner inset into every later distance.
+                // change can't skew every later reading. Guarded on !isSyncing
+                // so a sync that lands between gestures can't redefine zero
+                // from a position the athlete never rested at.
                 if newPhase == .idle, !isSyncing, let restY = lastOffsetY {
                     pullBaseline = restY
                 }
 
-                // The release decision. Armed can only be true if the drag
-                // went past `deepPullThreshold` and stayed there.
-                if !isDragging, deepSyncArmed {
-                    deepSyncArmed = false
-                    if isSyncing {
-                        // The same gesture's light tier is still running —
-                        // scrape when it finishes, don't race it.
-                        print("🔄 Deep pull released — scrape queued behind light refresh")
-                        pendingDeepSync = true
+                // The release decision — the only place either tier starts.
+                // Armed can only be true if the finger held past the threshold
+                // for the full `pullDwell`, so a stray swipe releases into
+                // nothing, and so does a long pull let go early.
+                if !isDragging {
+                    if lightSyncArmed || deepSyncArmed {
+                        let runDeep = deepSyncArmed
+                        resetPull()
+                        if runDeep {
+                            print("🔄 Deep pull released — COROS scrape")
+                            Task { await performSmartRefresh() }
+                        } else {
+                            print("🔄 Light pull released — DB refresh")
+                            Task { await refreshFromDatabase() }
+                        }
                     } else {
-                        print("🔄 Deep pull released — COROS scrape")
-                        Task { await performSmartRefresh() }
+                        // Let go mid-hold. Throw the partial payment away.
+                        resetPull()
                     }
                 }
             }
@@ -237,27 +264,6 @@ struct TodayView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        Task {
-                            print("🔄 Toolbar refresh tapped")
-                            await performSmartRefresh()
-                        }
-                    } label: {
-                        if isSyncing {
-                            ProgressView()
-                                .tint(DS.Colors.accent)
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(DS.Colors.accent)
-                        }
-                    }
-                    .disabled(isSyncing)
-                }
-            }
             .sheet(isPresented: $showHRVChart) {
                 MetricChartSheet(title: "HRV (ms)", data: dashboard?.recovery ?? [], metricType: .hrv)
             }
@@ -300,6 +306,18 @@ struct TodayView: View {
     
     // MARK: - UI Components
     
+    /// The border trace, 0-1. Purely the hold: dark until `pullDwell` starts
+    /// counting, full loop when it's paid.
+    ///
+    /// Reads only `lightSyncArmed` and the *animated* `dwellProgress` — never
+    /// `dwellTask`. The task is set with no animation attached, so any branch
+    /// on it flips the trace straight to its target value instead of riding
+    /// the dwell ramp: that was the full-white-at-the-haptic bug.
+    private var armProgress: CGFloat {
+        if lightSyncArmed { return 1 }
+        return dwellProgress
+    }
+
     /// What the pill says. During a drag it previews what releasing will do, so
     /// the deep tier is discovered by pulling rather than by being told.
     private var pillText: String {
@@ -312,11 +330,14 @@ struct TodayView: View {
             guard pullBaseline != nil else { return "PULL — NO BASELINE" }
             return "PULL \(Int(rawPull)) / \(Int(deepPullThreshold))\(deepSyncArmed ? " ARMED" : "")"
         }
-        // Armed outranks the sync message: with the light tier already running
-        // underneath, the pill's job is to say what release will do.
+        // Armed outranks everything: mid-drag the pill's only job is to say
+        // what letting go will do. The light line names the deep tier too —
+        // that is the only way the scrape stays discoverable now that the
+        // toolbar button is gone.
         if deepSyncArmed { return "RELEASE TO SCRAPE COROS" }
+        if lightSyncArmed { return "RELEASE TO REFRESH · PULL FOR COROS" }
         if isSyncing { return syncMessage }
-        if pullProgress > 0.12 { return "KEEP PULLING TO SCRAPE COROS" }
+        if dwellTask != nil { return "KEEP HOLDING" }
         return network.isConnected ? "Biometrics Synced" : "Connection Offline"
     }
 
@@ -349,42 +370,55 @@ struct TodayView: View {
                 }
             }
 
-            // Rotates 1:1 with the drag. Tying it to `pullProgress` rather than
-            // to a threshold is what makes the pull feel attached to the finger
-            // instead of snapping between two states.
+            // Sweeps a full turn across the gesture: distance first, then the
+            // hold. Tying it to `armProgress` rather than to a threshold is what
+            // makes the pull feel attached to the finger instead of snapping
+            // between two states — and during the hold it is the only thing
+            // moving, which is what tells you the wait is doing something.
             if !isSyncing {
                 Image(systemName: deepSyncArmed ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(DS.Colors.accent.opacity(0.7 + pullProgress * 0.3))
-                    .rotationEffect(.degrees(Double(pullProgress) * 180))
+                    .foregroundStyle(DS.Colors.accent.opacity(0.7 + armProgress * 0.3))
+                    .rotationEffect(.degrees(Double(armProgress) * 360))
                     .scaleEffect(deepSyncArmed ? 1.25 : 1.0)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isSyncing)
         // Spring, not easeInOut: arming should feel like a detent clicking over.
         .animation(.spring(response: 0.28, dampingFraction: 0.62), value: deepSyncArmed)
+        .animation(.spring(response: 0.28, dampingFraction: 0.62), value: lightSyncArmed)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .overlay(
-            Capsule()
-                .stroke(
-                    deepSyncArmed
-                        ? DS.Colors.accent.opacity(0.9)
-                        : Color.white.opacity(0.1 + pullProgress * 0.35),
-                    lineWidth: deepSyncArmed ? 1.5 : 1
-                )
+            // The border is the progress indicator. A bright white stroke
+            // traces the capsule as the gesture is earned — distance, then the
+            // hold — and a full loop means release will fire. Deep armed swaps
+            // the loop to accent, same as the rest of the pill's deep styling.
+            ZStack {
+                Capsule()
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                // Always in the tree: a trim inserted mid-animation renders
+                // straight at its target value, while one that exists at zero
+                // interpolates. Zero-length trim draws nothing.
+                Capsule()
+                    .trim(from: 0, to: armProgress)
+                    .stroke(
+                        deepSyncArmed ? DS.Colors.accent : .white,
+                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+                    )
+            }
         )
         .accessibilityLabel(isSyncing ? "Syncing" : (network.isConnected ? "Biometrics Synced" : "Connection Offline"))
-        .accessibilityHint("Pull down to refresh, or pull further to scrape COROS")
+        .accessibilityHint("Pull down and hold a moment to refresh, or pull further to scrape COROS")
     }
 
     /// Drives the pull readout and arms the deep tier.
     ///
     /// Haptics fire only on threshold *crossings*, never continuously — a buzz
     /// on every scroll event is the single fastest way to make a gesture feel
-    /// broken. `deepPullHysteresis` keeps a finger hovering at the boundary from
+    /// broken. `pullHysteresis` keeps a finger hovering at a boundary from
     /// rearming over and over.
     private func handlePull(offsetY: CGFloat) {
         lastOffsetY = offsetY
@@ -393,45 +427,90 @@ struct TodayView: View {
         // the top — so it defines zero. Captured ahead of the sync guard below:
         // the initial load holds `isSyncing` for the whole 30-60s cold start,
         // and a baseline that isn't set until that ends is a baseline taken
-        // while the refresh control is still extended.
+        // from wherever the list happened to be sitting by then.
         guard let baseline = pullBaseline else {
             pullBaseline = offsetY
             return
         }
 
-        // A pull during a scrape or the initial load is deliberately inert — a
-        // second scrape queued behind the first is never what the athlete
-        // meant. The *light* tier is exempt, and not by choice: `.refreshable`
-        // starts it mid-drag, so going inert on it would throw away the rest
-        // of the drag and make the deep threshold unreachable — field failure
-        // number two. Clear the readout too, or the last drag distance is
-        // still sitting there when the sync ends and the pill flashes a stale
-        // number.
-        guard !isSyncing || syncTier == .light else {
-            if pullProgress != 0 { pullProgress = 0 }
+        // A pull during a sync is inert. Nothing starts mid-drag any more, so
+        // in practice this catches the initial load and syncs kicked off from
+        // elsewhere. Reset rather than just ignore: a hold half-paid before the
+        // sync began must not carry over, and a stale drag distance left in the
+        // readout makes the pill flash a dead number when the sync ends.
+        guard !isSyncing else {
             if rawPull != 0 { rawPull = 0 }
+            resetPull()
             return
         }
 
         // Dragging past the top pushes the offset *below* its resting value, so
         // rest-minus-current is the pull distance. Scrolling down the list makes
         // it negative — clamped to zero, which is what `max` is doing here.
-        // While the refresh spinner's inset is extended the reading skews high
-        // by about the spinner height; arming is finger-gated and a light sync
-        // lasts ~1s, so the skew is tolerated rather than tracked.
         let pull = max(0, baseline - offsetY)
         rawPull = pull
-        pullProgress = min(1, pull / deepPullThreshold)
 
-        // `isDragging` gates both transitions: only the finger arms, and only
-        // the finger disarms. Without it, the settle animation's falling
-        // values would disarm the latch before the release decision reads it.
-        if !deepSyncArmed, isDragging, pull >= deepPullThreshold {
+        // Only the finger arms, and only the finger disarms. Without this gate
+        // the settle animation's falling values would cancel the hold and drop
+        // both latches before the release decision gets to read them.
+        guard isDragging else { return }
+
+        // Crossing the light threshold starts the clock; falling back below it
+        // stops it and throws away whatever was paid. The hysteresis is what
+        // keeps a finger hovering on the line from restarting the hold over and
+        // over — without it the timer resets on every jitter and the gesture is
+        // impossible to complete.
+        if pull >= lightPullThreshold {
+            if !lightSyncArmed, dwellTask == nil { startDwell() }
+        } else if pull < lightPullThreshold - pullHysteresis {
+            resetPull()
+            return
+        }
+
+        // Depth only counts once the hold is paid. Reaching 110pt in a flick
+        // that never held still is not a request for a COROS scrape.
+        guard lightSyncArmed else { return }
+
+        if !deepSyncArmed, pull >= deepPullThreshold {
             deepSyncArmed = true
             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-        } else if deepSyncArmed, isDragging, pull < deepPullThreshold - deepPullHysteresis {
+        } else if deepSyncArmed, pull < deepPullThreshold - pullHysteresis {
             deepSyncArmed = false
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        }
+    }
+
+    /// Starts the hold. The haptic here is the "I'm listening" signal — without
+    /// it a wait with no feedback is indistinguishable from a pull
+    /// that wasn't registered at all, which is how a hold gesture gets a
+    /// reputation for being broken.
+    private func startDwell() {
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        dwellProgress = 0
+        withAnimation(.linear(duration: pullDwell)) { dwellProgress = 1 }
+        dwellTask = Task {
+            try? await Task.sleep(for: .seconds(pullDwell))
+            guard !Task.isCancelled else { return }
+            lightSyncArmed = true
+            // Settle depth here too, not only in `handlePull`. A finger held
+            // perfectly still generates no scroll events, so a hold paid at
+            // 150pt would otherwise arm the light tier and never hear about the
+            // depth it was already at — releasing a deep pull into a DB refresh.
+            if rawPull >= deepPullThreshold { deepSyncArmed = true }
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        }
+    }
+
+    /// Drops the hold and both latches. Called when the drag falls back under
+    /// the threshold, when the finger lifts without having armed anything, and
+    /// when a sync starts from elsewhere mid-gesture.
+    private func resetPull() {
+        dwellTask?.cancel()
+        dwellTask = nil
+        lightSyncArmed = false
+        deepSyncArmed = false
+        if dwellProgress != 0 {
+            withAnimation(.easeOut(duration: 0.18)) { dwellProgress = 0 }
         }
     }
     
@@ -816,33 +895,26 @@ struct TodayView: View {
     /// Both refresh tiers and the initial load drive the status pill through
     /// these, so the spinner, the message and the elapsed counter can never
     /// disagree about whether a sync is running.
-    private func beginSync(_ message: String, tier: SyncTier) {
+    private func beginSync(_ message: String) {
         isSyncing = true
-        syncTier = tier
         syncMessage = message
         syncStartedAt = Date()
         // Drop the drag readout so the pill switches cleanly to sync state.
-        pullProgress = 0
+        rawPull = 0
+        resetPull()
     }
 
     private func endSync(haptic: UIImpactFeedbackGenerator.FeedbackStyle? = nil) {
         isSyncing = false
-        syncTier = nil
         syncStartedAt = nil
         if let haptic {
             UIImpactFeedbackGenerator(style: haptic).impactOccurred()
         }
-        // A deep pull released while this sync was running parked its request
-        // here rather than racing two syncs. Honor it now.
-        if pendingDeepSync {
-            pendingDeepSync = false
-            Task { await performSmartRefresh() }
-        }
     }
 
     private func loadInitialData() async {
-        // .deep so pulls stay inert for the whole cold start, same as a scrape.
-        beginSync("Loading training data...", tier: .deep)
+        // Pulls stay inert for the whole cold start, same as during a scrape.
+        beginSync("Loading training data...")
         // No forceRefresh here on purpose — the first load may use the client cache.
         async let dashTask: () = fetchDashboard()
         async let planTask: () = fetchWeeklyPlan()
@@ -892,13 +964,13 @@ struct TodayView: View {
     
     /// Re-reads what the backend already holds in Postgres. No COROS scrape.
     ///
-    /// This is the cheap tier — roughly a second — and it's what pull-to-refresh
-    /// runs. `forceRefresh: true` bypasses NetworkManager's 5-minute client-side
-    /// memory cache: an explicit pull should never hand back a cached copy, even
-    /// though the server work is only a row read.
+    /// This is the cheap tier — roughly a second — and it is what a short pull
+    /// runs on release. `forceRefresh: true` bypasses NetworkManager's 5-minute
+    /// client-side memory cache: an explicit pull should never hand back a
+    /// cached copy, even though the server work is only a row read.
     private func refreshFromDatabase() async {
         guard !isSyncing else { return }
-        beginSync("Refreshing data...", tier: .light)
+        beginSync("Refreshing data...")
 
         await detachedFetch { await fetchAllFromBackend() }
 
@@ -907,19 +979,20 @@ struct TodayView: View {
 
     /// Runs network work outside the caller's cancellation scope.
     ///
-    /// `.refreshable` runs its closure as a *structured child* of SwiftUI's
-    /// refresh task and cancels it the moment the refresh control retracts.
-    /// Cancellation propagates straight into `URLSession`, failing every
-    /// in-flight request with `NSURLErrorCancelled` (-999) — so the pull looks
-    /// like it succeeded while having fetched nothing. This is the same failure
-    /// the `Task.sleep` removal exposed: killing the sleeps stopped the silent
-    /// swallow, but the cancellation just moved downstream into the HTTP calls.
+    /// Both tiers now start from a plain `Task` in the release decision, so the
+    /// structured-cancellation trap that `.refreshable` set — its closure ran as
+    /// a child of SwiftUI's refresh task and was cancelled the moment the
+    /// control retracted — is no longer wired up. It is documented here because
+    /// it cost two rounds to find and would come straight back the moment any
+    /// caller became structured again: cancellation propagates into
+    /// `URLSession`, failing every in-flight request with `NSURLErrorCancelled`
+    /// (-999), so a refresh looks like it succeeded while having fetched
+    /// nothing. Killing the old `Task.sleep`s didn't fix it; it only moved the
+    /// silent swallow downstream into the HTTP calls.
     ///
     /// An unstructured `Task` does not inherit cancellation, so the fetch runs
     /// to completion regardless. Awaiting `.value` on a non-throwing task has no
     /// cancellation throw point, so the caller still waits for the real result.
-    /// The pill's own spinner and elapsed counter — not the refresh control —
-    /// are what tell the athlete a sync is still running.
     private func detachedFetch(_ body: @escaping () async -> Void) async {
         await Task { await body() }.value
     }
@@ -929,21 +1002,21 @@ struct TodayView: View {
     /// a minutes-long HTTP request open, and closing the app mid-scrape no
     /// longer kills it — the data is simply there on the next open.
     ///
-    /// The expensive tier — 30-90s, more on a cold dyno. Reached by the
-    /// release decision in `onScrollPhaseChange` (never by `.refreshable`,
-    /// which fires mid-drag), by `endSync` draining `pendingDeepSync`, and by
-    /// the toolbar button.
+    /// The expensive tier — 30-90s, more on a cold dyno. One entry point: the
+    /// release decision in `onScrollPhaseChange`, when the drag was past
+    /// `deepPullThreshold` at the moment the finger lifted. The toolbar button
+    /// that also called it was removed — a one-tap scrape sitting in the nav bar
+    /// is too easy to fire by accident for something this expensive.
     ///
-    /// Every await in here must stay inside `detachedFetch`. Under
-    /// `.refreshable` this function runs as a structured child of SwiftUI's
-    /// refresh task, where cancellation makes a bare `URLSession` call die
-    /// with -999 and a bare `Task.sleep` throw `CancellationError` — both
-    /// swallowed by catches, silently skipping the scrape. Inside
-    /// `detachedFetch`'s unstructured Task no cancellation ever arrives, which
-    /// is what makes the poll loop's sleep safe *there and only there*.
+    /// Every await in here must stay inside `detachedFetch`. A bare
+    /// `URLSession` call in a cancelled scope dies with -999 and a bare
+    /// `Task.sleep` throws `CancellationError` — both swallowed by the catch
+    /// below, silently skipping the scrape. Inside `detachedFetch`'s
+    /// unstructured Task no cancellation ever arrives, which is what makes the
+    /// poll loop's sleep safe *there and only there*.
     private func performSmartRefresh() async {
         guard !isSyncing else { return }
-        beginSync("Starting deep sync...", tier: .deep)
+        beginSync("Starting deep sync...")
 
         await detachedFetch {
             do {
