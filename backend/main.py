@@ -684,15 +684,22 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     data_agent = DataAgent(db)
     athlete_summary = data_agent.summarize()
     
-    # Generate only the remaining days
+    # Generate only the remaining days. A failed generation fails the request —
+    # nothing below this call may run, because everything below persists.
     response_agent = ResponseAgent()
-    new_days_result = response_agent.generate_remaining_days(
-        athlete_summary=athlete_summary,
-        profile=profile,
-        training_context=training_context,
-        completed_days_summary=completed_days_summary,
-        days_to_plan=days_to_replan
-    )
+    try:
+        new_days_result = response_agent.generate_remaining_days(
+            athlete_summary=athlete_summary,
+            profile=profile,
+            training_context=training_context,
+            completed_days_summary=completed_days_summary,
+            days_to_plan=days_to_replan
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Plan generation failed; existing plan left untouched: {e}"
+        )
     
     new_days = new_days_result.get("days", {})
     

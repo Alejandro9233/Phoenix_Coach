@@ -10,7 +10,10 @@ from openai import OpenAI
 
 # --- Configuration ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("COACHING_MODEL", "llama-3.3-70b-versatile")
+# llama-3.3-70b-versatile was retired by Groq (404 as of 2026-08-17). Models
+# must also be enabled for the org at console.groq.com/settings/limits — a
+# listed-but-blocked model fails with model_permission_blocked_org.
+GROQ_MODEL = os.getenv("COACHING_MODEL", "openai/gpt-oss-120b")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 
 def _use_groq() -> bool:

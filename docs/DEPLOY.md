@@ -8,7 +8,7 @@ Most of this exists **only in the Render dashboard** — this file is the offlin
 ```bash
 DATABASE_URL=postgresql://...        # auto-provisioned by Render
 GROQ_API_KEY=gsk_...                 # console.groq.com/keys
-COACHING_MODEL=llama-3.3-70b-versatile
+COACHING_MODEL=openai/gpt-oss-120b   # must ALSO be enabled at console.groq.com/settings/limits
 RENDER=true                          # triggers memory-safe RAG mode (see below)
 COROS_EMAIL=...
 COROS_PASSWORD=...

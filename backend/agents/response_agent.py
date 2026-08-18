@@ -646,9 +646,12 @@ Respond ONLY with the JSON block. Do not write introductory or concluding conver
             )
             return json.loads(content)
         except Exception as e:
+            # No placeholder fallback here: the caller persists whatever this
+            # returns, and on 2026-08-17 a retired Groq model turned that into
+            # "Error generating plan" overwriting all 7 days of a real week.
+            # A failed replan must fail the request and leave the plan alone.
             print(f"Error generating remaining days plan: {e}")
-            # Return empty days as fallback
-            return {"days": {d: {"summary": "Error generating plan", "workouts": [], "rationale": str(e), "coach_note": "Please try again."} for d in days_to_plan}}
+            raise
 
     def generate_weekly_review(self, compliance_data: dict, training_context: dict) -> dict:
         """
