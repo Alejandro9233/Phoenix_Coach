@@ -52,6 +52,18 @@ struct InjuryLogView: View {
                                         Label("Delete", systemImage: "trash")
                                     }
                                 }
+                                // Recovery used to have no exit here but delete,
+                                // which throws away the history the coach reads.
+                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                    if injury.status?.lowercased() == "active" {
+                                        Button {
+                                            Task { await resolveInjury(injury) }
+                                        } label: {
+                                            Label("Resolved", systemImage: "checkmark.seal.fill")
+                                        }
+                                        .tint(DS.Colors.success)
+                                    }
+                                }
                         }
                     }
                 }
@@ -94,6 +106,22 @@ struct InjuryLogView: View {
         }
     }
     
+    /// Mark an active injury resolved, keeping the row — history feeds the
+    /// coach's context. This does not rebuild plan days; chat's recovery card
+    /// (or Replan) does that.
+    private func resolveInjury(_ injury: Injury) async {
+        var updated = injury
+        updated.status = "Resolved"
+        do {
+            try await network.updateInjury(updated)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            await loadInjuries()
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func deleteInjury(_ injury: Injury) {
         // In a real app, make a network request to delete.
         // For now, delete locally and trigger haptic

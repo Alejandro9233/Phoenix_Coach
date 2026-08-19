@@ -212,6 +212,26 @@ struct CoachChatView: View {
                     .padding(.top, 4)
                 }
 
+                // Recovery: the mirror card. Confirm resolves the injury and
+                // (optionally) rebuilds the days it turned into rest.
+                if let recovery = message.recovery {
+                    RecoveryProposalCard(
+                        proposal: recovery,
+                        onConfirm: { rebuild in
+                            Task { await applyRecovery(proposal: recovery, rebuild: rebuild, messageId: message.id) }
+                        },
+                        onDismiss: {
+                            if let idx = messages.firstIndex(where: { $0.id == message.id }) {
+                                withAnimation(DS.Animation.normal) {
+                                    messages[idx].recovery = nil
+                                    messages[idx].proposalOutcome = "Kept as-is — injury still active."
+                                }
+                            }
+                        }
+                    )
+                    .padding(.top, 4)
+                }
+
                 if let outcome = message.proposalOutcome {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
@@ -317,6 +337,8 @@ struct CoachChatView: View {
                     case .proposal(let proposal):
                         // Arrives after the last token — see issue_triage.py.
                         messages[coachMsgIndex].proposal = proposal
+                    case .recovery(let recovery):
+                        messages[coachMsgIndex].recovery = recovery
                     }
                 }
             }
@@ -378,8 +400,48 @@ struct CoachChatView: View {
         }
     }
 
+    /// Resolve a recovered injury, then tell the rest of the app if days came
+    /// back. The resolve sticks even when the rebuild fails — the athlete is
+    /// recovered either way, they just replan by hand.
+    private func applyRecovery(proposal: RecoveryProposal, rebuild: Bool, messageId: UUID) async {
+        do {
+            let result = try await network.applyRecovery(injuryId: proposal.injury.id, rebuild: rebuild)
+
+            let outcome: String
+            if result.rebuildError != nil {
+                outcome = "\(result.bodyPart) resolved — couldn't rebuild the week, use Replan when you're ready."
+            } else if result.rebuiltDays.isEmpty {
+                outcome = "\(result.bodyPart) resolved."
+            } else {
+                outcome = "\(result.bodyPart) resolved — rebuilt \(result.rebuiltDays.joined(separator: ", "))."
+            }
+
+            await MainActor.run {
+                if let idx = messages.firstIndex(where: { $0.id == messageId }) {
+                    withAnimation(DS.Animation.normal) {
+                        messages[idx].recovery = nil
+                        messages[idx].proposalOutcome = outcome
+                    }
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                if !result.rebuiltDays.isEmpty {
+                    NotificationCenter.default.post(name: NSNotification.Name("PlanUpdated"), object: nil)
+                }
+            }
+        } catch {
+            await MainActor.run {
+                messages.append(ChatMessage(
+                    role: .coach,
+                    content: "I couldn't resolve that injury. Check Profile → Injuries to see its status, then try again.",
+                    timestamp: Date(),
+                    isError: true
+                ))
+            }
+        }
+    }
+
     // MARK: - Session Management
-    
+
     private func loadSessions() async {
         do {
             let fetched = try await network.fetchChatSessions()

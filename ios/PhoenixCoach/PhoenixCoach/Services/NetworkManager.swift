@@ -183,13 +183,19 @@ class NetworkManager: ObservableObject {
         let proposal: IssueProposal
     }
 
+    private struct RecoveryEnvelope: Codable {
+        let recovery: RecoveryProposal
+    }
+
     /// One item on the chat SSE stream.
     ///
-    /// The backend can append an injury-triage proposal after the last token
-    /// (see `issue_triage.py`), so the stream carries more than plain text.
+    /// The backend can append an injury-triage proposal or a recovery proposal
+    /// after the last token (see `issue_triage.py`), so the stream carries more
+    /// than plain text.
     enum ChatStreamEvent {
         case token(String)
         case proposal(IssueProposal)
+        case recovery(RecoveryProposal)
     }
 
     /// Send a chat message and receive events as they stream from the LLM.
@@ -236,11 +242,13 @@ class NetworkManager: ObservableObject {
                             continue
                         }
 
-                        // An injury-triage proposal, sent after the last token.
-                        // Decoding failure is non-fatal: the athlete still has
-                        // the coach's written reply, just no card.
+                        // An injury-triage or recovery proposal, sent after the
+                        // last token. Decoding failure is non-fatal: the athlete
+                        // still has the coach's written reply, just no card.
                         if let wrapper = try? JSONDecoder().decode(ProposalEnvelope.self, from: data) {
                             continuation.yield(.proposal(wrapper.proposal))
+                        } else if let wrapper = try? JSONDecoder().decode(RecoveryEnvelope.self, from: data) {
+                            continuation.yield(.recovery(wrapper.recovery))
                         }
                     }
                     
@@ -525,6 +533,25 @@ class NetworkManager: ObservableObject {
     private struct IssueApplyRequest: Codable {
         let issue: ReportedIssue
         let choices: [String: String]
+    }
+
+    /// Resolve a recovered injury and rebuild the remaining days it turned
+    /// into rest. The resolve always sticks; a failed rebuild comes back as
+    /// `rebuildError` with the plan untouched.
+    func applyRecovery(injuryId: Int, rebuild: Bool = true) async throws -> RecoveryApplyResult {
+        guard let url = URL(string: "\(baseURL)/coach/recovery/apply") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["injury_id": injuryId, "rebuild": rebuild])
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode(RecoveryApplyResult.self, from: data)
     }
 
     // MARK: - Training Context

@@ -483,3 +483,286 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
         "violations": violations,
         "plan": plan_json,
     }
+
+
+# ─── Recovery: the same door, swinging out ────────────────────────────────────
+#
+# Reporting an injury had a low-friction path (above); reporting that it healed
+# did not — the extraction prompt explicitly ignores "my calf finally feels
+# fine", so chat was a one-way door. Worse, resolving an injury by hand never
+# gave the week back: the rest days apply_issue wrote stayed rest days.
+#
+# Same three-step shape, mirrored, same human gate:
+#   1. detect   keyword filter (+ an active injury on record), one LLM call to
+#               match the message to a specific injury
+#   2. propose  Python finds the remaining days that are rest *because of that
+#               injury*; NOTHING is written
+#   3. apply    athlete confirms -> status Resolved, those days regenerated
+
+_RECOVERY_PATTERN = re.compile(
+    r"\b("
+    r"recovered|recovery|healed|back to normal|good to go|all (good|better)|"
+    r"(feels?|feeling|is|are) (fine|good|great|better|normal|ok(ay)?)|"
+    r"no (more )?pain|pain[ -]?free|doesn'?t hurt( anymore)?|stopped hurting|"
+    # Spanish — same athlete, same code-switching as the issue filter.
+    r"recuperad\w*|ya no (me )?duele|sin dolor|ya estoy bien|me siento (bien|mejor)|ya san\w*"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_recovery(message: str) -> bool:
+    """Pure-Python gate. Callers must also check an active injury exists —
+    good news about nothing on record is just conversation."""
+    if not message:
+        return False
+    return bool(_RECOVERY_PATTERN.search(message))
+
+
+def extract_recovery(message: str, active_injuries: list):
+    """
+    Ask the LLM whether the message says one of the ACTIVE injuries is healed.
+
+    Returns the matched InjuryLog row, or None. None on any failure — chat must
+    never break because recovery triage failed.
+    """
+    from backend.core.llm_client import chat_completion
+
+    injuries_by_id = {inj.id: inj for inj in active_injuries}
+    if not injuries_by_id:
+        return None
+
+    injury_lines = "\n".join(
+        f"  id={inj.id}: {inj.body_part} (reported {inj.date_reported}, "
+        f"blocks: {inj.affected_sports or 'nothing'})"
+        for inj in active_injuries
+    )
+    system = (
+        "You are a triage assistant for a triathlon coaching app.\n\n"
+        "The athlete has these ACTIVE injuries on record:\n"
+        f"{injury_lines}\n\n"
+        "Decide whether their message says one of these problems is RESOLVED — "
+        "healed, pain-free, ready to train normally again.\n\n"
+        "NOT recovery: still hurts, only partially better (\"a bit better but "
+        "still sore\" keeps the restriction), questions (\"when can I run "
+        "again?\"), new problems, or talk unrelated to these injuries.\n\n"
+        "Respond ONLY with JSON:\n"
+        '{"is_recovery": true, "injury_id": <id from the list>}\n'
+        'or {"is_recovery": false}'
+    )
+
+    try:
+        raw = chat_completion(
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": message},
+            ],
+            json_mode=True,
+        )
+        data = json.loads(raw)
+    except Exception as e:
+        print(f"⚠️ Recovery extraction failed (falling back to normal chat): {e}")
+        return None
+
+    if not isinstance(data, dict) or not data.get("is_recovery"):
+        return None
+    try:
+        return injuries_by_id.get(int(data.get("injury_id")))
+    except (TypeError, ValueError):
+        return None
+
+
+def _injury_rest_days(days_dict: dict, injury, today) -> list:
+    """
+    Remaining days (today → Sunday) that are rest *because of this injury*.
+
+    Both writers of injury rest days stamp the body part into the day:
+    `apply_issue` via `enforced_reason` / the day summary, the enforcer via
+    `enforced_reason` and `enforcement_notes`. Days the athlete swapped to
+    another sport hold real training and are left alone.
+    """
+    body_part = (injury.body_part or "").lower()
+    if not body_part:
+        return []
+
+    matched = []
+    for offset in range(today.weekday(), 7):
+        day_name = VALID_DAYS[offset]
+        day = days_dict.get(day_name)
+        if not isinstance(day, dict):
+            continue
+        workouts = day.get("workouts") or []
+        if not workouts or any(map_sport(w.get("sport", "")) != "rest" for w in workouts):
+            continue
+        haystack = " ".join(
+            [str(w.get("enforced_reason") or "") for w in workouts]
+            + [str(day.get("summary") or "")]
+            + [str(n) for n in (day.get("enforcement_notes") or [])]
+        ).lower()
+        if body_part in haystack:
+            matched.append(day_name)
+    return matched
+
+
+def build_recovery_proposal(db, injury) -> dict:
+    """
+    What resolving this injury would change. Read-only.
+
+    Always returns a proposal — even with nothing to rebuild, resolving the
+    injury is worth a card (it unblocks future planning).
+    """
+    from backend.models.database import WeeklyPlan
+
+    today = get_local_today()
+    start_of_week = today - timedelta(days=today.weekday())
+
+    rebuild_days = []
+    plan_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    if plan_record:
+        plan_json = normalize_plan(plan_record.plan_json)
+        rebuild_days = _injury_rest_days(plan_json.get("days") or {}, injury, today)
+
+    return {
+        "type": "recovery_proposal",
+        "injury": {
+            "id": injury.id,
+            "body_part": injury.body_part,
+            "date_reported": str(injury.date_reported) if injury.date_reported else None,
+            "affected_sports": [
+                s.strip() for s in (injury.affected_sports or "").split(",") if s.strip()
+            ],
+            "severity": injury.severity,
+        },
+        "rebuild_days": rebuild_days,
+    }
+
+
+def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
+    """
+    Commit a confirmed recovery: resolve the injury, rebuild its rest days.
+
+    The resolve and the rebuild are deliberately not atomic: the athlete IS
+    recovered whether or not the LLM can build new sessions right now. A failed
+    rebuild leaves the plan untouched and reports `rebuild_error` — the athlete
+    can replan later; their injury is not resurrected.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from backend.agents.data_agent import DataAgent
+    from backend.agents.response_agent import ResponseAgent
+    from backend.models.database import Athlete, InjuryLog, WeeklyPlan
+    from backend.services.periodization_engine import PeriodizationEngine
+
+    injury = db.query(InjuryLog).filter(InjuryLog.id == injury_id).first()
+    if not injury:
+        raise ValueError(f"No injury with id {injury_id}")
+    if injury.status != "Active":
+        # Double-tap or already resolved by hand — nothing to do, not an error.
+        return {"status": "already_resolved", "injury_id": injury.id,
+                "body_part": injury.body_part, "rebuilt_days": [], "violations": []}
+
+    today = get_local_today()
+    start_of_week = today - timedelta(days=today.weekday())
+
+    # 1. Resolve first, and commit: the athlete's word is the fact here. The
+    #    rebuild below reads get_active_injuries and must not see this row.
+    injury.status = "Resolved"
+    injury.expected_recovery_date = today  # record when it actually cleared
+    db.commit()
+
+    result = {
+        "status": "resolved",
+        "injury_id": injury.id,
+        "body_part": injury.body_part,
+        "rebuilt_days": [],
+        "violations": [],
+    }
+
+    if not rebuild:
+        return result
+
+    plan_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    if not plan_record:
+        return result
+
+    plan_json = normalize_plan(plan_record.plan_json)
+    days_dict = plan_json.get("days") or {}
+    rebuild_days = _injury_rest_days(days_dict, injury, today)
+    if not rebuild_days:
+        return result
+
+    athlete = db.query(Athlete).first()
+
+    # 2. Rebuild through the normal replan path — the coach sees the injury is
+    #    gone (resolved above) and whatever it returns clears the enforcer.
+    try:
+        engine = PeriodizationEngine()
+        training_context = engine.compute_context(db)
+        profile = {
+            "race_name": athlete.race_name,
+            "race_distance": athlete.race_distance,
+            "race_date": str(athlete.race_date) if athlete.race_date else None,
+            "weekly_hours_target": athlete.weekly_hours_target or 8.0,
+            "swim_days": athlete.swim_days,
+            "bike_days": athlete.bike_days,
+            "run_days": athlete.run_days,
+            "strength_days": athlete.strength_days,
+        }
+        summary_lines = [
+            f"The athlete has RECOVERED from: {injury.body_part} "
+            f"(reported {injury.date_reported}, now resolved).",
+            f"These days are currently rest only because of that injury: "
+            f"{', '.join(rebuild_days)}.",
+            "Rebuild them as normal training days for this phase. "
+            "Ease the first session back — nothing maximal on day one after an injury.",
+        ]
+        new_days = ResponseAgent().generate_remaining_days(
+            athlete_summary=DataAgent(db).summarize(),
+            profile=profile,
+            training_context=training_context,
+            completed_days_summary="\n".join(summary_lines),
+            days_to_plan=rebuild_days,
+        ).get("days") or {}
+    except Exception as e:
+        print(f"⚠️ Recovery rebuild failed, plan left as-is: {e}")
+        result["rebuild_error"] = str(e)
+        result["rebuild_days_pending"] = rebuild_days
+        return result
+
+    regenerated = []
+    for day_name, new_day in new_days.items():
+        if day_name not in rebuild_days or not isinstance(new_day, dict):
+            continue
+        new_day.pop("adaptation", None)
+        new_day.pop("original_workouts", None)
+        days_dict[day_name] = new_day
+        regenerated.append(day_name)
+
+    plan_json["days"] = days_dict
+    plan_json = normalize_plan(plan_json)
+    plan_json, violations = enforce_constraints(
+        plan_json,
+        availability={
+            "swim_days": athlete.swim_days,
+            "bike_days": athlete.bike_days,
+            "run_days": athlete.run_days,
+            "strength_days": athlete.strength_days,
+        },
+        active_injuries=get_active_injuries(db, athlete.id),
+        days=regenerated,
+    )
+    if violations:
+        print(f"🚧 Stripped {len(violations)} violation(s) after recovery rebuild")
+
+    plan_record.plan_json = plan_json
+    plan_record.last_adapted = None
+    flag_modified(plan_record, "plan_json")
+    db.commit()
+
+    result["rebuilt_days"] = sorted(regenerated)
+    result["violations"] = violations
+    return result

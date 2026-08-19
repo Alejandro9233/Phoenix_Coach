@@ -376,6 +376,28 @@ def apply_issue_endpoint(body: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@app.post("/coach/recovery/apply")
+def apply_recovery_endpoint(body: dict, db: Session = Depends(get_db)):
+    """
+    Commit a confirmed recovery: resolve the injury and rebuild the remaining
+    days it turned into rest.
+
+    Body: `{"injury_id": 3, "rebuild": true}`. Resolve always succeeds on an
+    active injury; a failed rebuild reports `rebuild_error` without resurrecting
+    the injury or touching the plan.
+    """
+    from backend.services.issue_triage import apply_recovery
+
+    injury_id = (body or {}).get("injury_id")
+    if not isinstance(injury_id, int):
+        raise HTTPException(status_code=400, detail="injury_id is required")
+
+    try:
+        return apply_recovery(db, injury_id, rebuild=bool((body or {}).get("rebuild", True)))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @app.post("/sync")
 async def sync_data(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
@@ -1386,6 +1408,42 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
         # Triage is an enhancement. Chat must still work if it breaks.
         print(f"⚠️ Issue triage failed (continuing with normal chat): {e}")
 
+    # Recovery triage — the same door swinging out. Only when issue triage
+    # found nothing ("calf hurts again" must win over "calf is fine"), only
+    # when the message sounds like good news, and only when something is
+    # actually active to resolve — then it's worth one extraction call.
+    recovery_proposal = None
+    if not proposal:
+        try:
+            from backend.services.issue_triage import (
+                build_recovery_proposal, extract_recovery, looks_like_recovery,
+            )
+            from backend.services.constraint_enforcer import get_active_injuries
+            athlete = db.query(Athlete).first()
+            if athlete and looks_like_recovery(message):
+                active = get_active_injuries(db, athlete.id)
+                if active:
+                    matched = extract_recovery(message, active)
+                    if matched:
+                        recovery_proposal = build_recovery_proposal(db, matched)
+        except Exception as e:
+            print(f"⚠️ Recovery triage failed (continuing with normal chat): {e}")
+
+    if recovery_proposal:
+        rebuild = recovery_proposal.get("rebuild_days") or []
+        messages.append({
+            "role": "system",
+            "content": (
+                "The athlete just said their "
+                f"{recovery_proposal['injury']['body_part']} has recovered. "
+                "A confirmation card is already being shown to them"
+                + (f" offering to rebuild {', '.join(rebuild)}" if rebuild else "")
+                + ", so do NOT propose specific sessions yourself. Reply in one "
+                "or two sentences: celebrate briefly, remind them to ease back "
+                "in, and tell them to confirm below."
+            ),
+        })
+
     if proposal:
         # Keep the prose and the card from contradicting each other. The card
         # owns the specifics; the reply is the human part around it.
@@ -1416,6 +1474,8 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
             # card to this message. Clients that don't know the key ignore it.
             if proposal:
                 yield f"data: {json.dumps({'proposal': proposal})}\n\n"
+            if recovery_proposal:
+                yield f"data: {json.dumps({'recovery': recovery_proposal})}\n\n"
             yield "data: [DONE]\n\n"
 
             # Save assistant response

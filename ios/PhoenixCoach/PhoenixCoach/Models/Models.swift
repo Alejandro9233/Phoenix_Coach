@@ -447,7 +447,10 @@ struct ChatMessage: Identifiable {
     /// a confirmation card under the reply. Nothing is written server-side until
     /// the athlete confirms it.
     var proposal: IssueProposal? = nil
-    /// Outcome text once the card has been acted on, so the card collapses to a
+    /// Set when the backend matched this message to a recovered injury. Renders
+    /// the mirror card: resolve the injury, rebuild the days it turned to rest.
+    var recovery: RecoveryProposal? = nil
+    /// Outcome text once a card has been acted on, so the card collapses to a
     /// receipt instead of staying tappable forever.
     var proposalOutcome: String? = nil
 
@@ -537,6 +540,51 @@ struct IssueApplyResult: Codable {
         case bodyPart = "body_part"
         case restDays = "rest_days"
         case swappedDays = "swapped_days"
+    }
+}
+
+// MARK: - Injury recovery (chat card + POST /coach/recovery/apply)
+
+struct RecoveryProposal: Codable, Equatable {
+    let injury: RecoveredInjury
+    let rebuildDays: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case injury
+        case rebuildDays = "rebuild_days"
+    }
+}
+
+struct RecoveredInjury: Codable, Equatable {
+    let id: Int
+    let bodyPart: String
+    let dateReported: String?
+    let affectedSports: [String]
+    let severity: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, severity
+        case bodyPart = "body_part"
+        case dateReported = "date_reported"
+        case affectedSports = "affected_sports"
+    }
+}
+
+struct RecoveryApplyResult: Codable {
+    let status: String
+    let injuryId: Int
+    let bodyPart: String
+    let rebuiltDays: [String]
+    /// Set when the injury resolved but the LLM couldn't rebuild the days —
+    /// the plan is untouched and the athlete can replan later.
+    let rebuildError: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case injuryId = "injury_id"
+        case bodyPart = "body_part"
+        case rebuiltDays = "rebuilt_days"
+        case rebuildError = "rebuild_error"
     }
 }
 
