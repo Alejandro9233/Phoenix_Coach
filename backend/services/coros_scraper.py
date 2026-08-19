@@ -1,7 +1,7 @@
 import os
 import asyncio
 from datetime import datetime, timedelta
-from playwright.async_api import async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -148,6 +148,20 @@ class CorosScraper:
             missing.append("profile")
         return missing
 
+    async def _goto(self, page, url):
+        """Fire a navigation so the SPA starts its API calls — that is its only
+        job. `domcontentloaded`, not `load`: capture is passive sniffing, so the
+        load event is nobody's readiness signal, and waiting for it is how
+        2026-08-19 lost a scrape — data-analysis blew the 30s default on
+        Render's cold CPU, the raise closed the browser, and payloads that were
+        arriving at that moment died with it. A slow navigation is a note, not
+        a failure; _missing() at the end is the real verdict."""
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        except PlaywrightTimeoutError:
+            print(f"  Navigation to {url} still loading after 60s — "
+                  "continuing on sniffed payloads.")
+
     async def _settle(self, page, what, predicate, timeout_s=60, grace_ms=2000):
         """Wait until the response sniffer satisfies `predicate`, then a short
         grace for whatever is still in flight. The deadline exists for Render's
@@ -236,7 +250,7 @@ class CorosScraper:
                 # 2. Data Analysis page — analyse_query feeds every recovery
                 # snapshot; without it the day's HRV/RHR/fatigue never lands.
                 print("Navigating to EvoLab metrics...")
-                await page.goto(f"{self.base_url}/admin/views/data-analysis", wait_until="load")
+                await self._goto(page, f"{self.base_url}/admin/views/data-analysis")
                 await self._settle(page, "analyse_query",
                                    lambda: "analyse_query" in captured_data["evolab"])
 
@@ -246,7 +260,7 @@ class CorosScraper:
                 # so don't wait long for it.
                 print("Navigating to Activity List...")
                 lists_before = capture_counts["activity_lists"]
-                await page.goto(f"{self.base_url}/admin/views/dash-board#/personal/list", wait_until="load")
+                await self._goto(page, f"{self.base_url}/admin/views/dash-board#/personal/list")
                 await self._settle(page, "activity list",
                                    lambda: capture_counts["activity_lists"] > lists_before,
                                    timeout_s=20 if captured_data["activities"] else 60)
