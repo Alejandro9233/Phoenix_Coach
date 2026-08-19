@@ -398,6 +398,28 @@ def apply_recovery_endpoint(body: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@app.post("/coach/travel/apply")
+def apply_travel_endpoint(body: dict, db: Session = Depends(get_db)):
+    """
+    Commit confirmed travel days: write TravelDay rows, rest the blocked days,
+    rebuild the open remainder of the week around them.
+
+    Body: `{"dates": ["2026-08-21", "2026-08-22"], "note": "work trip"}`.
+    Dates outside today→Sunday are ignored; all-ignored is a 400, not a 404 —
+    there is nothing to look up, the request just says nothing actionable.
+    """
+    from backend.services.issue_triage import apply_travel
+
+    dates = (body or {}).get("dates")
+    if not isinstance(dates, list) or not dates:
+        raise HTTPException(status_code=400, detail="dates is required")
+
+    try:
+        return apply_travel(db, dates, note=str((body or {}).get("note") or ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/sync")
 async def sync_data(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
@@ -1432,6 +1454,36 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
         except Exception as e:
             print(f"⚠️ Recovery triage failed (continuing with normal chat): {e}")
 
+    # Travel triage — third in line, and last on purpose: "hurt my knee on a
+    # trip" is an issue, "calf's fine, flying out tomorrow" is a recovery, and
+    # only a message that is neither gets read as pure logistics.
+    travel_proposal = None
+    if not proposal and not recovery_proposal:
+        try:
+            from backend.services.issue_triage import (
+                build_travel_proposal, extract_travel, looks_like_travel,
+            )
+            if looks_like_travel(message):
+                travel_days = extract_travel(message)
+                if travel_days:
+                    travel_proposal = build_travel_proposal(db, travel_days)
+        except Exception as e:
+            print(f"⚠️ Travel triage failed (continuing with normal chat): {e}")
+
+    if travel_proposal:
+        messages.append({
+            "role": "system",
+            "content": (
+                "The athlete just said they will be traveling on "
+                f"{', '.join(travel_proposal['days'])}. A confirmation card is "
+                "already being shown to them offering to rest those days and "
+                "rebuild the open days around the trip (run volume protected), "
+                "so do NOT propose specific rearrangements yourself. Reply in "
+                "one or two sentences: acknowledge the trip and tell them to "
+                "confirm below."
+            ),
+        })
+
     if recovery_proposal:
         rebuild = recovery_proposal.get("rebuild_days") or []
         messages.append({
@@ -1479,6 +1531,8 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
                 yield f"data: {json.dumps({'proposal': proposal})}\n\n"
             if recovery_proposal:
                 yield f"data: {json.dumps({'recovery': recovery_proposal})}\n\n"
+            if travel_proposal:
+                yield f"data: {json.dumps({'travel': travel_proposal})}\n\n"
             yield "data: [DONE]\n\n"
 
             # Save assistant response

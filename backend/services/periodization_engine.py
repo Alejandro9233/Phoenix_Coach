@@ -1154,6 +1154,15 @@ class PeriodizationEngine:
             "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri",
         }
 
+        # Travel days for the week being planned (context is always computed
+        # for the current week). Carried inside availability so every
+        # context-fed enforce_constraints call inherits the block unchanged.
+        from backend.services.constraint_enforcer import get_travel_day_names
+        start_of_week = today - timedelta(days=today.weekday())
+        travel_day_names = get_travel_day_names(db, athlete.id, start_of_week)
+        if travel_day_names:
+            availability["travel_day_names"] = travel_day_names
+
         return {
             # Where are we?
             "current_date": today.isoformat(),

@@ -114,7 +114,13 @@ def enforce_constraints(
     Args:
         plan_json: normalized plan, `{"days": {"Monday": {...}, ...}}`. Mutated in place.
         availability: `{"swim_days": "wed,sat,sun", ...}`. A missing or None entry
-            means unconstrained for that sport.
+            means unconstrained for that sport. May also carry
+            `travel_day_names` (full day names for THIS plan's week, from
+            `get_travel_day_names`) — those days allow rest and nothing else.
+            Travel rides inside availability on purpose: the three context-fed
+            call sites in main.py inherit it from `compute_context` without
+            changes, and a call site that forgets it fails toward the athlete's
+            plan surviving, never toward training on a plane.
         active_injuries: InjuryLog rows with status "Active".
         days: restrict enforcement to these day names. Defaults to all seven —
             pass the replanned subset so a mid-week change never rewrites history.
@@ -126,6 +132,7 @@ def enforce_constraints(
     """
     availability = availability or {}
     injury_blocks = _injury_blocked_sports(active_injuries)
+    travel_days = set(availability.get("travel_day_names") or [])
     target_days = list(days) if days is not None else list(VALID_DAYS)
 
     days_dict = plan_json.get("days") or {}
@@ -148,6 +155,15 @@ def enforce_constraints(
                 continue
 
             title = workout.get("title") or sport
+
+            if day_name in travel_days:
+                violations.append({
+                    "day": day_name,
+                    "sport": sport,
+                    "title": title,
+                    "reason": f"Traveling on {day_name} — no training can be scheduled",
+                })
+                continue
 
             injury_reason = injury_blocks.get(sport)
             if injury_reason:
@@ -187,6 +203,29 @@ def enforce_constraints(
 
     plan_json["days"] = days_dict
     return plan_json, violations
+
+
+def get_travel_day_names(db, athlete_id: int, week_start) -> list:
+    """
+    Full day names ("Friday") the athlete is traveling during the week that
+    starts on `week_start` (a Monday). Feeds `availability["travel_day_names"]`
+    for that week's plan — rows outside the week are simply not this week's
+    problem, and past rows age out by never being queried again.
+    """
+    from datetime import timedelta
+
+    from backend.models.database import TravelDay
+
+    week_end = week_start + timedelta(days=6)
+    rows = db.query(TravelDay).filter(
+        TravelDay.athlete_id == athlete_id,
+        TravelDay.date >= week_start,
+        TravelDay.date <= week_end,
+    ).all()
+    return sorted(
+        {VALID_DAYS[row.date.weekday()] for row in rows},
+        key=VALID_DAYS.index,
+    )
 
 
 def get_active_injuries(db, athlete_id: int) -> list:

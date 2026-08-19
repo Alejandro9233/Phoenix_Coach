@@ -165,6 +165,18 @@ class InjuryLog(Base):
     # the rest of the season. NULL = no expiry, resolve it by hand in Profile.
     expected_recovery_date = Column(Date, nullable=True)
 
+class TravelDay(Base):
+    # One row per date the athlete is away and cannot train at all. A date, not
+    # a weekday: "traveling Friday" means THIS Friday, and the row goes inert on
+    # its own once the date passes — no status machinery, nothing to resolve.
+    # Written only by confirmed chat triage (`apply_travel`); enforced through
+    # `availability["travel_day_names"]` in constraint_enforcer.
+    __tablename__ = "travel_days"
+    id = Column(Integer, primary_key=True, index=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.id"))
+    date = Column(Date, index=True)
+    note = Column(String, nullable=True)  # e.g. "work trip to CDMX", from chat
+
 class WeeklyPlan(Base):
     __tablename__ = "weekly_plans"
     id = Column(Integer, primary_key=True, index=True)

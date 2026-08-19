@@ -187,15 +187,20 @@ class NetworkManager: ObservableObject {
         let recovery: RecoveryProposal
     }
 
+    private struct TravelEnvelope: Codable {
+        let travel: TravelProposal
+    }
+
     /// One item on the chat SSE stream.
     ///
-    /// The backend can append an injury-triage proposal or a recovery proposal
+    /// The backend can append an injury-triage, recovery, or travel proposal
     /// after the last token (see `issue_triage.py`), so the stream carries more
     /// than plain text.
     enum ChatStreamEvent {
         case token(String)
         case proposal(IssueProposal)
         case recovery(RecoveryProposal)
+        case travel(TravelProposal)
     }
 
     /// Send a chat message and receive events as they stream from the LLM.
@@ -249,6 +254,8 @@ class NetworkManager: ObservableObject {
                             continuation.yield(.proposal(wrapper.proposal))
                         } else if let wrapper = try? JSONDecoder().decode(RecoveryEnvelope.self, from: data) {
                             continuation.yield(.recovery(wrapper.recovery))
+                        } else if let wrapper = try? JSONDecoder().decode(TravelEnvelope.self, from: data) {
+                            continuation.yield(.travel(wrapper.travel))
                         }
                     }
                     
@@ -552,6 +559,24 @@ class NetworkManager: ObservableObject {
             throw NetworkError.serverError
         }
         return try decoder.decode(RecoveryApplyResult.self, from: data)
+    }
+
+    /// Rest confirmed travel days and rebuild the open remainder of the week.
+    /// The block always sticks; a failed rebuild comes back as `rebuildError`.
+    func applyTravel(dates: [String], note: String = "") async throws -> TravelApplyResult {
+        guard let url = URL(string: "\(baseURL)/coach/travel/apply") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["dates": dates, "note": note])
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode(TravelApplyResult.self, from: data)
     }
 
     // MARK: - Training Context

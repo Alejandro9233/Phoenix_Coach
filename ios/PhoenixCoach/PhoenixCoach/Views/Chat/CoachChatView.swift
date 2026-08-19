@@ -232,6 +232,26 @@ struct CoachChatView: View {
                     .padding(.top, 4)
                 }
 
+                // Travel: rest the away days, rebuild the open week around
+                // them. Run volume is the protected quantity server-side.
+                if let travel = message.travel {
+                    TravelProposalCard(
+                        proposal: travel,
+                        onConfirm: {
+                            Task { await applyTravel(proposal: travel, messageId: message.id) }
+                        },
+                        onDismiss: {
+                            if let idx = messages.firstIndex(where: { $0.id == message.id }) {
+                                withAnimation(DS.Animation.normal) {
+                                    messages[idx].travel = nil
+                                    messages[idx].proposalOutcome = "Plan kept — travel not logged."
+                                }
+                            }
+                        }
+                    )
+                    .padding(.top, 4)
+                }
+
                 if let outcome = message.proposalOutcome {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
@@ -339,6 +359,8 @@ struct CoachChatView: View {
                         messages[coachMsgIndex].proposal = proposal
                     case .recovery(let recovery):
                         messages[coachMsgIndex].recovery = recovery
+                    case .travel(let travel):
+                        messages[coachMsgIndex].travel = travel
                     }
                 }
             }
@@ -433,6 +455,45 @@ struct CoachChatView: View {
                 messages.append(ChatMessage(
                     role: .coach,
                     content: "I couldn't resolve that injury. Check Profile → Injuries to see its status, then try again.",
+                    timestamp: Date(),
+                    isError: true
+                ))
+            }
+        }
+    }
+
+    /// Rest the confirmed travel days and rebuild the open week around them.
+    /// The block sticks even when the rebuild fails — the athlete is away
+    /// either way, they just replan the open days by hand.
+    private func applyTravel(proposal: TravelProposal, messageId: UUID) async {
+        do {
+            let result = try await network.applyTravel(dates: proposal.dates)
+
+            let days = result.travelDays.joined(separator: ", ")
+            let outcome: String
+            if result.rebuildError != nil {
+                outcome = "\(days) rested — couldn't rebuild the week, use Replan when you're ready."
+            } else if result.rebuiltDays.isEmpty {
+                outcome = "\(days) rested for the trip."
+            } else {
+                outcome = "\(days) rested — rebuilt \(result.rebuiltDays.joined(separator: ", ")) around the trip."
+            }
+
+            await MainActor.run {
+                if let idx = messages.firstIndex(where: { $0.id == messageId }) {
+                    withAnimation(DS.Animation.normal) {
+                        messages[idx].travel = nil
+                        messages[idx].proposalOutcome = outcome
+                    }
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                NotificationCenter.default.post(name: NSNotification.Name("PlanUpdated"), object: nil)
+            }
+        } catch {
+            await MainActor.run {
+                messages.append(ChatMessage(
+                    role: .coach,
+                    content: "I couldn't log the travel days. Tell me again, or adjust the week from Today → Replan.",
                     timestamp: Date(),
                     isError: true
                 ))

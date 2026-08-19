@@ -25,7 +25,7 @@ DIVISION OF LABOUR (project rule: Python = GPS, LLM = Coach):
 """
 import json
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from backend.services.constraint_enforcer import (
@@ -455,6 +455,7 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
     ]
 
     enforce_days = sorted(set(window_days) | set(rest_days) | set(swap_days))
+    from backend.services.constraint_enforcer import get_travel_day_names
     plan_json, violations = enforce_constraints(
         plan_json,
         availability={
@@ -462,6 +463,7 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
             "bike_days": athlete.bike_days,
             "run_days": athlete.run_days,
             "strength_days": athlete.strength_days,
+            "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
         },
         active_injuries=get_active_injuries(db, athlete.id),
         days=enforce_days,
@@ -761,6 +763,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
 
     plan_json["days"] = days_dict
     plan_json = normalize_plan(plan_json)
+    from backend.services.constraint_enforcer import get_travel_day_names
     plan_json, violations = enforce_constraints(
         plan_json,
         availability={
@@ -768,6 +771,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
             "bike_days": athlete.bike_days,
             "run_days": athlete.run_days,
             "strength_days": athlete.strength_days,
+            "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
         },
         active_injuries=get_active_injuries(db, athlete.id),
         days=regenerated,
@@ -781,5 +785,327 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     db.commit()
 
     result["rebuilt_days"] = sorted(regenerated)
+    result["violations"] = violations
+    return result
+
+
+# ─── Travel triage ───────────────────────────────────────────────────────────
+#
+# "I'm traveling Friday and Saturday" -> those days become rest, the rest of
+# the week is rebuilt around them. Same three-step shape as injuries:
+#
+#   1. detect   cheap Python keyword filter, then one LLM extraction call
+#   2. propose  Python reads what those days hold; NOTHING is written
+#   3. apply    athlete confirms -> TravelDay rows written, week rebuilt
+#
+# THE PRIORITY RULE (Alex, 2026-08-19): weekly RUN kilometers are the protected
+# quantity. When days disappear, runs — the long run above all — move to open
+# days; strength and cycling are the sessions that get dropped. The rule lives
+# in three places with three strengths: the rebuild prompt (suggestion), the
+# run-km comparison in the apply result (report), and the enforcer stripping
+# travel days (guarantee). Only the last one is load-bearing for safety; the
+# first is what actually shapes the week.
+#
+# V1 SCOPE: current week only (today -> Sunday). "Traveling in October" is
+# conversation, not a proposal — the extractor rejects days it can't map to a
+# date in the remaining week.
+
+_TRAVEL_PATTERN = re.compile(
+    r"\b("
+    r"travel(l?ing|s)?|trip|flight|flying|fly(ing)? (out|home|back)|"
+    r"out of town|on the road|away (for|this|next|on|until)|"
+    r"won'?t be (here|home|around|able to train)|"
+    # Spanish — same athlete, same code-switching as the other filters.
+    r"viaj\w*|vuelo|fuera de (la )?ciudad|no (voy a )?estar (aqu[ií]|en casa)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_travel(message: str) -> bool:
+    """Pure-Python gate — travel talk is rare enough that one extraction call
+    on a likely hit is fine, and false positives die in the extractor."""
+    if not message:
+        return False
+    return bool(_TRAVEL_PATTERN.search(message))
+
+
+def extract_travel(message: str) -> Optional[list]:
+    """
+    Ask the LLM which remaining days of THIS week the athlete will be away.
+
+    Returns a sorted list of full day names ("Friday"), or None. None on any
+    failure — chat must never break because travel triage failed.
+    """
+    from backend.core.llm_client import chat_completion
+
+    today = get_local_today()
+    remaining = []
+    for offset in range(today.weekday(), 7):
+        day_date = today + timedelta(days=offset - today.weekday())
+        remaining.append(f"  {VALID_DAYS[offset]} = {day_date.isoformat()}")
+
+    system = (
+        "You are a triage assistant for a triathlon coaching app.\n\n"
+        f"Today is {VALID_DAYS[today.weekday()]}, {today.isoformat()}. "
+        "The remaining days of the athlete's current training week are:\n"
+        + "\n".join(remaining) + "\n\n"
+        "Decide whether the athlete is saying they will be TRAVELING or "
+        "otherwise completely unavailable to train on specific days from this "
+        "list.\n\n"
+        "NOT travel-for-this-week: trips beyond this week (\"in October\", "
+        "\"next month\"), past trips, questions or hypotheticals (\"what if I "
+        "travel?\"), or being busy but still able to train. If they name days "
+        "outside the list above, exclude them.\n\n"
+        "Respond ONLY with JSON:\n"
+        '{"is_travel": true, "days": ["Friday", "Saturday"]}\n'
+        'or {"is_travel": false}'
+    )
+
+    try:
+        raw = chat_completion(
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": message},
+            ],
+            json_mode=True,
+        )
+        data = json.loads(raw)
+    except Exception as e:
+        print(f"⚠️ Travel extraction failed (falling back to normal chat): {e}")
+        return None
+
+    if not isinstance(data, dict) or not data.get("is_travel"):
+        return None
+    valid = {VALID_DAYS[o] for o in range(today.weekday(), 7)}
+    days = [d for d in (data.get("days") or []) if d in valid]
+    return sorted(set(days), key=VALID_DAYS.index) or None
+
+
+def build_travel_proposal(db, day_names: list) -> dict:
+    """
+    What blocking these days would change. Read-only.
+
+    Lists what each travel day currently holds so the card can show what is
+    displaced, and which open days would be rebuilt around the trip.
+    """
+    from backend.models.database import WeeklyPlan
+
+    today = get_local_today()
+    start_of_week = today - timedelta(days=today.weekday())
+
+    affected = []
+    plan_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    days_dict = {}
+    if plan_record:
+        days_dict = normalize_plan(plan_record.plan_json).get("days") or {}
+
+    displaced_runs = 0
+    for day_name in day_names:
+        day = days_dict.get(day_name) or {}
+        titles = []
+        for w in day.get("workouts") or []:
+            sport = map_sport(w.get("sport", ""))
+            if sport == "rest":
+                continue
+            titles.append(w.get("title") or sport)
+            if sport == "running":
+                displaced_runs += 1
+        affected.append({"day": day_name, "workouts": titles})
+
+    rebuild_days = [
+        VALID_DAYS[o] for o in range(today.weekday(), 7)
+        if VALID_DAYS[o] not in day_names
+    ]
+
+    return {
+        "type": "travel_proposal",
+        "days": day_names,
+        "dates": [
+            (start_of_week + timedelta(days=VALID_DAYS.index(d))).isoformat()
+            for d in day_names
+        ],
+        "affected_days": affected,
+        "displaced_runs": displaced_runs,
+        "rebuild_days": rebuild_days,
+        "priority_note": (
+            "Run volume is protected: displaced runs move to open days; "
+            "strength and cycling are dropped first."
+            if displaced_runs else
+            "No runs are displaced; the open days are rebalanced around the trip."
+        ),
+    }
+
+
+def apply_travel(db, dates: list, note: str = "") -> dict:
+    """
+    Commit confirmed travel: write TravelDay rows, rest the blocked days,
+    rebuild the remaining open days around them.
+
+    Same non-atomicity as recovery, same reason: the athlete IS traveling
+    whether or not the LLM can rebuild the week right now. A failed rebuild
+    still blocks the days (rows written, blocked days rested, enforcer armed)
+    and reports `rebuild_error`; only the rebalancing waits for a replan.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from backend.agents.data_agent import DataAgent
+    from backend.agents.response_agent import ResponseAgent
+    from backend.models.database import Athlete, TravelDay, WeeklyPlan
+    from backend.services.constraint_enforcer import get_travel_day_names
+    from backend.services.periodization_engine import PeriodizationEngine
+
+    today = get_local_today()
+    start_of_week = today - timedelta(days=today.weekday())
+    week_end = start_of_week + timedelta(days=6)
+
+    athlete = db.query(Athlete).first()
+    if not athlete:
+        raise ValueError("No athlete profile found")
+
+    parsed = []
+    for raw in dates:
+        d = raw if not isinstance(raw, str) else date.fromisoformat(raw)
+        if today <= d <= week_end:
+            parsed.append(d)
+    if not parsed:
+        raise ValueError("No dates in the remaining week to apply")
+
+    # 1. Write the rows first, and commit: the trip is the fact here. The
+    #    rebuild below reads them back through get_travel_day_names.
+    existing = {
+        row.date for row in db.query(TravelDay).filter(
+            TravelDay.athlete_id == athlete.id,
+            TravelDay.date.in_(parsed),
+        ).all()
+    }
+    for d in parsed:
+        if d not in existing:
+            db.add(TravelDay(athlete_id=athlete.id, date=d, note=note or None))
+    db.commit()
+
+    travel_day_names = get_travel_day_names(db, athlete.id, start_of_week)
+    blocked = [
+        VALID_DAYS[d.weekday()] for d in sorted(set(parsed))
+    ]
+
+    result = {
+        "status": "applied",
+        "travel_days": blocked,
+        "dates": [d.isoformat() for d in sorted(set(parsed))],
+        "rebuilt_days": [],
+        "violations": [],
+    }
+
+    plan_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    if not plan_record:
+        return result
+
+    plan_json = normalize_plan(plan_record.plan_json)
+    days_dict = plan_json.get("days") or {}
+
+    # 2. Rest the blocked days deterministically — Python, not the LLM. What
+    #    the athlete gets on a plane is not a coaching decision.
+    displaced = []
+    for day_name in blocked:
+        day = days_dict.get(day_name) or {}
+        for w in day.get("workouts") or []:
+            sport = map_sport(w.get("sport", ""))
+            if sport == "running":
+                displaced.append(w.get("title") or "run")
+        days_dict[day_name] = {
+            "summary": f"Rest — traveling{f' ({note})' if note else ''}",
+            "workouts": [{
+                "sport": "rest",
+                "title": "Rest (traveling)",
+                "steps": [],
+                "total_time": "0:00",
+                "enforced_reason": f"Traveling on {day_name}",
+            }],
+            "rationale": "Athlete confirmed travel via chat triage.",
+            "coach_note": "",
+        }
+
+    # 3. Rebuild the open remaining days around the trip. The context already
+    #    carries travel_day_names (written above), so the prompt states the
+    #    block and the run-km priority; the enforcer below guarantees it.
+    rebuild_days = [
+        VALID_DAYS[o] for o in range(today.weekday(), 7)
+        if VALID_DAYS[o] not in blocked
+    ]
+    regenerated = []
+    if rebuild_days:
+        try:
+            engine = PeriodizationEngine()
+            training_context = engine.compute_context(db)
+            profile = {
+                "race_name": athlete.race_name,
+                "race_distance": athlete.race_distance,
+                "race_date": str(athlete.race_date) if athlete.race_date else None,
+                "weekly_hours_target": athlete.weekly_hours_target or 8.0,
+                "swim_days": athlete.swim_days,
+                "bike_days": athlete.bike_days,
+                "run_days": athlete.run_days,
+                "strength_days": athlete.strength_days,
+            }
+            summary_lines = [
+                f"The athlete is TRAVELING on: {', '.join(blocked)} — those days "
+                "are now rest and must stay rest.",
+                (
+                    f"Displaced from the travel days: {', '.join(displaced)}. "
+                    "Weekly run kilometers are the protected quantity — refit "
+                    "the displaced running (the long run above all) onto the "
+                    "open days, dropping strength or cycling to make room."
+                    if displaced else
+                    "No running was displaced; rebalance the open days sensibly."
+                ),
+                "Do not raise total weekly load — this reshuffles the week, "
+                "it does not add to it.",
+            ]
+            new_days = ResponseAgent().generate_remaining_days(
+                athlete_summary=DataAgent(db).summarize(),
+                profile=profile,
+                training_context=training_context,
+                completed_days_summary="\n".join(summary_lines),
+                days_to_plan=rebuild_days,
+            ).get("days") or {}
+            for day_name, new_day in new_days.items():
+                if day_name not in rebuild_days or not isinstance(new_day, dict):
+                    continue
+                new_day.pop("adaptation", None)
+                new_day.pop("original_workouts", None)
+                days_dict[day_name] = new_day
+                regenerated.append(day_name)
+        except Exception as e:
+            print(f"⚠️ Travel rebuild failed, blocked days still rested: {e}")
+            result["rebuild_error"] = str(e)
+
+    plan_json["days"] = days_dict
+    plan_json = normalize_plan(plan_json)
+    plan_json, violations = enforce_constraints(
+        plan_json,
+        availability={
+            "swim_days": athlete.swim_days,
+            "bike_days": athlete.bike_days,
+            "run_days": athlete.run_days,
+            "strength_days": athlete.strength_days,
+            "travel_day_names": travel_day_names,
+        },
+        active_injuries=get_active_injuries(db, athlete.id),
+        days=blocked + regenerated,
+    )
+    if violations:
+        print(f"🚧 Stripped {len(violations)} violation(s) after travel rebuild")
+
+    plan_record.plan_json = plan_json
+    plan_record.last_adapted = None
+    flag_modified(plan_record, "plan_json")
+    db.commit()
+
+    result["rebuilt_days"] = sorted(regenerated, key=VALID_DAYS.index)
     result["violations"] = violations
     return result

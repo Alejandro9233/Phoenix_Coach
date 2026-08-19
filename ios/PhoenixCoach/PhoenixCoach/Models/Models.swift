@@ -450,6 +450,9 @@ struct ChatMessage: Identifiable {
     /// Set when the backend matched this message to a recovered injury. Renders
     /// the mirror card: resolve the injury, rebuild the days it turned to rest.
     var recovery: RecoveryProposal? = nil
+    /// Set when the backend read this message as travel days. Renders the card
+    /// that rests those days and rebuilds the open week around them.
+    var travel: TravelProposal? = nil
     /// Outcome text once a card has been acted on, so the card collapses to a
     /// receipt instead of staying tappable forever.
     var proposalOutcome: String? = nil
@@ -583,6 +586,48 @@ struct RecoveryApplyResult: Codable {
         case status
         case injuryId = "injury_id"
         case bodyPart = "body_part"
+        case rebuiltDays = "rebuilt_days"
+        case rebuildError = "rebuild_error"
+    }
+}
+
+// MARK: - Travel triage (chat SSE `travel` key, POST /coach/travel/apply)
+
+struct TravelProposal: Codable, Equatable {
+    /// Full day names for this week, e.g. ["Friday", "Saturday"].
+    let days: [String]
+    /// ISO dates matching `days` — what actually gets POSTed back on Confirm.
+    let dates: [String]
+    let affectedDays: [TravelAffectedDay]
+    let displacedRuns: Int
+    let rebuildDays: [String]
+    let priorityNote: String
+
+    enum CodingKeys: String, CodingKey {
+        case days, dates
+        case affectedDays = "affected_days"
+        case displacedRuns = "displaced_runs"
+        case rebuildDays = "rebuild_days"
+        case priorityNote = "priority_note"
+    }
+}
+
+struct TravelAffectedDay: Codable, Equatable {
+    let day: String
+    let workouts: [String]
+}
+
+struct TravelApplyResult: Codable {
+    let status: String
+    let travelDays: [String]
+    let rebuiltDays: [String]
+    /// Set when the days were blocked but the LLM couldn't rebuild the open
+    /// remainder — travel still sticks, the athlete replans later.
+    let rebuildError: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case travelDays = "travel_days"
         case rebuiltDays = "rebuilt_days"
         case rebuildError = "rebuild_error"
     }

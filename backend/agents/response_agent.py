@@ -114,6 +114,11 @@ def _format_training_context(ctx: dict) -> str:
         lines.append(f"  Cycling: {_availability_text(avail.get('bike_days'))}")
         lines.append(f"  Running: {_availability_text(avail.get('run_days'))}")
         lines.append(f"  Strength: {_availability_text(avail.get('strength_days'))}")
+        if avail.get("travel_day_names"):
+            lines.append(
+                f"  TRAVELING (no training possible, plan rest): "
+                f"{', '.join(avail['travel_day_names'])}"
+            )
 
     return "\n".join(lines)
 
@@ -385,6 +390,8 @@ CONSTRAINTS YOU MUST RESPECT:
 - Cycling: {_availability_text(ctx.get('availability', {}).get('bike_days'))}
 - Running: {_availability_text(ctx.get('availability', {}).get('run_days'))}
 - Strength: {_availability_text(ctx.get('availability', {}).get('strength_days'))}
+- Traveling (MUST be rest days, no training of any kind): {', '.join(ctx.get('availability', {}).get('travel_day_names') or []) or 'none this week'}
+- Weekly RUN kilometers are the protected quantity. If days are unavailable, move run sessions (especially the long run) to open days and drop strength or cycling instead. Never delete the long run to keep a strength session.
 - For strength workouts, you MUST include a "muscle_groups" array selecting from: ["chest", "shoulders", "back", "legs", "arms"] (e.g., ["legs"] or ["chest", "shoulders", "arms"]).
 
 OUTPUT FORMAT — respond ONLY with valid JSON matching the exact schema below.
