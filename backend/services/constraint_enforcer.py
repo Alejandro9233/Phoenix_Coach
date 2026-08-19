@@ -223,7 +223,8 @@ def get_active_injuries(db, athlete_id: int) -> list:
     if expired:
         # "Recovering" rather than "Resolved" — the window elapsing is evidence
         # the plan can resume, not evidence the body part is fine. The athlete
-        # closes it out in Profile.
+        # closes it out in Profile, or by telling the coach it's fine in chat
+        # (recovery triage matches Recovering rows too — get_open_injuries).
         db.commit()
         for inj in expired:
             print(f"🩹 Injury #{inj.id} ({inj.body_part}) passed its recovery date → Recovering")

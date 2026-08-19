@@ -1416,14 +1416,17 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
     if not proposal:
         try:
             from backend.services.issue_triage import (
-                build_recovery_proposal, extract_recovery, looks_like_recovery,
+                build_recovery_proposal, extract_recovery,
+                get_open_injuries, looks_like_recovery,
             )
-            from backend.services.constraint_enforcer import get_active_injuries
             athlete = db.query(Athlete).first()
             if athlete and looks_like_recovery(message):
-                active = get_active_injuries(db, athlete.id)
-                if active:
-                    matched = extract_recovery(message, active)
+                # Open = Active + Recovering. An auto-expired window parks the
+                # injury in Recovering, which is exactly the state waiting for
+                # the athlete to say "it's fine now".
+                open_injuries = get_open_injuries(db, athlete.id)
+                if open_injuries:
+                    matched = extract_recovery(message, open_injuries)
                     if matched:
                         recovery_proposal = build_recovery_proposal(db, matched)
         except Exception as e:

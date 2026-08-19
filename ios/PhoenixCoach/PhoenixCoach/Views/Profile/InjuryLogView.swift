@@ -55,7 +55,9 @@ struct InjuryLogView: View {
                                 // Recovery used to have no exit here but delete,
                                 // which throws away the history the coach reads.
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    if injury.status?.lowercased() == "active" {
+                                    // Recovering too: an expired window parks the
+                                    // injury there until the athlete closes it out.
+                                    if ["active", "recovering"].contains(injury.status?.lowercased()) {
                                         Button {
                                             Task { await resolveInjury(injury) }
                                         } label: {

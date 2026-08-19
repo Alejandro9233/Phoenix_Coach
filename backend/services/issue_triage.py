@@ -519,6 +519,23 @@ def looks_like_recovery(message: str) -> bool:
     return bool(_RECOVERY_PATTERN.search(message))
 
 
+def get_open_injuries(db, athlete_id: int) -> list:
+    """
+    Injuries the athlete can still close out: Active AND Recovering.
+
+    Distinct from get_active_injuries on purpose — enforcement only cares about
+    Active (a Recovering row no longer blocks training), but recovery triage
+    must also match Recovering: that's exactly the state an auto-expired window
+    parks an injury in while it waits for the athlete to say "it's fine now".
+    """
+    from backend.models.database import InjuryLog
+
+    return db.query(InjuryLog).filter(
+        InjuryLog.athlete_id == athlete_id,
+        InjuryLog.status.in_(["Active", "Recovering"]),
+    ).all()
+
+
 def extract_recovery(message: str, active_injuries: list):
     """
     Ask the LLM whether the message says one of the ACTIVE injuries is healed.
@@ -658,7 +675,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     injury = db.query(InjuryLog).filter(InjuryLog.id == injury_id).first()
     if not injury:
         raise ValueError(f"No injury with id {injury_id}")
-    if injury.status != "Active":
+    if injury.status not in ("Active", "Recovering"):
         # Double-tap or already resolved by hand — nothing to do, not an error.
         return {"status": "already_resolved", "injury_id": injury.id,
                 "body_part": injury.body_part, "rebuilt_days": [], "violations": []}

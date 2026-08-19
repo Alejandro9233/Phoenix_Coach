@@ -252,3 +252,37 @@ def test_apply_recovery_is_idempotent(db_session, monkeypatch):
 def test_apply_endpoint_unknown_injury_404(client):
     response = client.post("/coach/recovery/apply", json={"injury_id": 12345})
     assert response.status_code == 404
+
+
+# ─── Recovering rows (auto-expired windows) ──────────────────────────────────
+#
+# An expired window parks an injury in "Recovering" — no longer blocking, but
+# waiting for the athlete to say "it's fine". That state must be closable from
+# chat too, or it's back to delete-being-the-only-exit.
+
+def test_get_open_injuries_includes_recovering(db_session):
+    from backend.services.issue_triage import get_open_injuries
+
+    injury = _seed_injury_and_week(db_session)
+    injury.status = "Recovering"
+    db_session.commit()
+
+    athlete = db_session.query(Athlete).first()
+    open_ids = [i.id for i in get_open_injuries(db_session, athlete.id)]
+    assert injury.id in open_ids
+
+
+def test_apply_recovery_resolves_recovering_row(db_session, monkeypatch):
+    injury = _seed_injury_and_week(db_session)
+    injury.status = "Recovering"
+    db_session.commit()
+
+    monkeypatch.setattr(
+        ResponseAgent, "generate_remaining_days",
+        lambda self, **kw: {"days": {d: _training_day(d) for d in kw["days_to_plan"]}},
+    )
+
+    result = apply_recovery(db_session, injury.id)
+
+    assert result["status"] == "resolved"
+    assert db_session.get(InjuryLog, injury.id).status == "Resolved"
