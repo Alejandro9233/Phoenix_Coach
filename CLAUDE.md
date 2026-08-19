@@ -19,6 +19,9 @@ those limits and writes the coaching notes.
 - Don't set `TIMEZONE` in `.env` or on Render. It overrides the phone's reported
   timezone and breaks travel.
 - Commits go straight to `main` on this repo.
+- **Tell Alex what changed before committing.** Summarize the edits in chat
+  first; commit only after he's seen it. A commit is never the first report
+  of work.
 - **Never add a `Co-Authored-By:` trailer to commits.** No Claude/AI attribution
   lines, no `Generated with` footers. Commit messages end at the body.
 - The LLM never decides volume. Wrong mileage in a plan = bug in
@@ -48,6 +51,11 @@ those limits and writes the coaching notes.
   already watching. The app has no push infrastructure and no notification
   permission prompt, by choice. Anything worth telling the athlete belongs in the
   UI they already have open.
+- **`_fallback_weekly_plan`** (`response_agent.py`), deleted 2026-08-18. A
+  rule-based template week that shipped as the athlete's real plan whenever the
+  LLM failed (2026-08-17: retired Groq model → silent "Base Building" template
+  persisted). Failed generation raises; plan endpoints return 502 and persist
+  nothing. `test_weekly_plan_safety.py` guards it.
 - **`frontend/`** web UI — replaced by the iOS app.
 - **Root `phoenix_coach.db`** — no SQLite snapshot in the repo. Use `scripts/rebuild_db.py`.
 

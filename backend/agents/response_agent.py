@@ -19,6 +19,23 @@ from backend.core.llm_client import chat_completion
 from backend.core.knowledge_base import KnowledgeBase
 
 
+def _availability_text(value) -> str:
+    """Render an availability day-list the way an LLM can actually obey.
+
+    An empty string means the athlete disabled the sport. It used to render as
+    a blank after a colon ("Swimming ONLY on: "), which reads as *no*
+    restriction — the LLM scheduled a swim, the enforcer stripped it, and the
+    day shipped thin (2026-08-18 Tuesday). The enforcer stays the hard gate;
+    this just stops the LLM from spending a session slot on a doomed workout.
+    """
+    if value is None:
+        return "any day"
+    days = [d.strip() for d in value.split(",") if d.strip()]
+    if not days:
+        return "NEVER — the athlete has disabled this sport, do not schedule it"
+    return f"ONLY on {', '.join(days)} — all other days are forbidden"
+
+
 def _format_training_context(ctx: dict) -> str:
     """Format the TrainingContext dict as human-readable text for the LLM prompt."""
     lines = []
@@ -93,10 +110,10 @@ def _format_training_context(ctx: dict) -> str:
     avail = ctx.get("availability", {})
     if avail:
         lines.append(f"\nSport Availability:")
-        lines.append(f"  Swimming: {avail.get('swim_days', 'any')}")
-        lines.append(f"  Cycling: {avail.get('bike_days', 'any')}")
-        lines.append(f"  Running: {avail.get('run_days', 'any')}")
-        lines.append(f"  Strength: {avail.get('strength_days', 'any')}")
+        lines.append(f"  Swimming: {_availability_text(avail.get('swim_days'))}")
+        lines.append(f"  Cycling: {_availability_text(avail.get('bike_days'))}")
+        lines.append(f"  Running: {_availability_text(avail.get('run_days'))}")
+        lines.append(f"  Strength: {_availability_text(avail.get('strength_days'))}")
 
     return "\n".join(lines)
 
@@ -171,6 +188,21 @@ If prescribing a REST day, set sport to "rest" and steps to an empty array for t
 class ResponseAgent:
     def __init__(self):
         self.kb = KnowledgeBase.get_instance()
+
+    def _chat_json_with_retry(self, messages: list[dict]) -> dict:
+        """chat_completion in JSON mode, with one retry on malformed JSON.
+
+        Only decode errors retry — json_mode output occasionally truncates,
+        and a second attempt is cheap. API errors (dead model, auth, rate
+        limit) propagate immediately so the caller can fail the request.
+        """
+        content = chat_completion(messages=messages, json_mode=True)
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as e:
+            print(f"Malformed plan JSON ({e}); retrying once...")
+            content = chat_completion(messages=messages, json_mode=True)
+            return json.loads(content)
 
     def generate_recommendation(self, athlete_summary: str) -> dict:
         """
@@ -349,10 +381,10 @@ Design this week's 7-day plan (Monday to Sunday). You decide:
 7. For STRENGTH workouts: decide the split (Push/Pull/Legs, Upper/Lower, etc.) and include the targeted muscle groups.
 
 CONSTRAINTS YOU MUST RESPECT:
-- Swimming ONLY on: {ctx.get('availability', {}).get('swim_days', 'any')}
-- Cycling on: {ctx.get('availability', {}).get('bike_days', 'any')}
-- Running on: {ctx.get('availability', {}).get('run_days', 'any')}
-- Strength on: {ctx.get('availability', {}).get('strength_days', 'any')}
+- Swimming: {_availability_text(ctx.get('availability', {}).get('swim_days'))}
+- Cycling: {_availability_text(ctx.get('availability', {}).get('bike_days'))}
+- Running: {_availability_text(ctx.get('availability', {}).get('run_days'))}
+- Strength: {_availability_text(ctx.get('availability', {}).get('strength_days'))}
 - For strength workouts, you MUST include a "muscle_groups" array selecting from: ["chest", "shoulders", "back", "legs", "arms"] (e.g., ["legs"] or ["chest", "shoulders", "arms"]).
 
 OUTPUT FORMAT — respond ONLY with valid JSON matching the exact schema below.
@@ -394,18 +426,18 @@ CRITICAL: You MUST use the exact keys "week_summary" and "days". Do NOT output a
 Respond ONLY with the JSON block. Do not write introductory or concluding conversational text.
 """
 
+        # A failed generation must raise — the caller persists whatever this
+        # returns, and 2026-08-17 proved a silent fallback here becomes the
+        # athlete's actual week (a template plan shipped as a Marathon Base
+        # recovery week). Same rule as generate_remaining_days.
         try:
-            content = chat_completion(
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt}
-                ],
-                json_mode=True
-            )
-            return json.loads(content)
+            return self._chat_json_with_retry([
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt}
+            ])
         except Exception as e:
             print(f"Error generating weekly plan: {e}")
-            return self._fallback_weekly_plan(profile)
+            raise
 
     def _generate_plan_legacy(self, athlete_summary: str, profile: dict) -> dict:
         """Legacy plan generation without training context (backward compatible)."""
@@ -417,10 +449,10 @@ ATHLETE CURRENT STATE:
 ATHLETE CONSTRAINTS & OBJECTIVES:
 - Race: {profile.get('race_name') if profile.get('race_name') is not None else 'Not set'} ({profile.get('race_distance') if profile.get('race_distance') is not None else 'Not set'}) on {profile.get('race_date') if profile.get('race_date') is not None else 'Not set'}
 - Weekly target hours: {profile.get('weekly_hours_target') if profile.get('weekly_hours_target') is not None else 8.0} hours
-- Swim availability: {profile.get('swim_days') if profile.get('swim_days') is not None else 'wed,sat,sun'}
-- Bike availability: {profile.get('bike_days') if profile.get('bike_days') is not None else 'all'}
-- Run availability: {profile.get('run_days') if profile.get('run_days') is not None else 'all'}
-- Strength availability: {profile.get('strength_days') if profile.get('strength_days') is not None else 'mon,wed,fri'}
+- Swim availability: {_availability_text(profile.get('swim_days', 'wed,sat,sun'))}
+- Bike availability: {_availability_text(profile.get('bike_days'))}
+- Run availability: {_availability_text(profile.get('run_days'))}
+- Strength availability: {_availability_text(profile.get('strength_days', 'mon,wed,fri'))}
 
 COACHING RULES:
 1. Respect the sport availability constraints: do NOT schedule a swim, bike, run, or strength session on a day not listed in the athlete's availability.
@@ -467,17 +499,13 @@ You MUST respond with valid JSON in this exact structure:
 Respond ONLY with the JSON block. Do not write introductory or concluding conversational text.
 """
         try:
-            content = chat_completion(
-                messages=[
-                    {"role": "system", "content": "You are a professional triathlon coach that generates structured training plans in JSON format."},
-                    {"role": "user", "content": prompt}
-                ],
-                json_mode=True
-            )
-            return json.loads(content)
+            return self._chat_json_with_retry([
+                {"role": "system", "content": "You are a professional triathlon coach that generates structured training plans in JSON format."},
+                {"role": "user", "content": prompt}
+            ])
         except Exception as e:
             print(f"Error generating weekly plan: {e}")
-            return self._fallback_weekly_plan(profile)
+            raise
 
     def adapt_daily(self, planned_workout: dict, today_metrics: str,
                     training_context: dict = None) -> dict:
@@ -501,6 +529,15 @@ HRV vs baseline: {rec.get('hrv_vs_baseline', 'unknown')}
 TIB (form): {rec.get('tib', 'N/A')}
 Load ratio: {rec.get('load_ratio', 'N/A')}
 """
+            avail = training_context.get("availability", {})
+            if avail:
+                context_section += f"""
+SPORT AVAILABILITY (hard rule — a workout in a disallowed sport/day is removed after you answer):
+  Swimming: {_availability_text(avail.get('swim_days'))}
+  Cycling: {_availability_text(avail.get('bike_days'))}
+  Running: {_availability_text(avail.get('run_days'))}
+  Strength: {_availability_text(avail.get('strength_days'))}
+"""
 
         prompt = f"""You are Phoenix, an elite triathlon coach. You need to review today's PLANNED workout and decide if it needs to be adapted based on the athlete's actual RECOVERY metrics today.
 {context_section}
@@ -511,7 +548,7 @@ TODAY'S ACTUAL RECOVERY METRICS:
 {today_metrics}
 
 RULES FOR ADAPTATION:
-1. If the athlete's metrics show severe fatigue (extremely low HRV, elevated RHR, negative TIB, or high Load Ratio > 1.4), you MUST downgrade the session to "rest" or "active recovery" (very easy swim or spin in Zone 1 for < 20 min).
+1. If the athlete's metrics show severe fatigue (extremely low HRV, elevated RHR, negative TIB, or high Load Ratio > 1.4), you MUST downgrade the session to "rest" or "active recovery" (a very easy Zone 1 session under 20 min, in a sport allowed today).
 2. If they have minor fatigue, you may reduce the duration or intensity of the main set.
 3. If they are well-recovered (normal/high HRV, stable RHR, positive TIB), keep the planned workout exactly as is.
 4. If you adapt the session, set the "adaptation" field to explain exactly why and what was changed. If no change is made, set "adaptation" to null.
@@ -617,10 +654,10 @@ Account for the training already done. You must:
 5. For STRENGTH workouts: include the "muscle_groups" array
 
 CONSTRAINTS YOU MUST RESPECT:
-- Swimming ONLY on: {training_context.get('availability', dict()).get('swim_days', 'any')}
-- Cycling on: {training_context.get('availability', dict()).get('bike_days', 'any')}
-- Running on: {training_context.get('availability', dict()).get('run_days', 'any')}
-- Strength on: {training_context.get('availability', dict()).get('strength_days', 'any')}
+- Swimming: {_availability_text(training_context.get('availability', dict()).get('swim_days'))}
+- Cycling: {_availability_text(training_context.get('availability', dict()).get('bike_days'))}
+- Running: {_availability_text(training_context.get('availability', dict()).get('run_days'))}
+- Strength: {_availability_text(training_context.get('availability', dict()).get('strength_days'))}
 
 OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed above:
 {{
@@ -637,14 +674,10 @@ Respond ONLY with the JSON block. Do not write introductory or concluding conver
 """
 
         try:
-            content = chat_completion(
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt}
-                ],
-                json_mode=True
-            )
-            return json.loads(content)
+            return self._chat_json_with_retry([
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt}
+            ])
         except Exception as e:
             # No placeholder fallback here: the caller persists whatever this
             # returns, and on 2026-08-17 a retired Groq model turned that into
@@ -698,74 +731,9 @@ Respond in valid JSON:
                 "grade": "N/A"
             }
 
-    def _fallback_weekly_plan(self, profile: dict) -> dict:
-        """Rule-based fallback weekly plan generator when LLM is unavailable."""
-        swim_days = [d.strip().capitalize() for d in (profile.get('swim_days') if profile.get('swim_days') is not None else 'wed,sat,sun').split(',') if d.strip()]
-        bike_days = [d.strip().capitalize() for d in (profile.get('bike_days') if profile.get('bike_days') is not None else 'all').split(',') if d.strip()]
-        run_days = [d.strip().capitalize() for d in (profile.get('run_days') if profile.get('run_days') is not None else 'all').split(',') if d.strip()]
-        strength_days = [d.strip().capitalize() for d in (profile.get('strength_days') if profile.get('strength_days') is not None else 'mon,wed,fri').split(',') if d.strip()]
-
-        days_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-        plan = {
-            "week_summary": {
-                "focus": "Base Building",
-                "rationale": "Standard rule-based plan focusing on consistency across your available days.",
-                "expected_total_hours": profile.get('weekly_hours_target') or 8.0,
-                "expected_run_km": 20.0
-            },
-            "days": {}
-        }
-
-        for day in days_names:
-            day_abbr = day[:3].capitalize()
-
-            # Simple sport matching
-            sport = "rest"
-            title = "Rest Day"
-            steps = []
-            time = "0 min"
-            hr = "N/A"
-
-            if day_abbr in swim_days:
-                sport = "swimming"
-                title = "Easy Technical Swim"
-                steps = [{"type": "main", "duration": "30:00", "zone": 2, "description": "Focus on high elbow and core rotation"}]
-                time = "30 min"
-                hr = "Easy pace"
-            elif day_abbr in bike_days:
-                sport = "cycling"
-                title = "Aerobic Base Ride"
-                steps = [{"type": "main", "duration": "45:00", "zone": 2, "description": "Keep cadence 85-95 rpm"}]
-                time = "45 min"
-                hr = "110-130 bpm"
-            elif day_abbr in run_days:
-                sport = "running"
-                title = "Conversational Base Run"
-                steps = [{"type": "main", "duration": "30:00", "zone": 2, "description": "Very relaxed running"}]
-                time = "30 min"
-                hr = "120-140 bpm"
-            elif day_abbr in strength_days:
-                sport = "strength"
-                title = "General Core & Hip Stability"
-                steps = [{"type": "main", "duration": "20:00", "zone": 1, "description": "Planks, squats, and single-leg bridges"}]
-                time = "20 min"
-                hr = "N/A"
-
-            plan["days"][day] = {
-                "summary": f"{title} scheduled.",
-                "workouts": [{
-                    "sport": sport,
-                    "title": title,
-                    "steps": steps,
-                    "total_time": time,
-                    "hr_target": hr
-                }],
-                "rationale": "Scheduled base training day.",
-                "coach_note": "Consistency is king. Get it done!"
-            }
-
-        return plan
+    # _fallback_weekly_plan is gone on purpose (2026-08-18). It let a dead
+    # model ship a template week as if the coach had planned it. A failed
+    # generation raises; the endpoints return 502 and persist nothing.
 
     def _fallback_recommendation(self, summary: str) -> dict:
         """Fallback recommendation when LLM is unavailable."""

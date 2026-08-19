@@ -503,9 +503,18 @@ def get_weekly_plan(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"⚠️ Error checking previous week's recovery status: {e}")
         
+    # A failed generation fails the request — everything below this call
+    # persists, and a fabricated plan persisted here becomes the athlete's
+    # actual week (2026-08-17). Same rule as /weekly-plan/replan-remaining.
     response_agent = ResponseAgent()
-    new_plan_json = response_agent.generate_weekly_plan(summary, profile, training_context=training_context)
-    
+    try:
+        new_plan_json = response_agent.generate_weekly_plan(summary, profile, training_context=training_context)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Plan generation failed; no plan persisted: {e}"
+        )
+
     # Store training_context in new_plan_json under "_context" key for auditability
     new_plan_json["_context"] = training_context
     
@@ -559,15 +568,20 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
     
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
-    
-    # Delete existing plan for this week (overwrite)
+
+    # Delete without committing: if generation fails, the rollback below
+    # brings the old plan back. Committing the delete first meant a failed
+    # regenerate left the athlete with no week at all.
     db.query(WeeklyPlan).filter(
         WeeklyPlan.week_start == start_of_week
     ).delete()
-    db.commit()
-    
-    # Reuse the GET /weekly-plan logic to generate a new plan
-    return get_weekly_plan(db)
+
+    # Reuse the GET /weekly-plan logic; it commits the delete + new plan together.
+    try:
+        return get_weekly_plan(db)
+    except Exception:
+        db.rollback()
+        raise
 
 
 @app.post("/weekly-plan/replan-remaining")
