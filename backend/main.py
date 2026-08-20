@@ -26,7 +26,17 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./phoenix_coach.db")
 connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+# pool_pre_ping: test pooled connections before handing them to a request.
+# 2026-08-20: Render restarted the Postgres container and killed the pool's
+# 9-hour-old connections; without the ping every request drew a dead socket
+# ("SSL connection has been closed unexpectedly") until the service restarted.
+# pool_recycle retires anything older than 5 min as a second layer.
+engine = create_engine(
+    DATABASE_URL,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_recycle=300,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create tables
