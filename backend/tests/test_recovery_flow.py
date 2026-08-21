@@ -125,6 +125,8 @@ def test_looks_like_recovery_positives():
         "ya no me duele la pantorrilla",
         "leg feels good, no pain at all",
         "estoy recuperado",
+        "ya no duele la rodilla",
+        "me siento mejor, sin dolor",
     ]:
         assert looks_like_recovery(msg), msg
 
@@ -142,7 +144,7 @@ def test_looks_like_recovery_negatives():
 def test_extract_recovery_matches_active_injury(db_session, monkeypatch):
     injury = _seed_injury_and_week(db_session)
 
-    def fake_chat(messages, json_mode=False):
+    def fake_chat(messages, json_mode=False, **kwargs):
         return '{"is_recovery": true, "injury_id": %d}' % injury.id
 
     monkeypatch.setattr("backend.core.llm_client.chat_completion", fake_chat)
@@ -156,13 +158,13 @@ def test_extract_recovery_rejects_non_recovery_and_bogus_ids(db_session, monkeyp
 
     monkeypatch.setattr(
         "backend.core.llm_client.chat_completion",
-        lambda messages, json_mode=False: '{"is_recovery": false}',
+        lambda messages, json_mode=False, **kwargs: '{"is_recovery": false}',
     )
     assert extract_recovery("hi coach", [injury]) is None
 
     monkeypatch.setattr(
         "backend.core.llm_client.chat_completion",
-        lambda messages, json_mode=False: '{"is_recovery": true, "injury_id": 999}',
+        lambda messages, json_mode=False, **kwargs: '{"is_recovery": true, "injury_id": 999}',
     )
     assert extract_recovery("calf is fine", [injury]) is None
 

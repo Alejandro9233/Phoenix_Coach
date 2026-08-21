@@ -18,6 +18,13 @@ from backend.core.llm_client import chat_completion
 
 from backend.core.knowledge_base import KnowledgeBase
 
+# Structured output runs cold. 0.3 cuts run-to-run variance in workout
+# selection and schema adherence; the fixed seed lets the provider's
+# best-effort reproducibility do what it can (see llm_client docstring for
+# what that does NOT guarantee). Free-form chat stays at 0.7 — not here.
+PLAN_TEMPERATURE = 0.3
+PLAN_SEED = 1042
+
 
 def _availability_text(value) -> str:
     """Render an availability day-list the way an LLM can actually obey.
@@ -97,6 +104,13 @@ def _format_training_context(ctx: dict) -> str:
         lines.append(f"\nLast Week Summary:")
         lines.append(f"  Sessions: {lw.get('sessions_completed', 0)} completed" +
                      (f" / {lw['sessions_planned']} planned" if lw.get('sessions_planned') else ""))
+        if lw.get("compliance_pct") is None:
+            lines.append("  Compliance: n/a — no plan was on record last week "
+                         "(NOT non-compliance; do not treat as missed training)")
+        else:
+            lines.append(f"  Compliance: {lw['compliance_pct']}%")
+        if lw.get("note"):
+            lines.append(f"  Note: {lw['note']}")
         lines.append(f"  Hours: {lw.get('hours_done', 0)}h | Training Load: {lw.get('total_load', 0)}")
         if lw.get("long_run_km"):
             lines.append(f"  Longest run: {lw['long_run_km']} km")
@@ -194,19 +208,23 @@ class ResponseAgent:
     def __init__(self):
         self.kb = KnowledgeBase.get_instance()
 
-    def _chat_json_with_retry(self, messages: list[dict]) -> dict:
+    def _chat_json_with_retry(self, messages: list[dict],
+                              temperature: float = PLAN_TEMPERATURE,
+                              seed: int | None = PLAN_SEED) -> dict:
         """chat_completion in JSON mode, with one retry on malformed JSON.
 
         Only decode errors retry — json_mode output occasionally truncates,
         and a second attempt is cheap. API errors (dead model, auth, rate
         limit) propagate immediately so the caller can fail the request.
         """
-        content = chat_completion(messages=messages, json_mode=True)
+        content = chat_completion(messages=messages, json_mode=True,
+                                  temperature=temperature, seed=seed)
         try:
             return json.loads(content)
         except json.JSONDecodeError as e:
             print(f"Malformed plan JSON ({e}); retrying once...")
-            content = chat_completion(messages=messages, json_mode=True)
+            content = chat_completion(messages=messages, json_mode=True,
+                                      temperature=temperature, seed=seed)
             return json.loads(content)
 
     def generate_recommendation(self, athlete_summary: str) -> dict:
@@ -234,18 +252,15 @@ Based on this data and these principles, what should the athlete do today? Remem
 
         # 3. Call LLM Client
         try:
-            content = chat_completion(
-                messages=[
+            return self._chat_json_with_retry(
+                [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}
                 ],
-                json_mode=True
+                temperature=PLAN_TEMPERATURE, seed=None,
             )
-            return json.loads(content)
-
         except json.JSONDecodeError as e:
             print(f"Failed to parse LLM JSON: {e}")
-            print(f"Raw response: {content[:500]}")
             return self._fallback_recommendation(athlete_summary)
         except Exception as e:
             print(f"Ollama error: {e}")
@@ -298,14 +313,13 @@ Respond in valid JSON:
             system += f" The athlete is in {phase}."
 
         try:
-            content = chat_completion(
-                messages=[
+            return self._chat_json_with_retry(
+                [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_prompt}
                 ],
-                json_mode=True
+                temperature=PLAN_TEMPERATURE, seed=None,
             )
-            return json.loads(content)
         except Exception as e:
             print(f"Error analyzing activity: {e}")
             return {"analysis": f"Could not analyze activity: {str(e)}", "rating": "Error", "advice": "Try again later."}
@@ -582,14 +596,13 @@ You MUST respond with valid JSON in this exact format:
 Respond ONLY with the JSON block. Do not write introductory or concluding conversational text.
 """
         try:
-            content = chat_completion(
-                messages=[
+            return self._chat_json_with_retry(
+                [
                     {"role": "system", "content": "You are a professional triathlon coach that adapts training sessions based on recovery data in JSON format."},
                     {"role": "user", "content": prompt}
                 ],
-                json_mode=True
+                temperature=PLAN_TEMPERATURE, seed=None,
             )
-            return json.loads(content)
         except Exception as e:
             print(f"Error adapting workout: {e}")
             adapted = planned_workout.copy()
@@ -720,14 +733,13 @@ Respond in valid JSON:
 }}"""
 
         try:
-            content = chat_completion(
-                messages=[
+            return self._chat_json_with_retry(
+                [
                     {"role": "system", "content": "You are an elite triathlon coach providing a weekly training review in JSON format."},
                     {"role": "user", "content": prompt}
                 ],
-                json_mode=True
+                temperature=PLAN_TEMPERATURE, seed=None,
             )
-            return json.loads(content)
         except Exception as e:
             print(f"Error generating weekly review: {e}")
             return {

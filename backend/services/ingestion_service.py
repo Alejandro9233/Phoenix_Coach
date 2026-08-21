@@ -172,7 +172,7 @@ class IngestionService:
                 if latest_vo2: athlete.vo2_max = float(latest_vo2)
                 if latest_stamina: athlete.stamina_level = float(latest_stamina)
                 if latest_rhr: athlete.hr_rest = latest_rhr
-                if latest_lthr: athlete.hr_max = latest_lthr 
+                if latest_lthr: athlete.lthr = latest_lthr
                 if latest_ltsp: athlete.threshold_pace_min_km = latest_ltsp / 60.0
                 
                 if hrv_list:
@@ -201,6 +201,9 @@ class IngestionService:
                     if "cyclePowerZone" in zone_data: athlete.cycle_power_zones = zone_data["cyclePowerZone"]
                     if "ftp" in zone_data: athlete.ftp_watts = float(zone_data["ftp"])
                 
+                # The watch owns weight, always — Alex maintains it in one place
+                # (COROS) and the scrape propagates it. A Profile edit is a
+                # temporary value until the next scrape, by choice (2026-08-21).
                 if "weight" in endpoint_data:
                     try:
                         athlete.weight_kg = float(endpoint_data["weight"])

@@ -11,6 +11,8 @@ class Athlete(Base):
     name = Column(String, default="Athlete")
     age = Column(Integer, nullable=True)
     weight_kg = Column(Float, nullable=True)
+    # 'app' = athlete saved weight in Profile; the COROS scrape then stops
+    # overwriting weight_kg. NULL = watch weight keeps syncing.
     ftp_watts = Column(Float, nullable=True)
     threshold_pace_min_km = Column(Float, nullable=True)
     swim_css_sec_100m = Column(Float, nullable=True)
@@ -19,7 +21,8 @@ class Athlete(Base):
     race_type = Column(String, nullable=True)           # e.g. "Triathlon", "Running"
     race_distance = Column(String, nullable=True)        # e.g. "Olympic", "70.3", "Full Ironman"
     weekly_hours_target = Column(Float, nullable=True)
-    hr_max = Column(Integer, nullable=True)
+    hr_max = Column(Integer, nullable=True)  # true max HR — unset; await a real source
+    lthr = Column(Integer, nullable=True)  # COROS lactate-threshold HR (was mislabeled hr_max until 2026-08)
     hr_rest = Column(Integer, nullable=True)
     hrv_baseline = Column(Float, nullable=True)
     vo2_max = Column(Float, nullable=True)

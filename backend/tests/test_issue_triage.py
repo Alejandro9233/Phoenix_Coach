@@ -89,6 +89,8 @@ def _all_week(workout_factory):
     "shin splints again",
     "tengo dolor en la pantorrilla",
     "mi rodilla tiene una molestia",
+    "me duele la pantorrilla, no puedo correr",
+    "me lastimé el tobillo en la carrera",
 ])
 def test_gate_catches_issue_reports(message):
     assert looks_like_issue(message)
@@ -386,3 +388,78 @@ def test_apply_endpoint_updates_the_plan(client, db):
     assert body["rest_days"] == ["Wednesday"]
     assert [w["sport"] for w in body["plan"]["days"]["Wednesday"]["workouts"]] == ["rest"]
     assert db.query(InjuryLog).count() == 1
+
+
+# ─── data_agent injury visibility ─────────────────────────────────────────────
+#
+# summarize() reads injuries through constraint_enforcer.get_active_injuries,
+# so an injury past its expected_recovery_date must never reach the prompt as
+# ACTIVE — and the read has the enforcer's side effect of flipping the row to
+# Recovering. These use the real clock: dates are built relative to
+# get_local_today, so they hold on any run date (the frozen_today fixture only
+# pins issue_triage's clock, not data_agent's or the enforcer's).
+
+def _seed_injury(db, expected_recovery_date):
+    from datetime import timedelta
+
+    from backend.utils.timezone import get_local_today
+
+    athlete = Athlete(name="Test")
+    db.add(athlete)
+    db.commit()
+    db.refresh(athlete)
+
+    injury = InjuryLog(
+        athlete_id=athlete.id,
+        date_reported=get_local_today() - timedelta(days=5),
+        body_part="Right calf",
+        status="Active",
+        severity=6,
+        affected_sports="running",
+        expected_recovery_date=expected_recovery_date,
+    )
+    db.add(injury)
+    db.commit()
+    return injury
+
+
+def test_summarize_moves_an_expired_injury_to_recovering(db):
+    from datetime import timedelta
+
+    from backend.agents.data_agent import DataAgent
+    from backend.utils.timezone import get_local_today
+
+    injury = _seed_injury(db, get_local_today() - timedelta(days=1))
+
+    summary = DataAgent(db).summarize()
+
+    assert "ACTIVE INJURIES" not in summary
+    assert "RECOVERING" in summary
+    db.refresh(injury)
+    assert injury.status == "Recovering"
+
+
+def test_summarize_keeps_an_injury_active_through_its_recovery_date(db):
+    from backend.agents.data_agent import DataAgent
+    from backend.utils.timezone import get_local_today
+
+    injury = _seed_injury(db, get_local_today())
+
+    summary = DataAgent(db).summarize()
+
+    assert "ACTIVE INJURIES" in summary
+    db.refresh(injury)
+    assert injury.status == "Active"
+
+
+def test_summarize_keeps_a_dateless_injury_active(db):
+    """Legacy rows (expected_recovery_date NULL) last until resolved by hand."""
+    from backend.agents.data_agent import DataAgent
+
+    injury = _seed_injury(db, None)
+
+    summary = DataAgent(db).summarize()
+
+    assert "ACTIVE INJURIES" in summary
+    db.refresh(injury)
+    assert injury.status == "Active"

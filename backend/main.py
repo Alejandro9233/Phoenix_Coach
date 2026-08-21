@@ -43,6 +43,35 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
 
+def _migrate_athletes(target_engine):
+    """Add athletes columns introduced after the table was first created.
+
+    Factored out of _ensure_columns so the lthr backfill can be tested against
+    a throwaway engine.
+    """
+    from sqlalchemy import inspect, text
+    inspector = inspect(target_engine)
+    if "athletes" not in inspector.get_table_names():
+        return
+    existing = {c["name"] for c in inspector.get_columns("athletes")}
+
+    if "timezone" not in existing:
+        with target_engine.begin() as conn:
+            conn.execute(text("ALTER TABLE athletes ADD COLUMN timezone VARCHAR"))
+        print("✅ Migration: added athletes.timezone")
+
+    if "lthr" not in existing:
+        # One-shot backfill: hr_max always held COROS LTHR (ingestion wrote it
+        # there), so move the value and null the mislabeled column. All three
+        # statements stay inside this guard — re-running them on a later boot
+        # would wipe a future genuine hr_max.
+        with target_engine.begin() as conn:
+            conn.execute(text("ALTER TABLE athletes ADD COLUMN lthr INTEGER"))
+            conn.execute(text("UPDATE athletes SET lthr = hr_max"))
+            conn.execute(text("UPDATE athletes SET hr_max = NULL"))
+        print("✅ Migration: added athletes.lthr, backfilled from hr_max, nulled hr_max")
+
+
 def _ensure_columns():
     """Add columns introduced after a table was first created.
 
@@ -54,12 +83,7 @@ def _ensure_columns():
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
 
-    if "athletes" in tables:
-        existing = {c["name"] for c in inspector.get_columns("athletes")}
-        if "timezone" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE athletes ADD COLUMN timezone VARCHAR"))
-            print("✅ Migration: added athletes.timezone")
+    _migrate_athletes(engine)
 
     if "injury_logs" in tables:
         existing = {c["name"] for c in inspector.get_columns("injury_logs")}
@@ -231,7 +255,7 @@ def update_athlete_profile(body: dict, db: Session = Depends(get_db)):
     for field in updatable:
         if field in body:
             setattr(athlete, field, body[field])
-    
+
     # Handle race_date specially (string → date)
     if "race_date" in body:
         rd = body["race_date"]
@@ -524,12 +548,30 @@ def get_weekly_plan(db: Session = Depends(get_db)):
     if plan_record:
         from backend.services.plan_normalizer import normalize_plan
         return normalize_plan(plan_record.plan_json)
-        
+
+    # No race, no plan. Without race_date + race_distance the periodization
+    # engine invents weeks_to_race=99 and defaults to "Marathon", so an
+    # auto-created "New Athlete" got a full default-profile week on first app
+    # open. Stored plans (above) still serve; only generation is gated.
+    athlete = db.query(Athlete).first()
+    if athlete is None:
+        missing = ["athlete"]
+    else:
+        missing = [f for f in ("race_date", "race_distance") if not getattr(athlete, f)]
+    if missing:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "profile_incomplete",
+                "missing": missing,
+                "message": "Set your race in Profile before a plan can be generated.",
+            },
+        )
+
     # If not, generate a new one
     data_agent = DataAgent(db)
     summary = data_agent.summarize()
-    
-    athlete = db.query(Athlete).first()
+
     profile = {
         "race_name": athlete.race_name,
         "race_distance": athlete.race_distance,
@@ -1300,6 +1342,7 @@ COACHING KNOWLEDGE:
 {rag_context}
 
 RULES:
+- Reply in the language of the athlete's most recent message — he code-switches between Spanish and English.
 - Lead with the answer, then give 1-2 key reasons using the athlete's actual numbers or their scheduled workouts.
 - Maximum 4-6 lines total. No headers, no essays, no bullet-point lists longer than 3 items.
 - If the athlete asks a yes/no question, start with yes or no.

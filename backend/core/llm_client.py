@@ -27,42 +27,77 @@ def _get_groq_client() -> OpenAI:
         base_url="https://api.groq.com/openai/v1",
     )
 
-def chat_completion(messages: list[dict], json_mode: bool = False) -> str:
+def chat_completion(messages: list[dict], json_mode: bool = False,
+                    temperature: float = 0.7, seed: int | None = None) -> str:
     """
     Send a chat completion request to Groq (cloud) or Ollama (local).
 
     Args:
         messages: List of {"role": ..., "content": ...} dicts.
         json_mode: If True, request JSON output format.
+        temperature: Sampling temperature. Plan generation and other
+            structured-JSON calls run at 0.3, triage extraction at 0.2;
+            the 0.7 default keeps free-form chat lively.
+        seed: Sampling seed, passed to the provider when set.
 
     Returns:
         The assistant's response content as a string.
+
+    What lower temperature + a fixed seed buys: markedly less run-to-run
+    variance in workout selection, pace copying, and schema adherence — and a
+    malformed-JSON retry that is likelier to reproduce a good structure. What
+    it does NOT buy: identical plans across calls. The context text changes
+    daily (date, recovery numbers), and provider-side nondeterminism survives
+    seeding — Groq's OpenAI-compatible seed is explicitly best-effort, and
+    gpt-oss-120b is MoE on batched LPU inference, so same-seed drift persists.
+    "Plans still differ" is expected, not a bug.
     """
     if _use_groq():
-        return _groq_chat(messages, json_mode)
+        return _groq_chat(messages, json_mode, temperature, seed)
     else:
-        return _ollama_chat(messages, json_mode)
+        return _ollama_chat(messages, json_mode, temperature, seed)
 
-def _groq_chat(messages: list[dict], json_mode: bool) -> str:
-    """Call Groq via OpenAI-compatible SDK."""
-    client = _get_groq_client()
+def _build_groq_kwargs(model: str, messages: list[dict], json_mode: bool,
+                       temperature: float, seed: int | None) -> dict:
+    """Build the OpenAI-compatible request kwargs for a Groq chat call.
+
+    Pure — tests verify the request shape here without a network call.
+    """
     kwargs = {
-        "model": GROQ_MODEL,
+        "model": model,
         "messages": messages,
-        "temperature": 0.7,
+        "temperature": temperature,
     }
+    if seed is not None:
+        kwargs["seed"] = seed
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
+    return kwargs
+
+def _groq_chat(messages: list[dict], json_mode: bool,
+               temperature: float, seed: int | None) -> str:
+    """Call Groq via OpenAI-compatible SDK."""
+    client = _get_groq_client()
+    kwargs = _build_groq_kwargs(GROQ_MODEL, messages, json_mode, temperature, seed)
 
     response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content
 
-def _ollama_chat(messages: list[dict], json_mode: bool) -> str:
+def _build_ollama_options(temperature: float, seed: int | None) -> dict:
+    """Shared options dict for Ollama chat and stream calls."""
+    options = {"temperature": temperature}
+    if seed is not None:
+        options["seed"] = seed
+    return options
+
+def _ollama_chat(messages: list[dict], json_mode: bool,
+                 temperature: float, seed: int | None) -> str:
     """Call local Ollama (for development/testing only)."""
     import ollama
     kwargs = {
         "model": OLLAMA_MODEL,
         "messages": messages,
+        "options": _build_ollama_options(temperature, seed),
     }
     if json_mode:
         kwargs["format"] = "json"
@@ -75,36 +110,35 @@ def _ollama_chat(messages: list[dict], json_mode: bool) -> str:
         content = content.split("</think>")[-1].strip()
     return content
 
-async def chat_completion_stream(messages: list[dict]):
+async def chat_completion_stream(messages: list[dict],
+                                 temperature: float = 0.7,
+                                 seed: int | None = None):
     """
     Async generator that yields tokens for streaming responses.
-    Used by the /chat SSE endpoint.
+    Used by the /chat SSE endpoint. Chat stays at 0.7 on purpose —
+    conversation should remain lively; no caller lowers it.
     """
     if _use_groq():
-        async for token in _groq_stream(messages):
+        async for token in _groq_stream(messages, temperature, seed):
             yield token
     else:
-        async for token in _ollama_stream(messages):
+        async for token in _ollama_stream(messages, temperature, seed):
             yield token
 
-async def _groq_stream(messages: list[dict]):
+async def _groq_stream(messages: list[dict], temperature: float, seed: int | None):
     """Stream tokens from Groq."""
     from openai import AsyncOpenAI
     client = AsyncOpenAI(
         api_key=GROQ_API_KEY,
         base_url="https://api.groq.com/openai/v1",
     )
-    stream = await client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=messages,
-        stream=True,
-        temperature=0.7,
-    )
+    kwargs = _build_groq_kwargs(GROQ_MODEL, messages, False, temperature, seed)
+    stream = await client.chat.completions.create(stream=True, **kwargs)
     async for chunk in stream:
         if chunk.choices and chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-async def _ollama_stream(messages: list[dict]):
+async def _ollama_stream(messages: list[dict], temperature: float, seed: int | None):
     """Stream tokens from local Ollama (dev mode)."""
     import ollama
     client = ollama.AsyncClient()
@@ -115,6 +149,7 @@ async def _ollama_stream(messages: list[dict]):
         model=OLLAMA_MODEL,
         messages=messages,
         stream=True,
+        options=_build_ollama_options(temperature, seed),
     ):
         token = chunk["message"]["content"]
         if not token:

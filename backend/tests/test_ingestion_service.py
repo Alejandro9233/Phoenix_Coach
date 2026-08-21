@@ -2,8 +2,9 @@ import pytest
 import json
 import os
 import tempfile
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from backend.models.database import Base, Athlete
 from backend.services.ingestion_service import IngestionService
 
@@ -80,3 +81,123 @@ def test_ingest_coros_zones_and_profile(temp_db_url, mock_coros_json):
         engine.dispose()
     finally:
         os.unlink(temp_json_path)
+
+
+# ─── helpers ──────────────────────────────────────────────────────────────────
+
+def _read_athlete(db_url):
+    """Load the athlete from a file-backed test DB in a throwaway session."""
+    engine = create_engine(db_url)
+    session = sessionmaker(bind=engine)()
+    try:
+        return session.query(Athlete).first()
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.fixture
+def client(temp_db_url):
+    """TestClient wired to the same file-backed DB the IngestionService uses.
+
+    In-memory SQLite behind a get_db override, so safe on a machine holding
+    production credentials (see CLAUDE.md) — here file-backed, but still a
+    throwaway sqlite the override pins every request to.
+    """
+    from fastapi.testclient import TestClient
+    from backend.main import app, get_db
+
+    engine = create_engine(temp_db_url)
+    Session = sessionmaker(bind=engine)
+
+    def override():
+        session = Session()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+    engine.dispose()
+
+
+# ─── weight: the watch owns it, always ───────────────────────────────────────
+# Alex maintains weight in COROS and wants the scrape to propagate it — a
+# Profile edit is a temporary value until the next scrape, by choice
+# (2026-08-21). Do not add an app-wins guard here.
+
+def test_ingest_always_updates_weight(temp_db_url, mock_coros_json):
+    IngestionService(db_url=temp_db_url).ingest_coros_data(mock_coros_json)
+
+    assert _read_athlete(temp_db_url).weight_kg == 76.0
+
+
+def test_scrape_overwrites_app_entered_weight_by_design(client, temp_db_url, mock_coros_json):
+    response = client.put("/athlete/profile", json={"weight_kg": 71})
+    assert response.status_code == 200
+    assert _read_athlete(temp_db_url).weight_kg == 71
+
+    IngestionService(db_url=temp_db_url).ingest_coros_data(mock_coros_json)
+
+    assert _read_athlete(temp_db_url).weight_kg == 76.0
+
+    IngestionService(db_url=temp_db_url).ingest_coros_data(mock_coros_json)
+
+    assert _read_athlete(temp_db_url).weight_kg == 76.0
+
+
+# ─── lthr: COROS threshold HR stops masquerading as hr_max (C4) ──────────────
+
+def test_ingest_lthr_lands_in_lthr_not_hr_max(temp_db_url):
+    payload = {
+        "activities": [],
+        "evolab": {
+            "analyse_query": {
+                "dayList": [{"happenDay": 20260818, "lthr": 165}],
+            },
+        },
+    }
+
+    IngestionService(db_url=temp_db_url).ingest_coros_data(payload)
+
+    athlete = _read_athlete(temp_db_url)
+    assert athlete.lthr == 165
+    assert athlete.hr_max is None
+
+
+def test_lthr_migration_backfills_once():
+    """The backfill moves hr_max→lthr exactly once; a second boot must not
+    re-null a future genuine hr_max (the trap: UPDATEs outside the guard)."""
+    from backend.main import _migrate_athletes
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    with engine.begin() as conn:
+        # Pre-migration shape: hr_max holds COROS LTHR, no lthr column yet
+        conn.execute(text(
+            "CREATE TABLE athletes (id INTEGER PRIMARY KEY, name VARCHAR, hr_max INTEGER)"
+        ))
+        conn.execute(text("INSERT INTO athletes (name, hr_max) VALUES ('Alex', 178)"))
+
+    _migrate_athletes(engine)
+
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT lthr, hr_max FROM athletes")).one()
+    assert row.lthr == 178
+    assert row.hr_max is None
+
+    # Simulate a genuine max HR arriving later, then a second boot
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE athletes SET hr_max = 190"))
+    _migrate_athletes(engine)
+
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT lthr, hr_max FROM athletes")).one()
+    assert row.lthr == 178
+    assert row.hr_max == 190
+    engine.dispose()

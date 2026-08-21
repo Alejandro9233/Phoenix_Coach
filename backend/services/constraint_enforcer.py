@@ -228,7 +228,7 @@ def get_travel_day_names(db, athlete_id: int, week_start) -> list:
     )
 
 
-def get_active_injuries(db, athlete_id: int) -> list:
+def get_active_injuries(db, athlete_id: int, commit: bool = True) -> list:
     """
     Injuries currently blocking training, auto-resolving anything past its date.
 
@@ -240,6 +240,11 @@ def get_active_injuries(db, athlete_id: int) -> list:
     `expected_recovery_date` is NULL for injuries logged before this existed and
     for anything entered by hand; those keep the old behaviour of lasting until
     explicitly resolved.
+
+    `commit=False` performs the same Active→Recovering transitions but only
+    flushes them, leaving the commit to the caller's transaction — required
+    when the caller holds uncommitted work it may still roll back (see
+    data_agent.summarize).
     """
     from backend.models.database import InjuryLog
     from backend.utils.timezone import get_local_today
@@ -264,7 +269,15 @@ def get_active_injuries(db, athlete_id: int) -> list:
         # the plan can resume, not evidence the body part is fine. The athlete
         # closes it out in Profile, or by telling the coach it's fine in chat
         # (recovery triage matches Recovering rows too — get_open_injuries).
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            # Sessions here run autoflush=False, so later queries in the same
+            # request (data_agent's "Recovering" list) would miss the flips
+            # without this. A flush stays inside the caller's transaction and
+            # rolls back with it — unlike a commit, it cannot persist
+            # regenerate's pending plan delete.
+            db.flush()
         for inj in expired:
             print(f"🩹 Injury #{inj.id} ({inj.body_part}) passed its recovery date → Recovering")
 

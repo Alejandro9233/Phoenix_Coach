@@ -36,6 +36,15 @@ from backend.services.constraint_enforcer import (
 from backend.services.plan_normalizer import VALID_DAYS, map_sport, normalize_plan
 from backend.utils.timezone import get_local_today
 
+# Extraction is pure classification — the least creativity of any LLM call in
+# the app, so it runs the coldest (plans run at 0.3, chat at 0.7).
+TRIAGE_TEMPERATURE = 0.2
+
+# The athlete trains in Hermosillo and code-switches, so every extractor must
+# accept Spanish. One policy sentence, appended to each extraction system
+# prompt; the Spanish EXAMPLES stay per-prompt because they are prompt-specific.
+LANGUAGE_NOTE = "The athlete may write in Spanish — treat it the same:"
+
 # Cheap pre-filter. Runs on EVERY chat message, so it must stay pure Python —
 # paying for an extraction call on "how did my week go?" is waste. False
 # positives are harmless (the extractor rejects them); false negatives just mean
@@ -76,6 +85,10 @@ Respond ONLY with JSON:
 
 If is_issue is false, return {"is_issue": false} and nothing else.
 
+""" + LANGUAGE_NOTE + """ "me duele la pantorrilla
+derecha, no puedo correr" is an issue (body_part "Right calf", affected_sports
+["run"]).
+
 Guidance on severity: 1-3 mild niggle, train around it; 4-6 real soreness that
 rules out loading the area; 7-10 sharp pain, stop and consider a professional.
 Only list a sport in affected_sports if that sport would actually load the area.
@@ -106,6 +119,7 @@ def extract_issue(message: str) -> Optional[dict]:
                 {"role": "user", "content": message},
             ],
             json_mode=True,
+            temperature=TRIAGE_TEMPERATURE,
         )
         data = json.loads(raw)
     except Exception as e:
@@ -565,6 +579,9 @@ def extract_recovery(message: str, active_injuries: list):
         "NOT recovery: still hurts, only partially better (\"a bit better but "
         "still sore\" keeps the restriction), questions (\"when can I run "
         "again?\"), new problems, or talk unrelated to these injuries.\n\n"
+        f"{LANGUAGE_NOTE} \"ya no me "
+        "duele el tobillo\" reports an ankle injury from the list as "
+        "resolved.\n\n"
         "Respond ONLY with JSON:\n"
         '{"is_recovery": true, "injury_id": <id from the list>}\n'
         'or {"is_recovery": false}'
@@ -577,6 +594,7 @@ def extract_recovery(message: str, active_injuries: list):
                 {"role": "user", "content": message},
             ],
             json_mode=True,
+            temperature=TRIAGE_TEMPERATURE,
         )
         data = json.loads(raw)
     except Exception as e:
@@ -857,6 +875,8 @@ def extract_travel(message: str) -> Optional[list]:
         "\"next month\"), past trips, questions or hypotheticals (\"what if I "
         "travel?\"), or being busy but still able to train. If they name days "
         "outside the list above, exclude them.\n\n"
+        f"{LANGUAGE_NOTE} \"viajo el "
+        "viernes y el sábado\" means they are away Friday and Saturday.\n\n"
         "Respond ONLY with JSON:\n"
         '{"is_travel": true, "days": ["Friday", "Saturday"]}\n'
         'or {"is_travel": false}'
@@ -869,6 +889,7 @@ def extract_travel(message: str) -> Optional[list]:
                 {"role": "user", "content": message},
             ],
             json_mode=True,
+            temperature=TRIAGE_TEMPERATURE,
         )
         data = json.loads(raw)
     except Exception as e:

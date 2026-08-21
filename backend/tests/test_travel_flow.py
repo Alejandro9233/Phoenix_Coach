@@ -106,6 +106,8 @@ def test_travel_pattern_gate():
     assert looks_like_travel("flying out thursday night")
     assert looks_like_travel("tengo un viaje el fin de semana")
     assert looks_like_travel("estaré fuera de la ciudad el viernes")
+    assert looks_like_travel("viajo el jueves por trabajo")
+    assert looks_like_travel("tengo vuelo el sábado temprano")
     assert not looks_like_travel("how did my week go?")
     assert not looks_like_travel("my calf hurts")
     assert not looks_like_travel("")

@@ -36,11 +36,15 @@ is a hint — the enforcer is what actually holds. Do not trust the prompt alone
 docstring used to claim enforcement lived here and it did not, which shipped strength
 sessions onto non-strength days for months.
 """
+import copy
 from datetime import date, datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyPlan
+from backend.services.constraint_enforcer import (
+    SPORT_TO_AVAILABILITY_KEY, get_travel_day_names, parse_day_list,
+)
 from backend.utils.timezone import get_local_today
 
 
@@ -510,7 +514,7 @@ DISTANCE_PROFILES = {
                 "name": "Phase 1: Foundation",
                 "weeks_range": (23, 999),
                 "total_weeks": 8,
-                "priorities": "Build consistency, fix swim technique, establish aerobic base",
+                "priorities": "Build consistency, establish the aerobic base, grow run volume gradually (10% rule)",
                 "hours_range": "7-8",
                 "intensity_split": "90/10",
                 "max_quality_sessions": 1,
@@ -1130,9 +1134,11 @@ class PeriodizationEngine:
         # Build/Recovery cycle
         cycle_info = self._get_cycle_week(athlete.training_start_date, today)
 
-        # Workout menu — from distance-specific profile
+        # Workout menu — from distance-specific profile, minus sports the
+        # athlete has disabled (empty availability string = never)
         menus = profile["workout_menus"]
         menu_info = menus.get(phase_info["phase"], menus.get("foundation", _FOUNDATION_MENU))
+        menu_allowed = self._filter_by_availability(menu_info["allowed"], athlete)
 
         # Volume references
         volume_refs = self._get_volume_references(
@@ -1157,7 +1163,6 @@ class PeriodizationEngine:
         # Travel days for the week being planned (context is always computed
         # for the current week). Carried inside availability so every
         # context-fed enforce_constraints call inherits the block unchanged.
-        from backend.services.constraint_enforcer import get_travel_day_names
         start_of_week = today - timedelta(days=today.weekday())
         travel_day_names = get_travel_day_names(db, athlete.id, start_of_week)
         if travel_day_names:
@@ -1185,7 +1190,7 @@ class PeriodizationEngine:
             "recovery_note": cycle_info["recovery_note"],
 
             # Workout toolbox
-            "workout_menu": menu_info["allowed"],
+            "workout_menu": menu_allowed,
             "forbidden_workouts": menu_info["forbidden"],
             "forbidden_reason": menu_info["reason"],
 
@@ -1205,7 +1210,8 @@ class PeriodizationEngine:
             "athlete": {
                 "name": athlete.name,
                 "weekly_hours_target": athlete.weekly_hours_target,
-                "hr_max": athlete.hr_max,
+                "hr_max": athlete.hr_max,  # honestly null until a real max-HR source exists
+                "lthr": athlete.lthr,
                 "hr_rest": athlete.hr_rest,
                 "vo2_max": athlete.vo2_max,
                 "hrv_baseline": athlete.hrv_baseline,
@@ -1461,6 +1467,47 @@ class PeriodizationEngine:
             "recovery_note": note,
         }
 
+    def _filter_by_availability(self, mapping: dict, athlete: Athlete) -> dict:
+        """
+        Filter a copy of a phase's per-sport mapping (sport_sessions or a
+        workout menu's "allowed" dict) by the athlete's sport availability.
+
+        WHY: the phase tables in DISTANCE_PROFILES were written for the generic
+        athlete. Without this, one prompt says "Swimming: 2x/week" (from
+        sport_sessions) and "Swimming: NEVER" (from availability) — the enforcer
+        strips the swims afterward, but the LLM wastes slots planning them. An
+        empty availability string means "never" (sport removed); fewer available
+        days than advertised sessions caps the session count; None means "no
+        constraint recorded" and is left alone — the same semantics as
+        constraint_enforcer.parse_day_list.
+
+        The input is deep-copied before editing: DISTANCE_PROFILES is
+        module-level shared state, and mutating it would poison every later
+        request in the process.
+        """
+        filtered = copy.deepcopy(mapping)
+
+        for sport in list(filtered.keys()):
+            availability_key = SPORT_TO_AVAILABILITY_KEY.get(sport)
+            if availability_key is None:
+                continue  # no availability column for this sport
+            allowed = parse_day_list(getattr(athlete, availability_key, None))
+            if allowed is None:
+                continue  # no constraint recorded
+            if not allowed:
+                del filtered[sport]  # explicitly disabled
+                continue
+            info = filtered[sport]
+            if (isinstance(info, dict) and isinstance(info.get("sessions"), int)
+                    and info["sessions"] > len(allowed)):
+                info["sessions"] = len(allowed)
+                info["volume_note"] = (
+                    f"{info.get('volume_note', '')} "
+                    f"(capped — only {len(allowed)} day(s) available)"
+                ).strip()
+
+        return filtered
+
     def _get_volume_references(
         self, phase_info: dict, is_recovery_week: bool,
         athlete: Athlete, db: Session,
@@ -1494,14 +1541,18 @@ class PeriodizationEngine:
                 "max": round(latest_snapshot.recommend_tl_max),
             }
 
-        # Volume references
+        # Volume references — sport_sessions filtered to what the athlete's
+        # availability actually permits (a filtered copy, never the profile dict)
+        sport_sessions = self._filter_by_availability(
+            phase_def["sport_sessions"], athlete
+        )
         refs = {
             "weekly_hours_target": athlete.weekly_hours_target,
             "phase_hours_range": phase_def["hours_range"],
             "coros_tl_range": coros_tl_range,
             "intensity_split": phase_def["intensity_split"],
             "max_quality_sessions": phase_def["max_quality_sessions"],
-            "sport_sessions": phase_def["sport_sessions"],
+            "sport_sessions": sport_sessions,
         }
 
         # Recovery week adjustment
@@ -1623,31 +1674,9 @@ class PeriodizationEngine:
             Activity.start_time <= datetime.combine(last_sunday, datetime.max.time()),
         ).all()
 
-        if not activities:
-            return {
-                "sessions_completed": 0,
-                "hours_done": 0,
-                "total_load": 0,
-                "missed": [],
-                "compliance_pct": 0,
-                "sport_breakdown": {},
-                "note": "No activities recorded last week.",
-            }
-
-        total_duration = sum((a.duration_sec or 0) for a in activities) / 3600
-        total_load = sum((a.training_load or 0) for a in activities)
-
-        # Sport breakdown
-        sport_breakdown = {}
-        for a in activities:
-            sport = a.sport or "other"
-            sport_breakdown[sport] = sport_breakdown.get(sport, 0) + 1
-
-        # Find longest run
-        runs = [a for a in activities if a.sport == "running"]
-        long_run_km = max((a.distance_m or 0) / 1000 for a in runs) if runs else 0
-
-        # Check compliance from last week's plan
+        # Plan lookup happens before the no-activities return: a week where a
+        # plan existed but zero activities synced is real non-compliance (0%),
+        # not "no plan on record".
         last_plan = db.query(WeeklyPlan).filter(
             WeeklyPlan.week_start == last_monday
         ).first()
@@ -1679,20 +1708,44 @@ class PeriodizationEngine:
                         planned_sport = workouts[0].get("sport", "workout") if workouts else "workout"
                         missed.append(f"{day_name} {planned_sport}")
 
-        compliance_pct = 0
-        if sessions_planned > 0:
-            compliance_pct = round((len(activities) / sessions_planned) * 100)
+        total_duration = sum((a.duration_sec or 0) for a in activities) / 3600
+        total_load = sum((a.training_load or 0) for a in activities)
 
-        return {
+        # Sport breakdown
+        sport_breakdown = {}
+        for a in activities:
+            sport = a.sport or "other"
+            sport_breakdown[sport] = sport_breakdown.get(sport, 0) + 1
+
+        # Find longest run
+        runs = [a for a in activities if a.sport == "running"]
+        long_run_km = max((a.distance_m or 0) / 1000 for a in runs) if runs else 0
+
+        # None, not 0: "no plan to compare against" must never read as
+        # "athlete missed everything" (false detraining signal in prompts).
+        # A planned week with zero activities does read as 0 — that one is real.
+        compliance_pct = None
+        if sessions_planned > 0:
+            compliance_pct = min(100, round((len(activities) / sessions_planned) * 100))
+
+        summary = {
             "sessions_completed": len(activities),
             "sessions_planned": sessions_planned,
             "hours_done": round(total_duration, 1),
             "total_load": round(total_load),
             "long_run_km": round(long_run_km, 1),
             "missed": missed,
-            "compliance_pct": min(100, compliance_pct),
+            "compliance_pct": compliance_pct,
             "sport_breakdown": sport_breakdown,
         }
+        if sessions_planned == 0:
+            summary["note"] = (
+                "No plan on record last week — compliance not measurable, "
+                "do not treat as missed training."
+            )
+        elif not activities:
+            summary["note"] = "No activities recorded last week."
+        return summary
 
     def _empty_context(self, reason: str) -> dict:
         """Return a minimal context when data is unavailable."""

@@ -5,6 +5,7 @@ Pure Python, no LLM needed. Produces a compact text summary for the Response Age
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from backend.models.database import Athlete, Activity, RecoverySnapshot, InjuryLog, AthleteFeedback
+from backend.services.constraint_enforcer import get_active_injuries
 from backend.utils.timezone import get_local_today
 
 
@@ -39,11 +40,12 @@ class DataAgent:
         lines.append(f"ATHLETE STATE ({today.strftime('%B %d, %Y')}):")
         lines.append(f"Name: {athlete.name}")
         
-        # Active Injuries
-        active_injuries = self.db.query(InjuryLog).filter(
-            InjuryLog.athlete_id == athlete.id,
-            InjuryLog.status == "Active"
-        ).all()
+        # Active Injuries — through the enforcer's query so expiry is handled
+        # once: an injury past expected_recovery_date must not reach the prompt
+        # as ACTIVE. commit=False: a mid-request commit here would persist
+        # regenerate's deliberately-uncommitted plan delete and defeat its
+        # delete-then-rollback design; the flips ride the caller's transaction.
+        active_injuries = get_active_injuries(self.db, athlete.id, commit=False)
         if active_injuries:
             lines.append("")
             lines.append("ACTIVE INJURIES (CRITICAL):")
@@ -54,13 +56,23 @@ class DataAgent:
                 if inj.notes:
                     lines.append(f"    Notes: {inj.notes}")
 
-        
+        # Recently expired injuries: ease back in, don't restrict.
+        recovering = self.db.query(InjuryLog).filter(
+            InjuryLog.athlete_id == athlete.id,
+            InjuryLog.status == "Recovering"
+        ).all()
+        if recovering:
+            lines.append("")
+            lines.append("RECOVERING (recently cleared — ease back in, not a restriction):")
+            for inj in recovering:
+                lines.append(f"  - {inj.body_part} (reported {inj.date_reported})")
+
         # Profile thresholds
         profile_parts = []
         if athlete.weight_kg: profile_parts.append(f"Weight: {athlete.weight_kg}kg")
         if athlete.vo2_max: profile_parts.append(f"VO2max: {athlete.vo2_max}")
         if athlete.hr_rest: profile_parts.append(f"RHR: {athlete.hr_rest} bpm")
-        if athlete.hr_max: profile_parts.append(f"LTHR: {athlete.hr_max} bpm")
+        if athlete.lthr: profile_parts.append(f"LTHR: {athlete.lthr} bpm")
         if athlete.threshold_pace_min_km: 
             pace = athlete.threshold_pace_min_km
             mins = int(pace)
