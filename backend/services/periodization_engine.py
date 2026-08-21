@@ -1674,6 +1674,15 @@ class PeriodizationEngine:
             Activity.start_time <= datetime.combine(last_sunday, datetime.max.time()),
         ).all()
 
+        # Completeness guard: the scraper's list page only reaches back ~7
+        # activities, so a fresh or recently-wiped DB under-reports last week
+        # and reads as false detraining. If the DB's earliest activity is
+        # later than last Monday, the window can't be trusted. (start_time is
+        # UTC vs local last_monday — a boundary activity can misclassify by a
+        # day, irrelevant at this granularity.)
+        earliest = db.query(func.min(Activity.start_time)).scalar()
+        history_complete = earliest is not None and earliest.date() <= last_monday
+
         # Plan lookup happens before the no-activities return: a week where a
         # plan existed but zero activities synced is real non-compliance (0%),
         # not "no plan on record".
@@ -1737,6 +1746,7 @@ class PeriodizationEngine:
             "missed": missed,
             "compliance_pct": compliance_pct,
             "sport_breakdown": sport_breakdown,
+            "data_complete": history_complete,
         }
         if sessions_planned == 0:
             summary["note"] = (
@@ -1745,6 +1755,16 @@ class PeriodizationEngine:
             )
         elif not activities:
             summary["note"] = "No activities recorded last week."
+        if not history_complete:
+            start_txt = earliest.date().isoformat() if earliest else "empty"
+            incomplete_note = (
+                f"Activity history may be incomplete (local DB starts {start_txt}) — "
+                "treat low totals as missing data, not zero training."
+            )
+            summary["note"] = (
+                f"{summary['note']} {incomplete_note}" if summary.get("note")
+                else incomplete_note
+            )
         return summary
 
     def _empty_context(self, reason: str) -> dict:

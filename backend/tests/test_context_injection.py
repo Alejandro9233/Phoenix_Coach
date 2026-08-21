@@ -232,9 +232,16 @@ def test_no_activities_and_no_plan_is_not_measurable(temp_db_session):
 
 def test_fully_skipped_week_reads_as_zero_compliance(temp_db_session):
     """A plan existed but zero activities synced — that is real non-compliance
-    (0%), never "no plan on record"."""
+    (0%), never "no plan on record". Older history exists, so the empty week
+    is trusted (data_complete) and carries no incompleteness caveat."""
     athlete = _marathon_athlete()
     temp_db_session.add(athlete)
+    # History predating last week: proves the empty window is real, not a
+    # shallow scrape — without this row the same week reads as missing data.
+    temp_db_session.add(Activity(
+        id="old-act", athlete_id=1, sport="running",
+        start_time=datetime.combine(_last_monday() - timedelta(days=7), time(8, 0)),
+        duration_sec=3600, training_load=50, distance_m=10000))
     workout = {"sport": "running", "title": "Easy Run", "steps": [],
                "total_time": "1h", "hr_target": "Z2"}
     plan_json = {"days": {
@@ -253,6 +260,7 @@ def test_fully_skipped_week_reads_as_zero_compliance(temp_db_session):
     assert lw["sessions_planned"] == 3
     assert lw["compliance_pct"] == 0
     assert lw["missed"] == ["Monday running", "Wednesday running", "Friday running"]
+    assert lw["data_complete"] is True
     assert lw["note"] == "No activities recorded last week."
     # The false detraining disclaimer must not reach the prompt for this week.
     assert "Compliance: n/a" not in _format_training_context(ctx)
@@ -351,3 +359,73 @@ def test_partial_reason_is_caller_supplied(temp_db_session, monkeypatch):
 def test_disabled_sport_keeps_never_wording_in_block():
     block = build_constraint_block({"availability": {"swim_days": ""}})
     assert "Swimming: NEVER — the athlete has disabled this sport" in block
+
+
+# ─── D6: last-week completeness guard ─────────────────────────────────────────
+#
+# The scraper's list page reaches back ~7 activities, so a fresh or wiped DB
+# under-reports last week and reads as false detraining. data_complete flags
+# the states a backfill can't promise, and the caveat must reach the prompt.
+
+
+def test_empty_db_flags_incomplete_history(temp_db_session):
+    temp_db_session.add(_marathon_athlete())
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+    lw = ctx["last_week"]
+
+    assert lw["sessions_completed"] == 0
+    assert lw["data_complete"] is False
+    assert "missing data" in lw["note"]
+    # The warning reaches the prompt even with zero sessions to report.
+    assert "missing data" in _format_training_context(ctx)
+
+
+def test_history_starting_this_week_is_incomplete(temp_db_session):
+    """Activities exist, but none predate last Monday — the empty last-week
+    window still can't be trusted."""
+    temp_db_session.add(_marathon_athlete())
+    today = get_local_today()
+    temp_db_session.add(Activity(
+        id="fresh-act", athlete_id=1, sport="running",
+        start_time=datetime.combine(today, time(8, 0)),
+        duration_sec=3600, training_load=50, distance_m=10000))
+    temp_db_session.commit()
+
+    lw = PeriodizationEngine().compute_context(temp_db_session)["last_week"]
+
+    assert lw["data_complete"] is False
+    assert "missing data" in lw["note"]
+    # The note names where the DB actually starts.
+    assert str(today.isoformat()) in lw["note"]
+
+
+def test_deep_history_has_no_caveat(temp_db_session):
+    temp_db_session.add(_marathon_athlete())
+    for n, offset in ((1, 0), (2, 2)):
+        temp_db_session.add(_last_week_activity(n, day_offset=offset))
+    temp_db_session.add(Activity(
+        id="deep-act", athlete_id=1, sport="running",
+        start_time=datetime.combine(_last_monday() - timedelta(days=10), time(8, 0)),
+        duration_sec=3600, training_load=50, distance_m=10000))
+    temp_db_session.commit()
+
+    lw = PeriodizationEngine().compute_context(temp_db_session)["last_week"]
+
+    assert lw["data_complete"] is True
+    assert "missing data" not in (lw.get("note") or "")
+
+
+def test_recovery_score_surfaces_in_fitness_markers(temp_db_session):
+    """The COROS Recovery line is the sole advisory surface for recoveryPct —
+    and pins that the signal reaches the prompt as prose, not the gate."""
+    from backend.models.database import RecoverySnapshot
+
+    temp_db_session.add(_marathon_athlete())
+    temp_db_session.add(RecoverySnapshot(
+        athlete_id=1, date=get_local_today(), recovery_score=78.0))
+    temp_db_session.commit()
+
+    summary = DataAgent(temp_db_session).summarize()
+    assert "COROS Recovery: 78%" in summary

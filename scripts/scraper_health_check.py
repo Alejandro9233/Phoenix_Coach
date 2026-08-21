@@ -94,5 +94,47 @@ async def health_check():
         finally:
             await browser.close()
 
+async def backfill_check(backfill_days):
+    """Run the real scraper with pagination against the live site — the only
+    way to validate COROS's actual list-request shape before trusting the
+    backfill in the daily cron. Prints what a scrape would ingest; writes
+    nothing to any database."""
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from backend.services.coros_scraper import CorosScraper
+
+    data = await CorosScraper().scrape_all(backfill_days=backfill_days)
+    acts = [a for a in (data.get("activities") or []) if isinstance(a, dict)]
+    days = sorted(a["happenDay"] for a in acts if a.get("happenDay"))
+    print("\n=== Backfill check ===")
+    print(f"Activities captured: {len(acts)}")
+    list_request = data.get("_list_request")
+    if list_request:
+        # URL + body identify the endpoint and its pagination style; headers
+        # stay out of the log (they carry the session token).
+        print(f"List request: {list_request.get('method')} {list_request.get('url')}")
+        print(f"List request body: {str(list_request.get('post_data'))[:300]}")
+    if days:
+        print(f"Date span: {days[0]} → {days[-1]}")
+    if data.get("backfill_pages"):
+        print(f"Extra pages fetched: {data['backfill_pages']}")
+    if data.get("backfill_skipped"):
+        print(f"⚠️ Backfill skipped: {data['backfill_skipped']}")
+    if not data.get("backfill_pages") and not data.get("backfill_skipped"):
+        print("No backfill ran (first page already reached the cutoff, "
+              "or no list request was captured).")
+
+
 if __name__ == "__main__":
-    asyncio.run(health_check())
+    import argparse
+    parser = argparse.ArgumentParser(description="COROS scraper health check")
+    parser.add_argument(
+        "--backfill-days", type=int, default=0,
+        help="also validate history pagination: run the full scraper and page "
+             "back this many days (e.g. 90). 0 = plain login/metrics check.")
+    args = parser.parse_args()
+    if args.backfill_days > 0:
+        asyncio.run(backfill_check(args.backfill_days))
+    else:
+        asyncio.run(health_check())

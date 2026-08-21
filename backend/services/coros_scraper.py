@@ -1,5 +1,6 @@
 import os
 import asyncio
+import json
 from datetime import datetime, timedelta
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 from dotenv import load_dotenv
@@ -10,7 +11,7 @@ load_dotenv()
 SPORT_CODE_MAP = {
     100: "running",
     101: "running",       # Treadmill
-    102: "running",       # Trail running  
+    102: "running",       # Trail running
     104: "running",       # Ultra/trail
     200: "cycling",       # Indoor cycling
     201: "cycling",       # Outdoor cycling
@@ -19,6 +20,123 @@ SPORT_CODE_MAP = {
     402: "strength",      # Strength training
     10000: "triathlon",
 }
+
+# Page-number parameter names COROS might use in the list request. Cursor-based
+# pagination matches none of these — the backfill then skips instead of guessing.
+PAGE_PARAM_KEYS = ("pageNumber", "pageNo", "page")
+
+
+def _extract_activity_list(json_data):
+    """Pull the activity rows out of a captured list payload, or None."""
+    if isinstance(json_data, dict):
+        if isinstance(json_data.get("list"), list):
+            return json_data["list"]
+        if isinstance(json_data.get("sportDataList"), list):
+            return json_data["sportDataList"]
+    return None
+
+
+def _merge_activities(captured_data, activity_list):
+    """Merge rows by labelId — pages accumulate instead of overwriting.
+
+    The sniffer used to be last-one-wins, which was fine for a single page;
+    with backfill, page 3 must not erase page 2. Ingestion dedupes by labelId
+    anyway, so a re-seen row is harmless.
+    """
+    by_id = captured_data.setdefault("_activities_by_id", {})
+    for item in activity_list:
+        if not isinstance(item, dict):
+            continue
+        key = str(item["labelId"]) if item.get("labelId") else f"anon-{id(item)}"
+        by_id[key] = item
+    captured_data["activities"] = list(by_id.values())
+
+
+def _find_page_param(list_request):
+    """Locate the page-number parameter in a captured list request.
+
+    Returns ("url"|"body", key), or (None, None) when no recognizable page
+    param exists — the caller must skip, never guess.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    query = parse_qs(urlparse(list_request.get("url") or "").query)
+    for key in PAGE_PARAM_KEYS:
+        if key in query:
+            return "url", key
+    post_data = list_request.get("post_data")
+    if post_data:
+        try:
+            body = json.loads(post_data)
+        except (ValueError, TypeError):
+            return None, None
+        if isinstance(body, dict):
+            for key in PAGE_PARAM_KEYS:
+                if key in body:
+                    return "body", key
+    return None, None
+
+
+def _build_page_request(list_request, where, key, page_number):
+    """Return (url, post_data) requesting `page_number` of the activity list."""
+    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+    url = list_request["url"]
+    post_data = list_request.get("post_data")
+    if where == "url":
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        query[key] = [str(page_number)]
+        url = urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+    else:
+        body = json.loads(post_data)
+        body[key] = page_number
+        post_data = json.dumps(body)
+    return url, post_data
+
+
+def _oldest_happen_day(items):
+    """Smallest happenDay (int YYYYMMDD) on a page, or None."""
+    days = [i.get("happenDay") for i in items
+            if isinstance(i, dict) and isinstance(i.get("happenDay"), int)]
+    return min(days) if days else None
+
+
+def _find_access_token(captured_data):
+    """The session's API token, sniffed from any captured account payload
+    (account/query and friends carry accessToken next to weight/zones)."""
+    for payload in (captured_data.get("evolab") or {}).values():
+        if isinstance(payload, dict) and payload.get("accessToken"):
+            return payload["accessToken"]
+    return None
+
+
+def _normalize_backfill_row(row):
+    """Map an activity/query row onto the widget-row schema ingestion reads.
+
+    The sniffed "activity list" is really dashboard/detail/query's recent
+    widget; the paged activity/query endpoint names the same facts
+    differently (date vs happenDay, startTime vs timestamp, avgHr vs
+    avgHeartRate, workoutTime vs duration). Only fields ingestion actually
+    consumes are mapped; avgSpeed is deliberately dropped — its unit here is
+    not the widget's sec/km, and a guessed pace is worse than none.
+    """
+    return {
+        "labelId": row.get("labelId"),
+        "happenDay": row.get("date"),
+        "timestamp": row.get("startTime"),
+        "duration": row.get("workoutTime") or row.get("totalTime") or 0,
+        "distance": row.get("distance") or 0,
+        "sportType": row.get("sportType"),
+        "avgHeartRate": row.get("avgHr"),
+        "avgPower": row.get("avgPower"),
+        "totalElevation": row.get("ascent"),
+        "trainingLoad": row.get("trainingLoad"),
+        "step": row.get("step"),
+        "sets": row.get("sets"),
+        "pitch": row.get("pitch"),
+        "subMode": row.get("subMode"),
+    }
 
 
 class CorosScraper:
@@ -178,8 +296,111 @@ class CorosScraper:
         await page.wait_for_timeout(grace_ms)
         return True
 
-    async def scrape_all(self):
-        """Main entry point: login → EvoLab metrics → Activity list → return."""
+    # Backfill blast-radius bound: 15 pages ≈ 300 activities ≈ a year of training.
+    BACKFILL_PAGE_CAP = 15
+
+    async def _backfill_pages(self, page, captured_data, backfill_days):
+        """Fetch older activity-list pages by replaying the captured request.
+
+        Keeps the passive-capture rule: no clicking, no selectors — pages
+        2..N are direct fetches of the SAME request this live session just
+        made, with its own headers, page number incremented. Stops on: an
+        empty page, a page with nothing new, a page older than the cutoff,
+        or the page cap.
+
+        Every failure path degrades to "no backfill" (recorded under
+        backfill_skipped) — this must never fail the daily recovery-metrics
+        scrape it rides on.
+        """
+        from backend.utils.timezone import get_local_today
+
+        list_request = captured_data.get("_list_request") or {}
+        where, key = _find_page_param(list_request) if list_request else (None, None)
+        token = _find_access_token(captured_data) if where is None else None
+        if where is None and not token:
+            print("  Backfill: no pageable list request and no access token — skipping.")
+            captured_data["backfill_skipped"] = "no page param and no access token"
+            return
+
+        if where is not None:
+            # Replay the sniffed request for pages 2.. — page 1 is captured.
+            start_page = 2
+            # Verbatim except what the mutation invalidates: pseudo-headers
+            # and content-length belong to the original exchange.
+            replay_headers = {
+                k: v for k, v in (list_request.get("headers") or {}).items()
+                if not k.startswith(":") and k.lower() not in ("content-length", "host")
+            }
+
+            async def fetch_rows(n):
+                url, post_data = _build_page_request(list_request, where, key, n)
+                resp = await page.request.fetch(
+                    url,
+                    method=list_request.get("method") or "GET",
+                    headers=replay_headers,
+                    data=post_data,
+                )
+                payload = await resp.json()
+                rows = _extract_activity_list(
+                    payload.get("data", {}) if isinstance(payload, dict) else {})
+                return rows or [], None
+        else:
+            # The sniffed list is dashboard/detail/query's recent widget — it
+            # can't page (validated live 2026-08-21). Construct the real list
+            # endpoint with the session's own token instead, from page 1: the
+            # widget's ~7 rows are not the table's first page.
+            start_page = 1
+
+            async def fetch_rows(n):
+                url = ("https://teamapi.coros.com/activity/query"
+                       f"?size=20&pageNumber={n}&modeList=")
+                resp = await page.request.fetch(
+                    url, method="GET", headers={"accessToken": token})
+                payload = await resp.json()
+                d = payload.get("data") if isinstance(payload, dict) else None
+                raw = d.get("dataList") if isinstance(d, dict) else None
+                rows = [_normalize_backfill_row(r) for r in (raw or [])
+                        if isinstance(r, dict) and r.get("labelId") and r.get("startTime")]
+                total = d.get("totalPage") if isinstance(d, dict) else None
+                return rows, total
+
+        cutoff_day = int(
+            (get_local_today() - timedelta(days=backfill_days)).strftime("%Y%m%d"))
+        seen = set(captured_data.get("_activities_by_id") or {})
+        pages_fetched = 0
+        try:
+            for page_number in range(start_page, start_page + self.BACKFILL_PAGE_CAP):
+                items, total_page = await fetch_rows(page_number)
+                if not items:
+                    break
+                ids = {str(i["labelId"]) for i in items
+                       if isinstance(i, dict) and i.get("labelId")}
+                if ids and ids <= seen:
+                    break  # nothing new — history exhausted
+                _merge_activities(captured_data, items)
+                seen |= ids
+                pages_fetched += 1
+                oldest = _oldest_happen_day(items)
+                print(f"  Backfill: page {page_number} -> {len(items)} rows (oldest {oldest})")
+                if oldest is not None and oldest < cutoff_day:
+                    break
+                if isinstance(total_page, int) and page_number >= total_page:
+                    break
+        except Exception as e:
+            print(f"  Backfill stopped early (non-fatal): {e}")
+            captured_data["backfill_skipped"] = f"error: {e}"
+        if pages_fetched:
+            captured_data["backfill_pages"] = pages_fetched
+            print(f"  Backfill: merged {pages_fetched} extra page(s); "
+                  f"{len(captured_data['activities'])} activities total")
+
+    async def scrape_all(self, backfill_days: int = 0):
+        """Main entry point: login → EvoLab metrics → Activity list → return.
+
+        `backfill_days > 0` also pages back through the activity list until
+        history reaches that many days (or a stop condition in
+        _backfill_pages) — used to self-heal a shallow or wiped DB.
+        """
         captured_data = {
             "activities": [],
             "evolab": {}
@@ -202,15 +423,18 @@ class CorosScraper:
                         json_data = data.get("data", {})
                         
                         # Catch activity list (any endpoint that returns a list of activities)
-                        activity_list = None
-                        if isinstance(json_data, dict):
-                            if "list" in json_data and isinstance(json_data["list"], list):
-                                activity_list = json_data["list"]
-                            elif "sportDataList" in json_data and isinstance(json_data["sportDataList"], list):
-                                activity_list = json_data["sportDataList"]
-                        
+                        activity_list = _extract_activity_list(json_data)
+
                         if activity_list and len(activity_list) > 0:
-                            captured_data["activities"] = activity_list
+                            _merge_activities(captured_data, activity_list)
+                            # Remember the request so _backfill_pages can replay
+                            # it for pages 2..N inside this same session.
+                            captured_data["_list_request"] = {
+                                "url": url,
+                                "method": response.request.method,
+                                "headers": await response.request.all_headers(),
+                                "post_data": response.request.post_data,
+                            }
                             capture_counts["activity_lists"] += 1
                             print(f"    -> SUCCESS: Captured {len(captured_data['activities'])} activities")
                         
@@ -255,15 +479,20 @@ class CorosScraper:
                                    lambda: "analyse_query" in captured_data["evolab"])
 
                 # 3. Activity List page — wait for a list response that arrives
-                # *after* this navigation (last one wins in the sniffer). If the
-                # dashboard already supplied activities, this is just a top-up,
-                # so don't wait long for it.
+                # *after* this navigation (pages merge by labelId in the
+                # sniffer). If the dashboard already supplied activities, this
+                # is just a top-up, so don't wait long for it.
                 print("Navigating to Activity List...")
                 lists_before = capture_counts["activity_lists"]
                 await self._goto(page, f"{self.base_url}/admin/views/dash-board#/personal/list")
                 await self._settle(page, "activity list",
                                    lambda: capture_counts["activity_lists"] > lists_before,
                                    timeout_s=20 if captured_data["activities"] else 60)
+
+                # 3b. Optional history backfill: replay the captured list
+                # request for older pages while the session is still alive.
+                if backfill_days > 0:
+                    await self._backfill_pages(page, captured_data, backfill_days)
 
                 captured_data["missing"] = self._missing(captured_data)
                 if captured_data["missing"]:

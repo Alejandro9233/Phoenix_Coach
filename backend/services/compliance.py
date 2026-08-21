@@ -143,12 +143,27 @@ def _compute_workout_compliance(
                 notes.append(f"Avg HR {actual_avg_hr} bpm — {low - actual_avg_hr} bpm below target")
 
     # --- Distance compliance ---
-    planned_distance_km = None  # Would need to parse from steps/description
+    # Plans carry a numeric distance_km per workout since the prompt contract
+    # asked for it; older plans lack it and skip this check. Distance feeds the
+    # score and notes but not `status` — duration and HR already decide that,
+    # and a short-but-honest session shouldn't flip to "mismatch".
+    planned_distance_km = planned_workout.get("distance_km")
     actual_distance_m = actual_activity.get("distance_m") or 0
     actual_distance_km = actual_distance_m / 1000 if actual_distance_m else 0
     distance_pct = None
 
-    # We don't have explicit planned distance in the workout schema, skip for now
+    if planned_distance_km and actual_distance_km:
+        distance_pct = round((actual_distance_km / planned_distance_km) * 100)
+        if 90 <= distance_pct <= 110:
+            scores.append(100)
+            notes.append(f"Distance {actual_distance_km:.1f} km — on plan ({distance_pct}%)")
+        else:
+            scores.append(max(0, 100 - abs(distance_pct - 100)))
+            direction = "over" if distance_pct > 100 else "under"
+            notes.append(
+                f"Distance {actual_distance_km:.1f} km vs {planned_distance_km:.1f} km "
+                f"planned ({distance_pct}% — {direction})"
+            )
 
     # --- Overall score ---
     if scores:
@@ -170,6 +185,7 @@ def _compute_workout_compliance(
         "status": status,
         "duration_pct": duration_pct,
         "hr_on_target": hr_on_target,
+        "distance_pct": distance_pct,
         "notes": " ".join(notes) if notes else "Completed.",
     }
 

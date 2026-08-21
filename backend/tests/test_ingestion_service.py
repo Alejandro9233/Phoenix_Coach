@@ -233,3 +233,72 @@ def test_stale_hr_max_rewrite_heals_on_next_boot():
     assert row.lthr == 177
     assert row.hr_max is None
     engine.dispose()
+
+
+def test_recovery_pct_annotates_todays_snapshot(temp_db_url):
+    """dashboard_query.summaryInfo.recoveryPct lands on today's snapshot as
+    recovery_score — the column had no writer since the Garmin era. The row
+    itself comes from analyse_query.dayList (the real metrics ingest)."""
+    from backend.models.database import RecoverySnapshot
+    from backend.utils.timezone import get_local_today
+
+    today_int = int(get_local_today().strftime("%Y%m%d"))
+    payload = {
+        "activities": [],
+        "evolab": {
+            "analyse_query": {"dayList": [{"happenDay": today_int}]},
+            "dashboard_query": {"summaryInfo": {"recoveryPct": 78}},
+        },
+    }
+    IngestionService(db_url=temp_db_url).ingest_coros_data(payload)
+
+    engine = create_engine(temp_db_url)
+    session = sessionmaker(bind=engine)()
+    try:
+        snap = session.query(RecoverySnapshot).filter_by(
+            date=get_local_today()).first()
+        assert snap is not None
+        assert snap.recovery_score == 78.0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_recovery_pct_never_mints_a_snapshot(temp_db_url):
+    """A partial scrape (dashboard captured, analyse_query missing) must NOT
+    create a today-dated row: a bare row with every gate metric NULL would
+    make the adapt-today staleness guard read stale data as fresh."""
+    from backend.models.database import RecoverySnapshot
+
+    payload = {
+        "activities": [],
+        "evolab": {"dashboard_query": {"summaryInfo": {"recoveryPct": 78}}},
+    }
+    IngestionService(db_url=temp_db_url).ingest_coros_data(payload)
+
+    engine = create_engine(temp_db_url)
+    session = sessionmaker(bind=engine)()
+    try:
+        assert session.query(RecoverySnapshot).count() == 0
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_missing_recovery_pct_is_harmless(temp_db_url):
+    from backend.models.database import RecoverySnapshot
+
+    payload = {
+        "activities": [],
+        "evolab": {"dashboard_query": {"summaryInfo": {}}},
+    }
+    IngestionService(db_url=temp_db_url).ingest_coros_data(payload)
+
+    engine = create_engine(temp_db_url)
+    session = sessionmaker(bind=engine)()
+    try:
+        for snap in session.query(RecoverySnapshot).all():
+            assert snap.recovery_score is None
+    finally:
+        session.close()
+        engine.dispose()

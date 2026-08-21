@@ -1183,6 +1183,27 @@ async def smart_refresh(db: Session = Depends(get_db)):
     return await _run_smart_refresh(db)
 
 
+def _backfill_days_needed(db) -> int:
+    """90 when the local activity history is too shallow to trust, else 0.
+
+    The scraper's list page reaches back ~7 activities, so a fresh or wiped
+    DB under-reports every historical window (last week, progression math).
+    Shallow = earliest activity missing or younger than 28 days. A new
+    athlete whose COROS history genuinely starts <28d ago keeps returning 90
+    — a harmless few extra pages per morning scrape, capped in the scraper.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func
+
+    from backend.models.database import Activity
+
+    earliest = db.query(func.min(Activity.start_time)).scalar()
+    if earliest is None or earliest.date() > get_local_today() - timedelta(days=28):
+        return 90
+    return 0
+
+
 async def _run_smart_refresh(db: Session, progress=None):
     """Scrape → ingest → evaluate recovery → auto-adapt. Shared by the
     synchronous endpoint above and the background job below. `progress`
@@ -1196,11 +1217,12 @@ async def _run_smart_refresh(db: Session, progress=None):
     sync_status = "ok"
     sync_message = ""
 
-    # 1. Scrape COROS
+    # 1. Scrape COROS — with history backfill when the DB is shallow, so a
+    # wiped DB self-heals on the next morning refresh.
     try:
         report("Scraping COROS...")
         scraper = CorosScraper()
-        data = await scraper.scrape_all()
+        data = await scraper.scrape_all(backfill_days=_backfill_days_needed(db))
         service = IngestionService()
         service.ingest_coros_data(data)
         # A scrape can finish without the payloads ingestion needs (cold CPU,

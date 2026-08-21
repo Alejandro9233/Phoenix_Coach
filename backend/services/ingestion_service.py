@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from pathlib import Path
 from backend.models.database import Base, Athlete, Activity, RecoverySnapshot, ActivityRecord
+from backend.utils.timezone import get_local_today
 from backend.services.fit_importer import parse_fit_file
 from sqlalchemy import func
 
@@ -155,6 +156,22 @@ class IngestionService:
                     snapshot.hrv_ms = float(hrv_entry["avgSleepHrv"])
                 snapshot.hrv_baseline = float(hrv_entry.get("sleepHrvBase", 0))
                 snapshot.hrv_sd = float(hrv_entry.get("sleepHrvSd", 0))
+
+            # 4b. COROS's own recovery percentage (summaryInfo.recoveryPct)
+            # feeds the previously-dead recovery_score column. Advisory prose
+            # only — the deterministic adaptation gate in main.py does not
+            # read it. Annotate-only, NEVER create the row: summaryInfo is
+            # undated, and minting a today-dated row from it would make the
+            # adapt-today staleness guard read a partial scrape (dashboard
+            # captured, analyse_query missing) as fresh recovery data — a
+            # bare row with every gate metric NULL, sitting where the guard
+            # looks. If today's row doesn't exist, the signal is dropped.
+            recovery_pct = summary_info.get("recoveryPct")
+            if recovery_pct is not None:
+                snapshot = session.query(RecoverySnapshot).filter_by(
+                    date=get_local_today(), athlete_id=athlete_id).first()
+                if snapshot:
+                    snapshot.recovery_score = float(recovery_pct)
 
             # 5. Update Athlete Profile with latest available data (searching backwards)
             if day_list:

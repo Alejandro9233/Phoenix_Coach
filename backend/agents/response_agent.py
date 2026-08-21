@@ -127,9 +127,11 @@ def _format_training_context(ctx: dict) -> str:
     if rec.get("load_ratio") is not None:
         lines.append(f"  Load ratio: {rec['load_ratio']}")
 
-    # Last week
+    # Last week. Rendered when there is anything to say — including a bare
+    # warning note: an incomplete-history caveat that never reaches the
+    # prompt is how a hollow week reads as detraining.
     lw = ctx.get("last_week", {})
-    if lw.get("sessions_completed", 0) > 0:
+    if lw.get("sessions_completed", 0) > 0 or lw.get("note"):
         lines.append(f"\nLast Week Summary:")
         lines.append(f"  Sessions: {lw.get('sessions_completed', 0)} completed" +
                      (f" / {lw['sessions_planned']} planned" if lw.get('sessions_planned') else ""))
