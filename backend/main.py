@@ -657,7 +657,6 @@ def get_weekly_plan(db: Session = Depends(get_db)):
         "race_name": athlete.race_name,
         "race_distance": athlete.race_distance,
         "race_date": str(athlete.race_date) if athlete.race_date else None,
-        "weekly_hours_target": athlete.weekly_hours_target or 8.0,
         "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
         "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
         "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
@@ -680,22 +679,38 @@ def get_weekly_plan(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"⚠️ Error checking previous week's recovery status: {e}")
         
-    # A failed generation fails the request — everything below this call
-    # persists, and a fabricated plan persisted here becomes the athlete's
-    # actual week (2026-08-17). Same rule as /weekly-plan/replan-remaining.
+    # Generation runs INSIDE the pipeline so the volume gate can retry it
+    # once with numeric feedback. A failed generation still fails the whole
+    # request — a fabricated plan persisted here becomes the athlete's actual
+    # week (2026-08-17). Same rule as /weekly-plan/replan-remaining.
     response_agent = ResponseAgent()
+
+    def _generate(feedback=None):
+        return response_agent.generate_weekly_plan(
+            summary, profile, training_context=training_context,
+            feedback=feedback,
+        )
+
+    from backend.services.constraint_enforcer import get_active_injuries
+    from backend.services.plan_meta import run_plan_write_pipeline
     try:
-        new_plan_json = response_agent.generate_weekly_plan(summary, profile, training_context=training_context)
+        new_plan_json, violations = run_plan_write_pipeline(
+            db,
+            generate=_generate,
+            gate_ctx=training_context,
+            source="generate",
+            availability=training_context.get("availability", {}),
+            active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+            reason="Weekly plan generated",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=502,
             detail=f"Plan generation failed; no plan persisted: {e}"
         )
 
-    # Store training_context in new_plan_json under "_context" key for auditability
-    new_plan_json["_context"] = training_context
-    
-    # Generate a weekly review looking back at the past week's results
+    # Weekly review looks back at LAST week — independent of the new plan,
+    # so it attaches after the pipeline (one LLM call, never per attempt).
     if training_context.get("last_week") and training_context["last_week"].get("sessions_completed", 0) > 0:
         try:
             weekly_review = response_agent.generate_weekly_review(
@@ -706,18 +721,6 @@ def get_weekly_plan(db: Session = Depends(get_db)):
             print("📝 Weekly review generated successfully for the new plan.")
         except Exception as e:
             print(f"⚠️ Error generating weekly review: {e}")
-            
-    # Single persist pipeline: normalize -> hard constraint gate -> receipt.
-    # Never persist a plan that skipped a stage.
-    from backend.services.constraint_enforcer import get_active_injuries
-    from backend.services.plan_meta import run_plan_write_pipeline
-    new_plan_json, violations = run_plan_write_pipeline(
-        db, new_plan_json,
-        source="generate",
-        availability=training_context.get("availability", {}),
-        active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
-        reason="Weekly plan generated",
-    )
 
     # Save to database
     new_record = WeeklyPlan(
@@ -860,7 +863,6 @@ def replan_remaining_days(db: Session = Depends(get_db)):
         "race_name": athlete.race_name,
         "race_distance": athlete.race_distance,
         "race_date": str(athlete.race_date) if athlete.race_date else None,
-        "weekly_hours_target": athlete.weekly_hours_target or 8.0,
         "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
         "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
         "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
@@ -874,36 +876,36 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     data_agent = DataAgent(db)
     athlete_summary = data_agent.summarize()
     
-    # Generate only the remaining days. A failed generation fails the request —
-    # nothing below this call may run, because everything below persists.
+    # Generate only the remaining days, INSIDE the pipeline so the volume
+    # gate can retry with numeric feedback. Each attempt merges into a fresh
+    # copy of the week so a rejected attempt's days can't leak into the next.
+    # A failed generation fails the request — the existing plan stays.
+    import copy as _copy
+    from backend.services.volume_gate import completed_week_actuals
+    completed_run_km, completed_hours = completed_week_actuals(db, start_of_week, today)
+
     response_agent = ResponseAgent()
-    try:
-        new_days_result = response_agent.generate_remaining_days(
+
+    def _generate(feedback=None):
+        result = response_agent.generate_remaining_days(
             athlete_summary=athlete_summary,
             profile=profile,
             training_context=training_context,
             completed_days_summary=completed_days_summary,
             days_to_plan=days_to_replan,
             reason="The athlete requested a mid-week replan.",
+            feedback=feedback,
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Plan generation failed; existing plan left untouched: {e}"
-        )
-    
-    new_days = new_days_result.get("days", {})
-    
-    # Merge: keep locked days, replace remaining days
-    for day_name in days_to_replan:
-        if day_name in new_days:
-            # Clear any stale adaptation data from the replanned days
-            new_day = new_days[day_name]
-            new_day.pop("adaptation", None)
-            new_day.pop("original_workouts", None)
-            days_dict[day_name] = new_day
-    
-    plan_json["days"] = days_dict
+        merged = _copy.deepcopy(plan_json)
+        new_days = result.get("days", {})
+        for day_name in days_to_replan:
+            if day_name in new_days:
+                # Clear any stale adaptation data from the replanned days
+                new_day = new_days[day_name]
+                new_day.pop("adaptation", None)
+                new_day.pop("original_workouts", None)
+                merged["days"][day_name] = new_day
+        return merged
 
     # Single persist pipeline, scoped to the replanned days only — enforcing
     # the locked days would rewrite history the athlete already trained.
@@ -913,15 +915,25 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     # availability, the LLM ignored it, and nothing checked.
     from backend.services.constraint_enforcer import get_active_injuries
     from backend.services.plan_meta import run_plan_write_pipeline
-    plan_json, violations = run_plan_write_pipeline(
-        db, plan_json,
-        source="replan_remaining",
-        availability=training_context.get("availability", {}),
-        active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
-        days=days_to_replan,
-        reason="The athlete requested a mid-week replan.",
-        before=before,
-    )
+    try:
+        plan_json, violations = run_plan_write_pipeline(
+            db,
+            generate=_generate,
+            gate_ctx=training_context,
+            completed_run_km=completed_run_km,
+            completed_hours=completed_hours,
+            source="replan_remaining",
+            availability=training_context.get("availability", {}),
+            active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+            days=days_to_replan,
+            reason="The athlete requested a mid-week replan.",
+            before=before,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Plan generation failed; existing plan left untouched: {e}"
+        )
 
     from sqlalchemy.orm.attributes import flag_modified
     plan_record.plan_json = plan_json

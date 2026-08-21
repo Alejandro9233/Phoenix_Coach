@@ -63,7 +63,6 @@ def test_db_session():
     # exercise the generation branch, not the guard.
     athlete = Athlete(
         name="Test Athlete",
-        weekly_hours_target=8.0,
         race_date=get_local_today() + timedelta(weeks=12),
         race_distance="Marathon",
     )

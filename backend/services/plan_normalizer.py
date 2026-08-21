@@ -184,6 +184,11 @@ def normalize_workout(workout: dict) -> dict:
     if isinstance(dist, (int, float)) and not isinstance(dist, bool) and dist >= 0:
         normalized["distance_km"] = float(dist)
 
+    # Set by pace_enforcer (Python-computed band label). Load-bearing carry:
+    # dropping it here would silently erase every pace on every replan.
+    if workout.get("pace_target"):
+        normalized["pace_target"] = str(workout["pace_target"])
+
     return normalized
 
 def normalize_plan(plan_json: dict) -> dict:
@@ -265,6 +270,13 @@ def normalize_plan(plan_json: dict) -> dict:
                 normalized["week_summary"]["expected_run_km"] = float(run_val)
             except (ValueError, TypeError):
                 pass
+
+        # Volume-gate warnings must survive re-normalization — a warning
+        # dropped here never reaches the athlete.
+        if isinstance(ws.get("gate_warnings"), list) and ws["gate_warnings"]:
+            normalized["week_summary"]["gate_warnings"] = [
+                str(w) for w in ws["gate_warnings"]
+            ]
     else:
         # Fallback to top-level keys
         normalized["week_summary"]["focus"] = plan_json.get("focus") or plan_json.get("phase") or "Aerobic Base Building"

@@ -55,18 +55,39 @@ def build_constraint_block(ctx: dict) -> str:
     travel_day_names arrives via compute_context's availability, so travel
     coverage is automatic for every caller — no per-path plumbing.
 
-    B1's numeric volume-budget line (run-km range / hour range / quality cap)
-    slots in here once compute_budget exists.
+    The VOLUME BUDGET line states the exact numbers the volume gate will
+    grade the plan on (volume_gate.compute_budget — same source, so prompt
+    and gate can never disagree). Omitted per-axis when a number is missing.
     """
+    from backend.services.volume_gate import compute_budget
+
     avail = (ctx or {}).get("availability") or {}
     travel = ", ".join(avail.get("travel_day_names") or []) or "none this week"
+
+    budget = compute_budget(ctx or {}) or {}
+    budget_bits = []
+    if budget.get("run_km_target") is not None:
+        cap = budget.get("run_km_hard_cap")
+        cap_txt = f" (hard cap {cap} km)" if cap is not None else ""
+        budget_bits.append(f"running {budget['run_km_target']} km this week{cap_txt}")
+    if budget.get("hours_low") is not None:
+        budget_bits.append(
+            f"{budget['hours_low']:g}-{budget['hours_high']:g} hours excluding strength"
+        )
+    if budget.get("max_quality") is not None:
+        budget_bits.append(f"at most {budget['max_quality']} quality (hard) sessions")
+    budget_line = (
+        f"\n- VOLUME BUDGET (checked by the system): {'; '.join(budget_bits)}."
+        if budget_bits else ""
+    )
+
     return f"""CONSTRAINTS YOU MUST RESPECT (violations are removed by the system after you answer):
 - Swimming: {_availability_text(avail.get('swim_days'))}
 - Cycling: {_availability_text(avail.get('bike_days'))}
 - Running: {_availability_text(avail.get('run_days'))}
 - Strength: {_availability_text(avail.get('strength_days'))}
 - Traveling (MUST be rest days, no training of any kind): {travel}
-- Weekly RUN kilometers are the protected quantity. If days are unavailable, move run sessions (especially the long run) to open days and drop strength or cycling instead. Never delete the long run to keep a strength session.
+- Weekly RUN kilometers are the protected quantity. If days are unavailable, move run sessions (especially the long run) to open days and drop strength or cycling instead. Never delete the long run to keep a strength session.{budget_line}
 - Copy workout titles VERBATIM from the AVAILABLE WORKOUTS menu — an off-menu title will be rejected.
 - Every running/cycling/swimming workout MUST include "distance_km" (a number).
 - For strength workouts, you MUST include a "muscle_groups" array selecting from: ["chest", "shoulders", "back", "legs", "arms"]."""
@@ -94,11 +115,24 @@ def _format_training_context(ctx: dict) -> str:
     if ctx.get("is_recovery_week"):
         lines.append("⚠️ THIS IS A RECOVERY WEEK — reduce all volumes 20-25%")
 
-    # Volume references
+    # Volume — the computed run target when the engine produced one (running
+    # races), phase-range prose otherwise. The target numbers are enforced
+    # post-generation; the LLM is told exactly what it will be graded on.
     vol = ctx.get("volume_references", {})
-    lines.append(f"\nVolume References:")
-    if vol.get("weekly_hours_target"):
-        lines.append(f"  Athlete's target hours: {vol['weekly_hours_target']}h/week")
+    vt = ctx.get("volume_targets")
+    if vt:
+        lines.append("\nTHIS WEEK'S RUN VOLUME (computed — the week's running MUST total within 10% of this):")
+        lines.append(f"  Run km target: {vt['run_km_target']} km"
+                     f" (hard cap {vt['run_km_hard_cap']} km — the system trims anything above)")
+        if vt.get("long_run_minutes"):
+            lines.append(f"  Long run: ~{vt['long_run_minutes']} min")
+        lines.append(f"  Derivation: {vt['basis']}")
+        lines.append(f"\nVolume References:")
+    else:
+        lines.append(f"\nVolume References:")
+        run_note = vol.get("sport_sessions", {}).get("running", {}).get("volume_note")
+        if run_note:
+            lines.append(f"  Running: {run_note}")
     lines.append(f"  Phase recommended hours: {vol.get('phase_hours_range', '?')}h/week")
     if vol.get("coros_tl_range"):
         lines.append(f"  COROS recommended training load: {vol['coros_tl_range']['min']}-{vol['coros_tl_range']['max']} (from watch)")
@@ -107,6 +141,24 @@ def _format_training_context(ctx: dict) -> str:
 
     if vol.get("recovery_week_adjustment"):
         lines.append(f"  ⚠️ {vol['recovery_week_adjustment']}")
+
+    # Python-computed run paces (pace_model.py). The LLM copies these; it
+    # never invents a pace. pace_enforcer stamps pace_target after
+    # generation regardless, so drift here self-heals.
+    pm = ctx.get("pace_model")
+    if pm:
+        lines.append("\nRUN PACES (computed from the watch's lactate threshold — use EXACTLY these):")
+        for key, name in (("recovery", "Recovery"), ("easy", "Easy"),
+                          ("long_run", "Long run"), ("marathon", "Marathon pace"),
+                          ("tempo", "Tempo"), ("interval", "Interval")):
+            band = (pm.get("bands") or {}).get(key)
+            if band:
+                lines.append(f"  {name}: {band['label']}")
+        lines.append("  Every running workout MUST include a \"pace_target\" field "
+                     "copied verbatim from the matching line. Do not write numeric "
+                     "paces in prose; the pace_target field is the authority.")
+        if pm.get("note"):
+            lines.append(f"  ⚠️ {pm['note']}")
 
     # Sport sessions reference
     sport_sessions = vol.get("sport_sessions", {})
@@ -356,7 +408,8 @@ Respond in valid JSON:
             return {"analysis": f"Could not analyze activity: {str(e)}", "rating": "Error", "advice": "Try again later."}
 
     def generate_weekly_plan(self, athlete_summary: str, profile: dict,
-                             training_context: dict = None) -> dict:
+                             training_context: dict = None,
+                             feedback: str = None) -> dict:
         """
         Generate a full 7-day training plan.
 
@@ -370,12 +423,14 @@ Respond in valid JSON:
         The LLM decides: which workouts, what sequence, how to handle gaps, coaching notes.
         """
         if training_context:
-            return self._generate_plan_with_context(athlete_summary, profile, training_context)
+            return self._generate_plan_with_context(
+                athlete_summary, profile, training_context, feedback=feedback
+            )
         else:
             return self._generate_plan_legacy(athlete_summary, profile)
 
     def _generate_plan_with_context(self, athlete_summary: str, profile: dict,
-                                     ctx: dict) -> dict:
+                                     ctx: dict, feedback: str = None) -> dict:
         """Phase-aware weekly plan generation."""
         # Format the training context as readable text
         context_text = _format_training_context(ctx)
@@ -431,7 +486,7 @@ Design this week's 7-day plan (Monday to Sunday). You decide:
 7. For STRENGTH workouts: decide the split (Push/Pull/Legs, Upper/Lower, etc.) and include the targeted muscle groups.
 
 {build_constraint_block(ctx)}
-
+{(chr(10) + feedback + chr(10)) if feedback else ""}
 OUTPUT FORMAT — respond ONLY with valid JSON matching the exact schema below.
 CRITICAL: You MUST use the exact keys "week_summary" and "days". Do NOT output a flat list under keys like "workout_plan" or "schedule". The "days" dictionary MUST contain the keys "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", and each day MUST have "summary", "workouts" (an array), "rationale", and "coach_note".
 
@@ -455,6 +510,7 @@ CRITICAL: You MUST use the exact keys "week_summary" and "days". Do NOT output a
           "total_time": "XX min",
           "hr_target": "XXX-XXX bpm",
           "distance_km": 10.0,
+          "pace_target": "4:26-4:34/km",
           "muscle_groups": ["chest", "shoulders", "back", "legs", "arms"]
         }}
       ],
@@ -494,7 +550,6 @@ ATHLETE CURRENT STATE:
 
 ATHLETE CONSTRAINTS & OBJECTIVES:
 - Race: {profile.get('race_name') if profile.get('race_name') is not None else 'Not set'} ({profile.get('race_distance') if profile.get('race_distance') is not None else 'Not set'}) on {profile.get('race_date') if profile.get('race_date') is not None else 'Not set'}
-- Weekly target hours: {profile.get('weekly_hours_target') if profile.get('weekly_hours_target') is not None else 8.0} hours
 - Swim availability: {_availability_text(profile.get('swim_days', 'wed,sat,sun'))}
 - Bike availability: {_availability_text(profile.get('bike_days'))}
 - Run availability: {_availability_text(profile.get('run_days'))}
@@ -504,9 +559,9 @@ COACHING RULES:
 1. Respect the sport availability constraints: do NOT schedule a swim, bike, run, or strength session on a day not listed in the athlete's availability.
 2. Follow the 80/20 intensity rule: mostly Zone 1-2 easy aerobic base training.
 3. Include at least 1-2 rest days depending on fatigue.
-4. Scale total session time to fit the weekly target hours.
+4. Scale total session time to fit the phase recommended hours range.
 5. If the race is approaching or is this week, apply tapering principles (short duration, light intensity, lots of rest).
-6. You may schedule double-workout days (e.g. morning swim, evening strength) if it makes sense to hit the weekly target hours without violating the 80/20 rule or causing extreme fatigue. Let the weekly target hours and availability guide this decision.
+6. You may schedule double-workout days (e.g. morning swim, evening strength) if it makes sense to hit the recommended hours without violating the 80/20 rule or causing extreme fatigue. Let the recommended hours and availability guide this decision.
 
 OUTPUT FORMAT:
 You MUST respond with valid JSON in this exact structure:
@@ -638,7 +693,8 @@ Respond ONLY with the JSON block. Do not write introductory or concluding conver
                                  training_context: dict,
                                  completed_days_summary: str,
                                  days_to_plan: list[str],
-                                 reason: str = "You are replanning the remaining days of an in-progress week.") -> dict:
+                                 reason: str = "You are replanning the remaining days of an in-progress week.",
+                                 feedback: str = None) -> dict:
         """
         Generate a partial weekly plan for only the remaining days.
 
@@ -704,7 +760,7 @@ Account for the training already done. You must:
 5. For STRENGTH workouts: include the "muscle_groups" array
 
 {build_constraint_block(training_context)}
-
+{(chr(10) + feedback + chr(10)) if feedback else ""}
 OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed above:
 {{
   "days": {{
@@ -713,7 +769,7 @@ OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed a
 }}
 
 Each day must have: "summary", "workouts" (array), "rationale", "coach_note".
-Each workout: "sport", "title", "steps" (array), "total_time", "hr_target", "distance_km" (for running/cycling/swimming), "muscle_groups" (for strength).
+Each workout: "sport", "title", "steps" (array), "total_time", "hr_target", "distance_km" (for running/cycling/swimming), "pace_target" (for running, copied from RUN PACES), "muscle_groups" (for strength).
 Each step: "type" (warmup|main|recovery|cooldown), "duration" (MM:SS), "zone" (1-5), "description".
 
 Respond ONLY with the JSON block. Do not write introductory or concluding conversational text.

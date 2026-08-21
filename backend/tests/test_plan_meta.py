@@ -1,10 +1,11 @@
 """The plan-write pipeline: one choke point, receipts, fresh metadata.
 
 Rules locked in here:
-- finalize_plan_write recomputes week_summary.expected_total_hours as the
-  deterministic sum of planned durations, EXCLUDING strength (gym time never
-  counts toward volume targets) and leaves expected_run_km alone (it is the
-  protected target, not a sum).
+- finalize_plan_write stamps week_summary.expected_total_hours AND
+  expected_run_km as the deterministic sums of the planned week (strength
+  excluded from hours — gym time never counts toward volume targets). The
+  LLM's numbers never survive; the week's TARGET lives separately in
+  _context.volume_targets, written only by C3.
 - Every write appends a receipt to plan_json["_revisions"] (source, days,
   reason, before-snapshot, what enforcement stripped), capped at
   MAX_REVISIONS, and normalize_plan round-trips it.
@@ -51,7 +52,6 @@ def test_db_session():
 
     athlete = Athlete(
         name="Test Athlete",
-        weekly_hours_target=8.0,
         race_date=get_local_today() + timedelta(weeks=12),
         race_distance="Marathon",
         swim_days="wed,sat,sun",
@@ -104,8 +104,10 @@ def test_finalize_recomputes_hours_excluding_strength(test_db_session):
     )
     # 45 + 45 running/cycling minutes; the 60 strength minutes must not count.
     assert out["week_summary"]["expected_total_hours"] == 1.5
-    # The protected run-km target is never recomputed from the schedule.
-    assert out["week_summary"]["expected_run_km"] == 42.0
+    # expected_run_km is the planned sum too — the LLM's 42.0 must not
+    # survive. The 45-min Easy Run has no distance, so the gate's estimated
+    # tier prices it at 45/6.0 = 7.5 km.
+    assert out["week_summary"]["expected_run_km"] == 7.5
     assert "_context" in out
 
 

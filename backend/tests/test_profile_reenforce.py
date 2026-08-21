@@ -41,7 +41,6 @@ def test_db_session():
 
     athlete = Athlete(
         name="Test Athlete",
-        weekly_hours_target=8.0,
         race_date=FROZEN_TODAY + timedelta(weeks=12),
         race_distance="Marathon",
         swim_days="wed,sat,sun",

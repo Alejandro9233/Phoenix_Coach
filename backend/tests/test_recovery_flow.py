@@ -66,7 +66,7 @@ def db_session():
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
 
-    athlete = Athlete(name="Test Athlete", weekly_hours_target=8.0)
+    athlete = Athlete(name="Test Athlete")
     session.add(athlete)
     session.commit()
 

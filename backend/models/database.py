@@ -20,7 +20,7 @@ class Athlete(Base):
     race_name = Column(String, nullable=True)           # e.g. "Monterrey 70.3"
     race_type = Column(String, nullable=True)           # e.g. "Triathlon", "Running"
     race_distance = Column(String, nullable=True)        # e.g. "Olympic", "70.3", "Full Ironman"
-    weekly_hours_target = Column(Float, nullable=True)
+    weekly_hours_target = Column(Float, nullable=True)  # dead — never written; kept because _ensure_columns never drops columns
     hr_max = Column(Integer, nullable=True)  # true max HR — unset; await a real source
     lthr = Column(Integer, nullable=True)  # COROS lactate-threshold HR (was mislabeled hr_max until 2026-08)
     hr_rest = Column(Integer, nullable=True)

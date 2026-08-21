@@ -37,6 +37,7 @@ docstring used to claim enforcement lived here and it did not, which shipped str
 sessions onto non-strength days for months.
 """
 import copy
+import re
 from datetime import date, datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -45,7 +46,15 @@ from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyP
 from backend.services.constraint_enforcer import (
     SPORT_TO_AVAILABILITY_KEY, get_travel_day_names, parse_day_list,
 )
+from backend.services.pace_model import compute_pace_model
 from backend.utils.timezone import get_local_today
+
+# Weekly run-km progression (_get_weekly_run_target). Tunable in one place.
+RUN_RAMP = 1.08            # next week = 8% over the best recent week
+RUN_RAMP_HARD_CAP = 1.15   # never plan >15% above demonstrated volume,
+                           # even when the phase floor asks for more
+LONG_RUN_STEP_MIN = 12     # long run grows this many minutes per week
+RUN_NOISE_FLOOR_KM = 5.0   # weeks at or under this are noise, not capacity
 
 
 # ─── Shared workout menu building blocks ──────────────────────────────────────
@@ -454,6 +463,8 @@ DISTANCE_PROFILES = {
                 "hours_range": "4-6",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 1,
+                "run_km_range": (15, 30),
+                "long_run_cap_min": 90,
                 "sport_sessions": {
                     "running": {"sessions": 3, "volume_note": "Short easy runs + strides, last long run 3 weeks out"},
                     "swimming": {"sessions": 1, "volume_note": "1 easy technique session for blood flow"},
@@ -470,6 +481,8 @@ DISTANCE_PROFILES = {
                 "hours_range": "10-11",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 2,
+                "run_km_range": (40, 55),
+                "long_run_cap_min": 150,
                 "sport_sessions": {
                     "running": {"sessions": 4, "volume_note": "40-55 km/week, M-pace + cruise intervals"},
                     "swimming": {"sessions": 2, "volume_note": "3-4 km/session, maintain CSS work"},
@@ -486,6 +499,8 @@ DISTANCE_PROFILES = {
                 "hours_range": "10-12",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 2,
+                "run_km_range": (40, 55),
+                "long_run_cap_min": 160,
                 "sport_sessions": {
                     "running": {"sessions": 4, "volume_note": "40-55 km/week, long run + M-pace + tempo"},
                     "swimming": {"sessions": 2, "volume_note": "3-4 km/session, maintain — don't increase"},
@@ -502,6 +517,8 @@ DISTANCE_PROFILES = {
                 "hours_range": "9-10",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 2,
+                "run_km_range": (28, 40),
+                "long_run_cap_min": 110,
                 "sport_sessions": {
                     "running": {"sessions": 4, "volume_note": "28-40 km/week, add long run 60-90 min"},
                     "swimming": {"sessions": 2, "volume_note": "3-4 km/session, CSS intervals"},
@@ -518,6 +535,8 @@ DISTANCE_PROFILES = {
                 "hours_range": "7-8",
                 "intensity_split": "90/10",
                 "max_quality_sessions": 1,
+                "run_km_range": (20, 28),
+                "long_run_cap_min": 90,
                 "sport_sessions": {
                     "running": {"sessions": 3, "volume_note": "20-28 km/week, easy runs, build gradually (10% rule)"},
                     "swimming": {"sessions": 2, "volume_note": "2-3 km/session, technique drills, CSS test"},
@@ -1146,6 +1165,20 @@ class PeriodizationEngine:
             race_distance=race_distance
         )
 
+        # THE weekly run-km target — actuals-derived, ramp-capped. The volume
+        # gate enforces these numbers; the phase range above is only prose.
+        volume_targets = self._get_weekly_run_target(
+            db, self._phase_def(profile, phase_info),
+            cycle_info["is_recovery_week"], today,
+        )
+
+        # Python-derived training paces from the watch's LT pace (running
+        # races only). None degrades every consumer to HR-zone guidance.
+        pace_model = compute_pace_model(
+            athlete.threshold_pace_min_km, athlete.target_finish_time,
+            race_distance,
+        )
+
         # Recovery status
         recovery = self._get_recovery_status(db)
 
@@ -1197,6 +1230,10 @@ class PeriodizationEngine:
             # Volume references (NOT hard limits — reference data for the LLM)
             "volume_references": volume_refs,
 
+            # Computed weekly run target (hard numbers — the volume gate
+            # enforces run_km_hard_cap). None for profiles without a run range.
+            "volume_targets": volume_targets,
+
             # How is the body?
             "recovery": recovery,
 
@@ -1209,7 +1246,6 @@ class PeriodizationEngine:
             # Athlete profile snapshot
             "athlete": {
                 "name": athlete.name,
-                "weekly_hours_target": athlete.weekly_hours_target,
                 "hr_max": athlete.hr_max,  # honestly null until a real max-HR source exists
                 "lthr": athlete.lthr,
                 "hr_rest": athlete.hr_rest,
@@ -1219,6 +1255,9 @@ class PeriodizationEngine:
             "race_goals": {
                 "target_finish_time": athlete.target_finish_time,
             },
+
+            # Training paces computed from measured threshold (pace_model.py).
+            "pace_model": pace_model,
         }
 
     def compute_block_calendar(self, db: Session) -> dict:
@@ -1302,13 +1341,7 @@ class PeriodizationEngine:
             expected_run_km = "0"
             workouts_list = []
             
-            # Find the phase definition from distance-specific phases
-            phase_def = None
-            for p in profile["phases"]:
-                if p["id"] == phase_info["phase"]:
-                    phase_def = p
-                    break
-            phase_def = phase_def or profile["phases"][-1]
+            phase_def = self._phase_def(profile, phase_info)
             
             if plan_rec and plan_rec.plan_json:
                 ws = plan_rec.plan_json.get("week_summary", {})
@@ -1363,7 +1396,6 @@ class PeriodizationEngine:
                 # Try to parse running volume note from phase definition
                 run_info = phase_def["sport_sessions"].get("running", {})
                 vol_note = run_info.get("volume_note", "")
-                import re
                 match = re.search(r"(\d+-\d+|\d+)\s*km", vol_note)
                 if match:
                     expected_run_km = match.group(1)
@@ -1508,6 +1540,15 @@ class PeriodizationEngine:
 
         return filtered
 
+    @staticmethod
+    def _phase_def(profile: dict, phase_info: dict) -> dict:
+        """The profile's phase definition for phase_info, falling back to the
+        last phase (foundation) when the id is unknown."""
+        for p in profile["phases"]:
+            if p["id"] == phase_info["phase"]:
+                return p
+        return profile["phases"][-1]
+
     def _get_volume_references(
         self, phase_info: dict, is_recovery_week: bool,
         athlete: Athlete, db: Session,
@@ -1518,16 +1559,9 @@ class PeriodizationEngine:
         These are NOT hard limits — they're reference points backed by:
         - distance-specific phase guidelines
         - COROS recommended training load range (from the watch)
-        - Athlete's own weekly_hours_target setting
         """
-        # Find the phase definition from distance-specific profile
         profile = self._get_profile(race_distance)
-        phase_def = None
-        for p in profile["phases"]:
-            if p["id"] == phase_info["phase"]:
-                phase_def = p
-                break
-        phase_def = phase_def or profile["phases"][-1]  # fallback to last (foundation)
+        phase_def = self._phase_def(profile, phase_info)
 
         # COROS recommended TL range from latest recovery snapshot
         latest_snapshot = db.query(RecoverySnapshot).order_by(
@@ -1547,7 +1581,6 @@ class PeriodizationEngine:
             phase_def["sport_sessions"], athlete
         )
         refs = {
-            "weekly_hours_target": athlete.weekly_hours_target,
             "phase_hours_range": phase_def["hours_range"],
             "coros_tl_range": coros_tl_range,
             "intensity_split": phase_def["intensity_split"],
@@ -1573,6 +1606,109 @@ class PeriodizationEngine:
             refs["recovery_week_adjustment"] = None
 
         return refs
+
+    def _get_weekly_run_target(
+        self, db: Session, phase_def: dict,
+        is_recovery_week: bool, today: date, tuneup_week: bool = False,
+    ) -> Optional[dict]:
+        """THE weekly run-km target, derived from what the athlete actually ran.
+
+        RUN_RAMP x the best of the last 3 weeks' actual run km, clamped to the
+        phase floor/ceiling — but a hard ramp cap of RUN_RAMP_HARD_CAP x
+        demonstrated volume beats the phase floor, so thin history (post-wipe,
+        post-break) rebuilds gradually instead of cliff-jumping to the phase
+        range. Best-of-3 rather than mean: one missed week can't crater the
+        target (the false-detraining signal _get_last_week_summary warns
+        about must never shrink a plan).
+
+        Returns None when the phase has no run range (triathlon stubs without
+        km in their volume_note) — callers and the prompt degrade to the
+        phase-range prose. The volume gate (B1) enforces run_km_hard_cap;
+        this method only computes it.
+        """
+        rng = phase_def.get("run_km_range")
+        if not rng:
+            note = phase_def.get("sport_sessions", {}).get("running", {}).get("volume_note", "")
+            m = re.search(r"(\d+)\s*-\s*(\d+)\s*km", note)
+            if not m:
+                return None
+            rng = (float(m.group(1)), float(m.group(2)))
+        floor, ceiling = float(rng[0]), float(rng[1])
+        long_run_cap = phase_def.get("long_run_cap_min")
+
+        monday = today - timedelta(days=today.weekday())
+        window_start = monday - timedelta(days=21)
+        activities = db.query(Activity).filter(
+            Activity.start_time >= datetime.combine(window_start, datetime.min.time()),
+            Activity.start_time < datetime.combine(monday, datetime.min.time()),
+        ).all()
+
+        week_km: dict[int, float] = {}
+        longest_run_min = 0.0
+        for a in activities:
+            if (a.sport or "") != "running" or not a.start_time:
+                continue
+            km = (a.distance_m or 0) / 1000
+            wk = (a.start_time.date() - window_start).days // 7
+            week_km[wk] = week_km.get(wk, 0.0) + km
+            if km >= 8 and a.duration_sec:
+                longest_run_min = max(longest_run_min, a.duration_sec / 60)
+
+        weeks_with_data = [v for v in week_km.values() if v > RUN_NOISE_FLOOR_KM]
+
+        if not weeks_with_data:
+            ramp_base = 0.0
+            target = floor
+            hard_cap = floor * 1.10
+            rebuild_mode = False
+            basis = (
+                f"no run history in the last 3 weeks — starting at the "
+                f"phase floor ({floor:g} km)"
+            )
+        else:
+            ramp_base = max(weeks_with_data)
+            ramp_cap = ramp_base * RUN_RAMP_HARD_CAP
+            target = min(ceiling, max(floor, ramp_base * RUN_RAMP), ramp_cap)
+            rebuild_mode = ramp_cap < floor
+            hard_cap = min(ceiling * 1.05, ramp_cap)
+            basis = (
+                f"{RUN_RAMP:g}x best of last {len(weeks_with_data)} week(s) "
+                f"({ramp_base:.1f} km), clamped to phase {floor:g}-{ceiling:g} km"
+            )
+            if rebuild_mode:
+                basis += (
+                    f" — rebuild mode: ramp cap {ramp_cap:.1f} km is below the "
+                    f"phase floor, building back gradually"
+                )
+
+        if longest_run_min > 0:
+            long_run = longest_run_min + LONG_RUN_STEP_MIN
+            if long_run_cap:
+                long_run = min(long_run_cap, long_run)
+        else:
+            long_run = min(long_run_cap, 70) if long_run_cap else 70
+
+        if is_recovery_week:
+            target *= 0.75
+            hard_cap *= 0.80
+            long_run *= 0.7
+        if tuneup_week:
+            # C7 hook: race week — the tune-up race IS the long run.
+            target *= 0.6
+            hard_cap *= 0.65
+            long_run = 0
+
+        return {
+            "run_km_target": round(target, 1),
+            "run_km_floor": floor,
+            "run_km_ceiling": ceiling,
+            "run_km_hard_cap": round(hard_cap, 1),
+            "long_run_minutes": int(round(long_run)),
+            "history_weeks": len(weeks_with_data),
+            "ramp_base_km": round(ramp_base, 1),
+            "rebuild_mode": rebuild_mode,
+            "basis": basis,
+        }
 
     def _get_recovery_status(self, db: Session) -> dict:
         """Assess current recovery status from recent snapshots."""
