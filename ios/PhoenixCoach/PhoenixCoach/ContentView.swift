@@ -37,6 +37,10 @@ struct ContentView: View {
         .onChange(of: selectedTab) { _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
+        // Posted by TodayView's race-setup card ("no race configured yet").
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenProfileTab"))) { _ in
+            selectedTab = 3
+        }
     }
 }
 

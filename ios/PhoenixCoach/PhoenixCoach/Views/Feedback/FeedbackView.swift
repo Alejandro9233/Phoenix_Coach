@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct FeedbackView: View {
     @State private var dashboard: DashboardResponse?
@@ -21,6 +22,26 @@ struct FeedbackView: View {
     
     private var visibleActivities: [Activity] {
         Array(filteredActivities.prefix(visibleCount))
+    }
+
+    /// Chronological CTI/ATI/TIB series, capped at the last 12 weeks.
+    /// Snapshot dates arrive as "yyyy-MM-dd" (Date primary key, no time part).
+    private var fitnessPoints: [FitnessPoint] {
+        guard let recovery = dashboard?.recovery else { return [] }
+        let points = recovery.compactMap { snap -> FitnessPoint? in
+            guard let dateStr = snap.date,
+                  let date = Formatters.yyyyMMdd.date(from: dateStr),
+                  snap.cti != nil || snap.ati != nil || snap.tib != nil
+            else { return nil }
+            return FitnessPoint(date: date, cti: snap.cti, ati: snap.ati, tib: snap.tib)
+        }
+        .sorted { $0.date < $1.date }
+        return Array(points.suffix(84))
+    }
+
+    private var raceDate: Date? {
+        guard let dateStr = dashboard?.athlete?.raceDate else { return nil }
+        return Formatters.yyyyMMdd.date(from: dateStr)
     }
     
     // Design system colors matching TodayView & ProfileView
@@ -45,9 +66,22 @@ struct FeedbackView: View {
                 
                 ScrollView {
                     VStack(spacing: 40) {
-                        
+                        // Bound once — the property parses and sorts on every read.
+                        let fitnessPoints = self.fitnessPoints
 
-                        
+                        // Fitness (CTI/ATI/TIB form curve). Hidden until a week
+                        // of snapshots exists — fewer points is noise, not a trend.
+                        if fitnessPoints.count >= 7 {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Fitness")
+                                    .font(.system(size: 24, weight: .regular))
+                                    .foregroundStyle(.white)
+                                    .padding(.bottom, 8)
+
+                                FitnessChartCard(points: fitnessPoints, raceDate: raceDate)
+                            }
+                        }
+
                         // Recent Load (Activity History)
                         VStack(alignment: .leading, spacing: 16) {
                             HStack(alignment: .bottom) {
@@ -161,6 +195,94 @@ struct FeedbackView: View {
                 self.isLoadingActivities = false
             }
         }
+    }
+}
+
+// MARK: - Fitness Chart (CTI/ATI/TIB form curve)
+
+struct FitnessPoint: Identifiable {
+    let date: Date
+    let cti: Double?
+    let ati: Double?
+    let tib: Double?
+    var id: Date { date }
+}
+
+/// Banister form chart: fitness (CTI) and fatigue (ATI) as lines, form (TIB)
+/// as bars. Inline-card variant of the MetricChartSheet pattern in TodayView.
+struct FitnessChartCard: View {
+    let points: [FitnessPoint]
+    let raceDate: Date?
+
+    /// Marker only when the race sits within 14 days after the latest snapshot
+    /// (race week approaching) — any further out and the RuleMark stretches the
+    /// x-domain until months of history compress into a sliver.
+    private var raceMarkerDate: Date? {
+        guard let race = raceDate,
+              let latest = points.last?.date,
+              race >= latest,
+              let cutoff = Calendar.current.date(byAdding: .day, value: 14, to: latest),
+              race <= cutoff
+        else { return nil }
+        return race
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(points) { point in
+                if let tib = point.tib {
+                    BarMark(
+                        x: .value("Date", point.date),
+                        y: .value("Value", tib)
+                    )
+                    .foregroundStyle(by: .value("Metric", "Form"))
+                }
+            }
+            ForEach(points) { point in
+                if let cti = point.cti {
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Value", cti),
+                        series: .value("Metric", "Fitness")
+                    )
+                    .foregroundStyle(by: .value("Metric", "Fitness"))
+                    .interpolationMethod(.catmullRom)
+                }
+            }
+            ForEach(points) { point in
+                if let ati = point.ati {
+                    LineMark(
+                        x: .value("Date", point.date),
+                        y: .value("Value", ati),
+                        series: .value("Metric", "Fatigue")
+                    )
+                    .foregroundStyle(by: .value("Metric", "Fatigue"))
+                    .interpolationMethod(.catmullRom)
+                }
+            }
+            if let race = raceMarkerDate {
+                RuleMark(x: .value("Race", race))
+                    .foregroundStyle(DS.Colors.accent.opacity(0.5))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .annotation(position: .top, alignment: .trailing) {
+                        Text("RACE")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(DS.Colors.outline)
+                    }
+            }
+        }
+        .chartForegroundStyleScale([
+            "Fitness": Color.blue,
+            "Fatigue": DS.Colors.warning,
+            "Form": DS.Colors.success.opacity(0.45)
+        ])
+        .chartYAxis {
+            AxisMarks(position: .leading)
+        }
+        .chartLegend(position: .top, alignment: .leading)
+        .frame(height: 220)
+        .glassCard()
     }
 }
 

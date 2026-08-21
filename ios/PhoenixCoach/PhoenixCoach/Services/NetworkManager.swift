@@ -425,10 +425,27 @@ class NetworkManager: ObservableObject {
         do {
             var request = URLRequest(url: url)
             request.timeoutInterval = 10
-            let (data, _) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
+            // 409 = no race configured yet; the backend refuses to generate.
+            // It must bypass the cached-plan fallback below, or a stale week
+            // keeps showing instead of the race-setup card — and the cache
+            // must go too, or a later transport error resurrects that week.
+            if let http = response as? HTTPURLResponse, http.statusCode == 409 {
+                UserDefaults.standard.removeObject(forKey: "cached_weekly_plan")
+                throw NetworkError.profileIncomplete
+            }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                throw NetworkError.serverError
+            }
+            let plan = try decoder.decode(WeeklyPlanResponse.self, from: data)
+            // Cache only after a successful decode — a raw 5xx body written
+            // here would poison the fallback below and shadow the last good plan.
             UserDefaults.standard.set(data, forKey: "cached_weekly_plan")
-            return try decoder.decode(WeeklyPlanResponse.self, from: data)
+            return plan
+        } catch NetworkError.profileIncomplete {
+            throw NetworkError.profileIncomplete
         } catch {
+            // Transport errors (Render cold start) still serve the cached plan.
             if let cachedData = UserDefaults.standard.data(forKey: "cached_weekly_plan"),
                let cachedResponse = try? decoder.decode(WeeklyPlanResponse.self, from: cachedData) {
                 return cachedResponse
@@ -603,13 +620,16 @@ enum NetworkError: LocalizedError {
     case serverError
     case decodingError
     case ollamaOffline
-    
+    /// Backend 409: no race_date/race_distance yet, so no plan can be generated.
+    case profileIncomplete
+
     var errorDescription: String? {
         switch self {
         case .invalidURL: return "Invalid server URL"
         case .serverError: return "Server error"
         case .decodingError: return "Failed to parse response"
         case .ollamaOffline: return "Ollama is not running on your Mac"
+        case .profileIncomplete: return "Set your race in Profile to get your first plan"
         }
     }
 }

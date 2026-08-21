@@ -112,6 +112,9 @@ struct TodayView: View {
     private let showPullDebug = false
     @State private var errorMessage: String?
     @State private var showConnectionSettings = false
+    /// Backend 409 profile_incomplete: no race configured, so no plan exists
+    /// yet. A setup card, not an error — fresh installs land here by design.
+    @State private var needsRaceSetup = false
     
     @State private var showScraperError = false
     @State private var scraperErrorMessage = ""
@@ -201,7 +204,11 @@ struct TodayView: View {
 
                             timelineLink
 
-                            workoutProtocolSection
+                            if needsRaceSetup {
+                                raceSetupCard
+                            } else {
+                                workoutProtocolSection
+                            }
 
                             complianceSection
 
@@ -872,24 +879,69 @@ struct TodayView: View {
         }
     }
     
-    private var emptyDayCard: some View {
+    /// Shared scaffold for the empty-state cards, so their styles can't drift.
+    /// `messagePadding` exists because raceSetupCard insets its message and
+    /// emptyDayCard never did.
+    private func statusCard(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        message: String,
+        messagePadding: Edge.Set = [],
+        @ViewBuilder accessory: () -> some View
+    ) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "zzz")
+            Image(systemName: icon)
                 .font(.largeTitle)
-                .foregroundStyle(DS.Colors.outline)
-            Text("Rest Day")
+                .foregroundStyle(iconColor)
+            Text(title)
                 .font(.headline.bold())
                 .foregroundStyle(DS.Colors.primaryText)
-            Text("No structured training scheduled for today. Focus on active recovery, stretching, or general wellness.")
+            Text(message)
                 .font(.caption)
                 .foregroundStyle(DS.Colors.onSurface)
                 .multilineTextAlignment(.center)
+                .padding(messagePadding)
+            accessory()
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
         .glassCard()
     }
-    
+
+    private var emptyDayCard: some View {
+        statusCard(
+            icon: "zzz",
+            iconColor: DS.Colors.outline,
+            title: "Rest Day",
+            message: "No structured training scheduled for today. Focus on active recovery, stretching, or general wellness."
+        ) {
+            EmptyView()
+        }
+    }
+
+    /// Shown in place of the plan when the backend answers 409
+    /// profile_incomplete: no race_date/race_distance, so nothing to plan yet.
+    private var raceSetupCard: some View {
+        statusCard(
+            icon: "flag.checkered",
+            iconColor: DS.Colors.accent.opacity(0.8),
+            title: "No plan yet",
+            message: "Tell me your race and date in Profile and I'll build your week.",
+            messagePadding: .horizontal
+        ) {
+            Button("Set Up Race") {
+                NotificationCenter.default.post(name: NSNotification.Name("OpenProfileTab"), object: nil)
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background(DS.Colors.accent.opacity(0.8))
+            .clipShape(Capsule())
+        }
+    }
+
     // MARK: - Logic & Network Helpers
     
     /// Both refresh tiers and the initial load drive the status pill through
@@ -930,6 +982,13 @@ struct TodayView: View {
             let plan = try await network.fetchWeeklyPlan()
             await MainActor.run {
                 self.weeklyPlan = plan
+                self.needsRaceSetup = false
+                self.isLoading = false
+            }
+        } catch NetworkError.profileIncomplete {
+            await MainActor.run {
+                self.needsRaceSetup = true
+                self.weeklyPlan = nil
                 self.isLoading = false
             }
         } catch {

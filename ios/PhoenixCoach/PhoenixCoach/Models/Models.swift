@@ -258,7 +258,9 @@ struct Athlete: Codable {
     let thresholdPaceMinKm: Double?
     let hrvBaseline: Double?
     let staminaLevel: Double?
-    
+    /// "yyyy-MM-dd" — drives the race marker on the Recent tab's fitness chart.
+    let raceDate: String?
+
     enum CodingKeys: String, CodingKey {
         case id, name
         case vo2Max = "vo2_max"
@@ -267,6 +269,7 @@ struct Athlete: Codable {
         case thresholdPaceMinKm = "threshold_pace_min_km"
         case hrvBaseline = "hrv_baseline"
         case staminaLevel = "stamina_level"
+        case raceDate = "race_date"
     }
 }
 
