@@ -201,3 +201,35 @@ def test_lthr_migration_backfills_once():
     assert row.lthr == 178
     assert row.hr_max == 190
     engine.dispose()
+
+
+def test_stale_hr_max_rewrite_heals_on_next_boot():
+    """During the lthr deploy an old instance re-wrote hr_max with the LTHR
+    value after the backfill nulled it. The one-shot guard won't re-run, so
+    the every-boot cleanup must clear the equal case — and only that case."""
+    from backend.main import _migrate_athletes
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE athletes (id INTEGER PRIMARY KEY, name VARCHAR, hr_max INTEGER)"
+        ))
+        conn.execute(text("INSERT INTO athletes (name, hr_max) VALUES ('Alex', 177)"))
+
+    _migrate_athletes(engine)
+
+    # Deploy overlap: an old instance writes the stale LTHR value back.
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE athletes SET hr_max = 177"))
+
+    _migrate_athletes(engine)
+
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT lthr, hr_max FROM athletes")).one()
+    assert row.lthr == 177
+    assert row.hr_max is None
+    engine.dispose()

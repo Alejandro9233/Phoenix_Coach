@@ -177,6 +177,13 @@ def normalize_workout(workout: dict) -> dict:
     if workout.get("enforced_reason"):
         normalized["enforced_reason"] = workout["enforced_reason"]
 
+    # Planned distance, prompted for since the constraint block asked for it.
+    # Only a clean number survives — the volume gate will sum these, and a
+    # string like "10-12km" summed as 0 is a silent hole in the gate.
+    dist = workout.get("distance_km")
+    if isinstance(dist, (int, float)) and not isinstance(dist, bool) and dist >= 0:
+        normalized["distance_km"] = float(dist)
+
     return normalized
 
 def normalize_plan(plan_json: dict) -> dict:
@@ -199,6 +206,7 @@ def normalize_plan(plan_json: dict) -> dict:
         ...
       },
       "_context": {...},       # Optional preserved metadata
+      "_revisions": [...],     # Optional preserved write receipts (plan_meta)
       "weekly_review": {...}   # Optional preserved metadata
     }
     """
@@ -218,6 +226,8 @@ def normalize_plan(plan_json: dict) -> dict:
     # Preserve metadata fields
     if "_context" in plan_json:
         normalized["_context"] = plan_json["_context"]
+    if "_revisions" in plan_json:
+        normalized["_revisions"] = plan_json["_revisions"]
     if "weekly_review" in plan_json:
         review_val = plan_json["weekly_review"]
         if isinstance(review_val, dict):
@@ -478,6 +488,13 @@ def normalize_plan(plan_json: dict) -> dict:
             # reason as `enforced_reason` on the workout — see normalize_workout.
             if day_data.get("enforcement_notes"):
                 normalized["days"][day_name]["enforcement_notes"] = day_data["enforcement_notes"]
+            # Adapt-today's provenance (what today looked like pre-adaptation).
+            # Replans pop these before inserting fresh days; everywhere else a
+            # normalize pass must not silently discard them.
+            if day_data.get("original_workouts") is not None:
+                normalized["days"][day_name]["original_workouts"] = day_data["original_workouts"]
+            if day_data.get("adaptation") is not None:
+                normalized["days"][day_name]["adaptation"] = day_data["adaptation"]
         else:
             # Fallback if day_data is string or not dict
             normalized["days"][day_name] = {

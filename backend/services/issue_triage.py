@@ -30,7 +30,6 @@ from typing import Optional
 
 from backend.services.constraint_enforcer import (
     SPORT_TO_INJURY_TOKENS,
-    enforce_constraints,
     get_active_injuries,
 )
 from backend.services.plan_normalizer import VALID_DAYS, map_sport, normalize_plan
@@ -373,6 +372,10 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
     plan_json = normalize_plan(plan_record.plan_json)
     days_dict = plan_json.get("days") or {}
 
+    # Receipt snapshot — full week; finalize trims it to the days written.
+    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    before = capture_before(plan_json)
+
     rest_days = [d for d, c in choices.items() if c == "rest" and d in VALID_DAYS]
     swap_days = [d for d, c in choices.items() if c == "swap" and d in VALID_DAYS]
 
@@ -425,6 +428,7 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
                 training_context=training_context,
                 completed_days_summary="\n".join(summary_lines),
                 days_to_plan=swap_days,
+                reason="The athlete reported an injury; the affected days are being rebuilt.",
             )
             for day_name, new_day in (result.get("days") or {}).items():
                 if day_name not in swap_days or not isinstance(new_day, dict):
@@ -453,12 +457,11 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
                 days_dict[day_name] = day
 
     plan_json["days"] = days_dict
-    plan_json = normalize_plan(plan_json)
 
-    # 4. Final gate, over the WHOLE injury window rather than just the days the
-    #    athlete picked an option for. A day the client omitted must not keep a
-    #    session the injury forbids — trusting the caller to send every day is
-    #    the same mistake as trusting the prompt.
+    # 4. Single persist pipeline, over the WHOLE injury window rather than just
+    #    the days the athlete picked an option for. A day the client omitted
+    #    must not keep a session the injury forbids — trusting the caller to
+    #    send every day is the same mistake as trusting the prompt.
     #
     #    Clipped to today onward: enforcing earlier days would rewrite training
     #    that already happened.
@@ -470,8 +473,9 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
 
     enforce_days = sorted(set(window_days) | set(rest_days) | set(swap_days))
     from backend.services.constraint_enforcer import get_travel_day_names
-    plan_json, violations = enforce_constraints(
-        plan_json,
+    plan_json, violations = run_plan_write_pipeline(
+        db, plan_json,
+        source="apply_issue",
         availability={
             "swim_days": athlete.swim_days,
             "bike_days": athlete.bike_days,
@@ -481,9 +485,9 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
         },
         active_injuries=get_active_injuries(db, athlete.id),
         days=enforce_days,
+        reason=f"{injury.body_part} reported (severity {injury.severity}/10)",
+        before=before,
     )
-    if violations:
-        print(f"🚧 Stripped {len(violations)} violation(s) after applying issue #{injury.id}")
 
     plan_record.plan_json = plan_json
     plan_record.last_adapted = None
@@ -732,6 +736,10 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     if not rebuild_days:
         return result
 
+    # Receipt snapshot — taken before the rebuild rewrites the rest days.
+    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    before = capture_before(plan_json, days=rebuild_days)
+
     athlete = db.query(Athlete).first()
 
     # 2. Rebuild through the normal replan path — the coach sees the injury is
@@ -763,6 +771,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
             training_context=training_context,
             completed_days_summary="\n".join(summary_lines),
             days_to_plan=rebuild_days,
+            reason="An injury resolved; its rest days are being rebuilt as training days.",
         ).get("days") or {}
     except Exception as e:
         print(f"⚠️ Recovery rebuild failed, plan left as-is: {e}")
@@ -780,10 +789,10 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
         regenerated.append(day_name)
 
     plan_json["days"] = days_dict
-    plan_json = normalize_plan(plan_json)
     from backend.services.constraint_enforcer import get_travel_day_names
-    plan_json, violations = enforce_constraints(
-        plan_json,
+    plan_json, violations = run_plan_write_pipeline(
+        db, plan_json,
+        source="apply_recovery",
         availability={
             "swim_days": athlete.swim_days,
             "bike_days": athlete.bike_days,
@@ -793,9 +802,9 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
         },
         active_injuries=get_active_injuries(db, athlete.id),
         days=regenerated,
+        reason=f"Recovered from {injury.body_part}",
+        before=before,
     )
-    if violations:
-        print(f"🚧 Stripped {len(violations)} violation(s) after recovery rebuild")
 
     plan_record.plan_json = plan_json
     plan_record.last_adapted = None
@@ -1029,6 +1038,10 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
     plan_json = normalize_plan(plan_record.plan_json)
     days_dict = plan_json.get("days") or {}
 
+    # Receipt snapshot — full week; finalize trims it to the days written.
+    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    before = capture_before(plan_json)
+
     # 2. Rest the blocked days deterministically — Python, not the LLM. What
     #    the athlete gets on a plane is not a coaching decision.
     displaced = []
@@ -1093,6 +1106,7 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
                 training_context=training_context,
                 completed_days_summary="\n".join(summary_lines),
                 days_to_plan=rebuild_days,
+                reason="Travel days were added; the open days are being rebuilt around them.",
             ).get("days") or {}
             for day_name, new_day in new_days.items():
                 if day_name not in rebuild_days or not isinstance(new_day, dict):
@@ -1106,9 +1120,9 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
             result["rebuild_error"] = str(e)
 
     plan_json["days"] = days_dict
-    plan_json = normalize_plan(plan_json)
-    plan_json, violations = enforce_constraints(
-        plan_json,
+    plan_json, violations = run_plan_write_pipeline(
+        db, plan_json,
+        source="apply_travel",
         availability={
             "swim_days": athlete.swim_days,
             "bike_days": athlete.bike_days,
@@ -1118,9 +1132,9 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
         },
         active_injuries=get_active_injuries(db, athlete.id),
         days=blocked + regenerated,
+        reason=f"Traveling on {', '.join(blocked)}" + (f" ({note})" if note else ""),
+        before=before,
     )
-    if violations:
-        print(f"🚧 Stripped {len(violations)} violation(s) after travel rebuild")
 
     plan_record.plan_json = plan_json
     plan_record.last_adapted = None

@@ -43,6 +43,35 @@ def _availability_text(value) -> str:
     return f"ONLY on {', '.join(days)} — all other days are forbidden"
 
 
+def build_constraint_block(ctx: dict) -> str:
+    """The single source of constraint prose for BOTH generation prompts.
+
+    Full-plan and partial-plan generation must state identical constraints —
+    the partial prompt used to omit travel and the protected-run-km rule, so
+    every mid-week rebuild (replan, injury, travel, recovery) lost the two
+    most important lines. test_context_injection.py pins the two prompts to
+    this block by string equality; extend it here, never inline.
+
+    travel_day_names arrives via compute_context's availability, so travel
+    coverage is automatic for every caller — no per-path plumbing.
+
+    B1's numeric volume-budget line (run-km range / hour range / quality cap)
+    slots in here once compute_budget exists.
+    """
+    avail = (ctx or {}).get("availability") or {}
+    travel = ", ".join(avail.get("travel_day_names") or []) or "none this week"
+    return f"""CONSTRAINTS YOU MUST RESPECT (violations are removed by the system after you answer):
+- Swimming: {_availability_text(avail.get('swim_days'))}
+- Cycling: {_availability_text(avail.get('bike_days'))}
+- Running: {_availability_text(avail.get('run_days'))}
+- Strength: {_availability_text(avail.get('strength_days'))}
+- Traveling (MUST be rest days, no training of any kind): {travel}
+- Weekly RUN kilometers are the protected quantity. If days are unavailable, move run sessions (especially the long run) to open days and drop strength or cycling instead. Never delete the long run to keep a strength session.
+- Copy workout titles VERBATIM from the AVAILABLE WORKOUTS menu — an off-menu title will be rejected.
+- Every running/cycling/swimming workout MUST include "distance_km" (a number).
+- For strength workouts, you MUST include a "muscle_groups" array selecting from: ["chest", "shoulders", "back", "legs", "arms"]."""
+
+
 def _format_training_context(ctx: dict) -> str:
     """Format the TrainingContext dict as human-readable text for the LLM prompt."""
     lines = []
@@ -399,14 +428,7 @@ Design this week's 7-day plan (Monday to Sunday). You decide:
 6. Write step-by-step details for each workout
 7. For STRENGTH workouts: decide the split (Push/Pull/Legs, Upper/Lower, etc.) and include the targeted muscle groups.
 
-CONSTRAINTS YOU MUST RESPECT:
-- Swimming: {_availability_text(ctx.get('availability', {}).get('swim_days'))}
-- Cycling: {_availability_text(ctx.get('availability', {}).get('bike_days'))}
-- Running: {_availability_text(ctx.get('availability', {}).get('run_days'))}
-- Strength: {_availability_text(ctx.get('availability', {}).get('strength_days'))}
-- Traveling (MUST be rest days, no training of any kind): {', '.join(ctx.get('availability', {}).get('travel_day_names') or []) or 'none this week'}
-- Weekly RUN kilometers are the protected quantity. If days are unavailable, move run sessions (especially the long run) to open days and drop strength or cycling instead. Never delete the long run to keep a strength session.
-- For strength workouts, you MUST include a "muscle_groups" array selecting from: ["chest", "shoulders", "back", "legs", "arms"] (e.g., ["legs"] or ["chest", "shoulders", "arms"]).
+{build_constraint_block(ctx)}
 
 OUTPUT FORMAT — respond ONLY with valid JSON matching the exact schema below.
 CRITICAL: You MUST use the exact keys "week_summary" and "days". Do NOT output a flat list under keys like "workout_plan" or "schedule". The "days" dictionary MUST contain the keys "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", and each day MUST have "summary", "workouts" (an array), "rationale", and "coach_note".
@@ -430,6 +452,7 @@ CRITICAL: You MUST use the exact keys "week_summary" and "days". Do NOT output a
           ],
           "total_time": "XX min",
           "hr_target": "XXX-XXX bpm",
+          "distance_km": 10.0,
           "muscle_groups": ["chest", "shoulders", "back", "legs", "arms"]
         }}
       ],
@@ -612,13 +635,19 @@ Respond ONLY with the JSON block. Do not write introductory or concluding conver
     def generate_remaining_days(self, athlete_summary: str, profile: dict,
                                  training_context: dict,
                                  completed_days_summary: str,
-                                 days_to_plan: list[str]) -> dict:
+                                 days_to_plan: list[str],
+                                 reason: str = "You are replanning the remaining days of an in-progress week.") -> dict:
         """
         Generate a partial weekly plan for only the remaining days.
-        
+
         Receives a summary of what the athlete already completed this week
         and generates only the specified remaining days, ensuring proper
         volume balancing and no missed key sessions.
+
+        `reason` tells the LLM WHY it is replanning (mid-week replan, injury,
+        travel, recovery). The old hardcoded line claimed "an earlier system
+        error corrupted some days" for every caller — a lie that skewed the
+        coaching tone on every rebuild.
         """
         context_text = _format_training_context(training_context)
         menu_text = _format_workout_menu(training_context)
@@ -646,8 +675,7 @@ The athlete has already completed some training this week. You MUST account for 
 load, and stimulus already delivered when planning the remaining days.
 
 IMPORTANT: Only prescribe workouts from the AVAILABLE WORKOUTS list. Do NOT prescribe anything from the FORBIDDEN list.
-IMPORTANT: You are replanning because an earlier system error corrupted some days. Make sure key 
-sessions (tempo runs, long runs, quality swim/bike sessions) are included if they were lost."""
+IMPORTANT: {reason} Make sure key sessions (tempo runs, long runs, quality swim/bike sessions) the week still needs are included."""
 
         prompt = f"""=== TRAINING CONTEXT ===
 {context_text}
@@ -673,11 +701,7 @@ Account for the training already done. You must:
 4. Use only workouts from the available menu
 5. For STRENGTH workouts: include the "muscle_groups" array
 
-CONSTRAINTS YOU MUST RESPECT:
-- Swimming: {_availability_text(training_context.get('availability', dict()).get('swim_days'))}
-- Cycling: {_availability_text(training_context.get('availability', dict()).get('bike_days'))}
-- Running: {_availability_text(training_context.get('availability', dict()).get('run_days'))}
-- Strength: {_availability_text(training_context.get('availability', dict()).get('strength_days'))}
+{build_constraint_block(training_context)}
 
 OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed above:
 {{
@@ -687,7 +711,7 @@ OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed a
 }}
 
 Each day must have: "summary", "workouts" (array), "rationale", "coach_note".
-Each workout: "sport", "title", "steps" (array), "total_time", "hr_target", "muscle_groups" (for strength).
+Each workout: "sport", "title", "steps" (array), "total_time", "hr_target", "distance_km" (for running/cycling/swimming), "muscle_groups" (for strength).
 Each step: "type" (warmup|main|recovery|cooldown), "duration" (MM:SS), "zone" (1-5), "description".
 
 Respond ONLY with the JSON block. Do not write introductory or concluding conversational text.

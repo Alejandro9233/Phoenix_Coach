@@ -71,6 +71,16 @@ def _migrate_athletes(target_engine):
             conn.execute(text("UPDATE athletes SET hr_max = NULL"))
         print("✅ Migration: added athletes.lthr, backfilled from hr_max, nulled hr_max")
 
+    # Every boot, not one-shot: during the lthr deploy an old instance re-wrote
+    # hr_max with the LTHR value after the backfill nulled it. hr_max == lthr is
+    # always that stale copy (a real max HR sits well above LTHR), so clearing
+    # the equal case is safe to repeat and heals any future overlap the same way.
+    with target_engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE athletes SET hr_max = NULL "
+            "WHERE hr_max IS NOT NULL AND hr_max = lthr"
+        ))
+
 
 def _ensure_columns():
     """Add columns introduced after a table was first created.
@@ -237,16 +247,78 @@ def get_athlete_profile(db: Session = Depends(get_db)):
     }
 
 
+def _reenforce_current_week(db, athlete):
+    """Re-enforce the stored week after availability changed in Profile.
+
+    Deliberately pure Python: ProfileView autosaves on every toggle, so an
+    LLM call here would fire per keystroke, cost money, and could 502
+    mid-edit. The enforcer is idempotent and fails toward rest-with-reason;
+    the athlete can hit replan-remaining afterward for a proper refit.
+
+    Scoped to today-forward — past days are history and are never
+    revalidated (same invariant as replan-remaining). Persists only when a
+    session was actually stripped, so repeated autosaves don't churn the row.
+    """
+    from datetime import timedelta
+
+    from backend.models.database import WeeklyPlan
+    from backend.services.constraint_enforcer import (
+        get_active_injuries,
+        get_travel_day_names,
+    )
+    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    from backend.services.plan_normalizer import VALID_DAYS, normalize_plan
+
+    today = get_local_today()
+    start_of_week = today - timedelta(days=today.weekday())
+    plan_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    if not plan_record:
+        return None
+
+    days = VALID_DAYS[today.weekday():]
+    plan_json = normalize_plan(plan_record.plan_json)
+    before = capture_before(plan_json, days=days)
+
+    plan_json, violations = run_plan_write_pipeline(
+        db, plan_json,
+        source="profile_reenforce",
+        availability={
+            "swim_days": athlete.swim_days,
+            "bike_days": athlete.bike_days,
+            "run_days": athlete.run_days,
+            "strength_days": athlete.strength_days,
+            "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
+        },
+        active_injuries=get_active_injuries(db, athlete.id),
+        days=days,
+        reason="Availability changed in Profile",
+        before=before,
+    )
+    if violations:
+        from sqlalchemy.orm.attributes import flag_modified
+        plan_record.plan_json = plan_json
+        flag_modified(plan_record, "plan_json")
+        db.commit()
+    return {"stripped": len(violations), "details": violations}
+
+
 @app.put("/athlete/profile")
 def update_athlete_profile(body: dict, db: Session = Depends(get_db)):
     """Update the athlete's profile."""
     from datetime import date as date_type
-    
+
     athlete = db.query(Athlete).first()
     if not athlete:
         athlete = Athlete(name="New Athlete")
         db.add(athlete)
-    
+
+    # A disabled sport must not leave ghost sessions in the stored week, so
+    # availability changes re-enforce the plan below. Snapshot to detect them.
+    availability_fields = ("swim_days", "bike_days", "run_days", "strength_days")
+    old_availability = {f: getattr(athlete, f, None) for f in availability_fields}
+
     # Update only provided fields
     updatable = [
         "name", "age", "weight_kg", "race_name", "race_type", "race_distance",
@@ -288,7 +360,16 @@ def update_athlete_profile(body: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(athlete)
     print(f"Profile updated: {athlete.name}, race={athlete.race_name} on {athlete.race_date}, start={athlete.training_start_date}")
-    return {"status": "ok", "message": "Profile updated"}
+
+    # A prompt-only constraint is a suggestion; the stored week must obey the
+    # new availability too. iOS never decodes this body, so the extra key is
+    # safe — a future nudge ("Replan remaining week?") can read it.
+    response = {"status": "ok", "message": "Profile updated"}
+    if any(getattr(athlete, f) != old_availability[f] for f in availability_fields):
+        enforcement = _reenforce_current_week(db, athlete)
+        if enforcement is not None:
+            response["plan_enforcement"] = enforcement
+    return response
 
 @app.get("/athlete/injuries")
 def get_athlete_injuries(db: Session = Depends(get_db)):
@@ -626,22 +707,17 @@ def get_weekly_plan(db: Session = Depends(get_db)):
         except Exception as e:
             print(f"⚠️ Error generating weekly review: {e}")
             
-    # Normalize the generated plan
-    from backend.services.plan_normalizer import normalize_plan
-    new_plan_json = normalize_plan(new_plan_json)
-
-    # Hard gate: the prompt asks the LLM to respect availability and injuries,
-    # but only this strips what it emits anyway. Never persist an unenforced plan.
-    from backend.services.constraint_enforcer import enforce_constraints, get_active_injuries
-    new_plan_json, violations = enforce_constraints(
-        new_plan_json,
+    # Single persist pipeline: normalize -> hard constraint gate -> receipt.
+    # Never persist a plan that skipped a stage.
+    from backend.services.constraint_enforcer import get_active_injuries
+    from backend.services.plan_meta import run_plan_write_pipeline
+    new_plan_json, violations = run_plan_write_pipeline(
+        db, new_plan_json,
+        source="generate",
         availability=training_context.get("availability", {}),
         active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+        reason="Weekly plan generated",
     )
-    if violations:
-        print(f"🚧 Stripped {len(violations)} constraint violation(s) from the new plan:")
-        for v in violations:
-            print(f"   - {v['day']}: {v['title']} — {v['reason']}")
 
     # Save to database
     new_record = WeeklyPlan(
@@ -713,11 +789,15 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     
     plan_json = normalize_plan(plan_record.plan_json)
     days_dict = plan_json.get("days", {})
-    
+
     # Determine which days to lock and which to replan
     # Lock everything before today; replan today + future
     locked_days = day_names_ordered[:today_idx]
     days_to_replan = day_names_ordered[today_idx:]
+
+    # Receipt snapshot — taken now, before the merge below rewrites the days.
+    from backend.services.plan_meta import capture_before
+    before = capture_before(plan_json, days=days_to_replan)
     
     # Get all activities this week for the completed days summary
     week_activities = db.query(Activity).filter(
@@ -803,7 +883,8 @@ def replan_remaining_days(db: Session = Depends(get_db)):
             profile=profile,
             training_context=training_context,
             completed_days_summary=completed_days_summary,
-            days_to_plan=days_to_replan
+            days_to_plan=days_to_replan,
+            reason="The athlete requested a mid-week replan.",
         )
     except Exception as e:
         raise HTTPException(
@@ -824,26 +905,23 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     
     plan_json["days"] = days_dict
 
-    # Re-normalize and save
-    plan_json = normalize_plan(plan_json)
-
-    # Hard gate, scoped to the replanned days only — enforcing the locked days
-    # would rewrite history the athlete already trained.
+    # Single persist pipeline, scoped to the replanned days only — enforcing
+    # the locked days would rewrite history the athlete already trained.
     #
-    # This is the fix for: change strength_days in Profile, hit replan, and the
-    # strength session stays put. The prompt carried the new availability, the
-    # LLM ignored it, and nothing checked.
-    from backend.services.constraint_enforcer import enforce_constraints, get_active_injuries
-    plan_json, violations = enforce_constraints(
-        plan_json,
+    # The gate stage is the fix for: change strength_days in Profile, hit
+    # replan, and the strength session stays put. The prompt carried the new
+    # availability, the LLM ignored it, and nothing checked.
+    from backend.services.constraint_enforcer import get_active_injuries
+    from backend.services.plan_meta import run_plan_write_pipeline
+    plan_json, violations = run_plan_write_pipeline(
+        db, plan_json,
+        source="replan_remaining",
         availability=training_context.get("availability", {}),
         active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
         days=days_to_replan,
+        reason="The athlete requested a mid-week replan.",
+        before=before,
     )
-    if violations:
-        print(f"🚧 Stripped {len(violations)} constraint violation(s) from the replan:")
-        for v in violations:
-            print(f"   - {v['day']}: {v['title']} — {v['reason']}")
 
     from sqlalchemy.orm.attributes import flag_modified
     plan_record.plan_json = plan_json
@@ -911,6 +989,10 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     days_dict = plan_json.get("days", {})
     if today_day_name not in days_dict:
         raise HTTPException(status_code=400, detail=f"Today's day name ({today_day_name}) not found in the weekly plan.")
+
+    # Receipt snapshot — before the adaptation rewrites today.
+    from backend.services.plan_meta import capture_before
+    before = capture_before(plan_json, days=[today_day_name])
         
     planned_workout_day = days_dict[today_day_name]
     
@@ -989,22 +1071,22 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
         adapted_day["original_workouts"] = planned_workout_day["original_workouts"]
     plan_json["days"][today_day_name] = adapted_day
 
-    # Hard gate today only. Adaptation can swap the sport entirely (a hard run
-    # downgraded to an easy spin), so it can invent a violation the original
-    # plan didn't have.
-    from backend.services.constraint_enforcer import enforce_constraints, get_active_injuries
+    # Single persist pipeline, today only. Adaptation can swap the sport
+    # entirely (a hard run downgraded to an easy spin), so it can invent a
+    # violation the original plan didn't have.
+    from backend.services.constraint_enforcer import get_active_injuries
+    from backend.services.plan_meta import run_plan_write_pipeline
     athlete_row = db.query(Athlete).first()
-    plan_json, violations = enforce_constraints(
-        plan_json,
+    plan_json, violations = run_plan_write_pipeline(
+        db, plan_json,
+        source="adapt_today",
         availability=training_context.get("availability", {}),
         active_injuries=get_active_injuries(db, athlete_row.id) if athlete_row else [],
         days=[today_day_name],
+        reason="Today's workout adapted to recovery metrics.",
+        before=before,
     )
     adapted_day = plan_json["days"][today_day_name]
-    if violations:
-        print(f"🚧 Stripped {len(violations)} constraint violation(s) from today's adaptation:")
-        for v in violations:
-            print(f"   - {v['day']}: {v['title']} — {v['reason']}")
 
     # We must explicitly flag the JSON as modified for SQLAlchemy to update it
     from sqlalchemy.orm.attributes import flag_modified

@@ -256,3 +256,98 @@ def test_fully_skipped_week_reads_as_zero_compliance(temp_db_session):
     assert lw["note"] == "No activities recorded last week."
     # The false detraining disclaimer must not reach the prompt for this week.
     assert "Compliance: n/a" not in _format_training_context(ctx)
+
+
+# ─── B5: one constraint block for both generation prompts ─────────────────────
+#
+# The partial-plan prompt used to omit travel and the protected-run-km rule,
+# so every mid-week rebuild (replan, injury, travel, recovery) lost the two
+# most important constraints. build_constraint_block is now the single source;
+# these tests pin both prompts to it and kill the false "system error" line.
+
+import backend.agents.response_agent as ra
+from backend.agents.response_agent import ResponseAgent, build_constraint_block
+
+
+def _capture_chat(monkeypatch, payload):
+    calls = []
+
+    def fake_chat(messages, **kwargs):
+        calls.append(messages)
+        return payload
+
+    monkeypatch.setattr(ra, "chat_completion", fake_chat)
+    return calls
+
+
+def _marathon_ctx(session, **overrides):
+    session.add(_marathon_athlete(**overrides))
+    session.commit()
+    ctx = PeriodizationEngine().compute_context(session)
+    ctx.setdefault("availability", {})["travel_day_names"] = ["Friday"]
+    return ctx
+
+
+def _all_text(calls):
+    return "\n".join(m["content"] for call in calls for m in call)
+
+
+def test_partial_prompt_carries_travel_and_protected_km(temp_db_session, monkeypatch):
+    calls = _capture_chat(monkeypatch, '{"days": {}}')
+    ctx = _marathon_ctx(temp_db_session)
+
+    ResponseAgent().generate_remaining_days(
+        athlete_summary="S", profile={}, training_context=ctx,
+        completed_days_summary="done", days_to_plan=["Friday", "Saturday"])
+
+    text = _all_text(calls)
+    assert "Traveling (MUST be rest days, no training of any kind): Friday" in text
+    assert "protected quantity" in text
+
+
+def test_both_prompts_contain_the_identical_block(temp_db_session, monkeypatch):
+    calls = _capture_chat(monkeypatch, '{"week_summary": {}, "days": {}}')
+    ctx = _marathon_ctx(temp_db_session)
+    block = build_constraint_block(ctx)
+
+    ResponseAgent().generate_weekly_plan("S", {}, training_context=ctx)
+    ResponseAgent().generate_remaining_days(
+        athlete_summary="S", profile={}, training_context=ctx,
+        completed_days_summary="done", days_to_plan=["Saturday"])
+
+    assert len(calls) == 2
+    for call in calls:
+        user_prompt = call[-1]["content"]
+        assert block in user_prompt
+
+
+def test_no_prompt_claims_a_system_error(temp_db_session, monkeypatch):
+    calls = _capture_chat(monkeypatch, '{"week_summary": {}, "days": {}}')
+    ctx = _marathon_ctx(temp_db_session)
+
+    ResponseAgent().generate_weekly_plan("S", {}, training_context=ctx)
+    ResponseAgent().generate_remaining_days(
+        athlete_summary="S", profile={}, training_context=ctx,
+        completed_days_summary="done", days_to_plan=["Saturday"])
+
+    assert "system error" not in _all_text(calls)
+    assert "corrupted" not in _all_text(calls)
+
+
+def test_partial_reason_is_caller_supplied(temp_db_session, monkeypatch):
+    calls = _capture_chat(monkeypatch, '{"days": {}}')
+    ctx = _marathon_ctx(temp_db_session)
+
+    ResponseAgent().generate_remaining_days(
+        athlete_summary="S", profile={}, training_context=ctx,
+        completed_days_summary="done", days_to_plan=["Saturday"],
+        reason="The athlete reported an injury; the affected days are being rebuilt.")
+
+    system_prompt = calls[0][0]["content"]
+    assert ("The athlete reported an injury; the affected days are being rebuilt."
+            in system_prompt)
+
+
+def test_disabled_sport_keeps_never_wording_in_block():
+    block = build_constraint_block({"availability": {"swim_days": ""}})
+    assert "Swimming: NEVER — the athlete has disabled this sport" in block
