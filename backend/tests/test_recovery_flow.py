@@ -29,10 +29,16 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 
 
 def _training_day(name):
+    # A short run with a PLAUSIBLE declared km (20 min / 3 km = 6:40/km)
+    # keeps a full-week rebuild under the volume gate's ceiling on ANY
+    # weekday — a Monday rebuild spans 7 days, and an implausible pace would
+    # get the declared km discarded and re-estimated. This suite is about
+    # recovery, not volume.
     return {
         "summary": f"{name} session",
         "workouts": [
-            {"sport": "running", "title": "Easy Run", "steps": [], "total_time": "45:00"}
+            {"sport": "running", "title": "Easy Run", "steps": [],
+             "total_time": "20:00", "distance_km": 3.0}
         ],
         "rationale": "train",
         "coach_note": "go",

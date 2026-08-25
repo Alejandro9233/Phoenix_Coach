@@ -173,7 +173,12 @@ def test_replan_receipt_and_fresh_context(client, test_db_session, monkeypatch):
     athlete.swim_days = "sat"
     test_db_session.commit()
 
+    # Plausible declared km (60 min / 6 km = 10:00/km, the plausibility
+    # edge) keep a whole-week replan (Monday: all 7 days) inside the volume
+    # gate's ceiling — this test is about receipts, not volume.
     fixed_days = {d: _day("running", "Replanned Run", "60 min") for d in remaining}
+    for d in fixed_days:
+        fixed_days[d]["workouts"][0]["distance_km"] = 6.0
     monkeypatch.setattr(
         ResponseAgent, "generate_remaining_days",
         lambda self, **kwargs: {"days": json.loads(json.dumps(fixed_days))})

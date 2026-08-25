@@ -296,12 +296,26 @@ class ResponseAgent:
                               seed: int | None = PLAN_SEED) -> dict:
         """chat_completion in JSON mode, with one retry on malformed JSON.
 
-        Only decode errors retry — json_mode output occasionally truncates,
-        and a second attempt is cheap. API errors (dead model, auth, rate
-        limit) propagate immediately so the caller can fail the request.
+        Two failure shapes retry once, both meaning "the model fumbled the
+        JSON, a resample is cheap": a local decode error, and Groq's
+        server-side json_validate_failed 400 (its json_object validator
+        rejecting the output — seen 2026-08-24 when reasoning starved the
+        completion budget). Every other API error (dead model, auth, rate
+        limit) propagates immediately so the caller can fail the request.
         """
-        content = chat_completion(messages=messages, json_mode=True,
-                                  temperature=temperature, seed=seed)
+        def _is_json_validate_failed(exc: Exception) -> bool:
+            return "json_validate_failed" in str(exc)
+
+        try:
+            content = chat_completion(messages=messages, json_mode=True,
+                                      temperature=temperature, seed=seed)
+        except Exception as e:
+            if not _is_json_validate_failed(e):
+                raise
+            print(f"Groq rejected plan JSON ({e}); retrying once...")
+            content = chat_completion(messages=messages, json_mode=True,
+                                      temperature=temperature, seed=seed)
+            return json.loads(content)
         try:
             return json.loads(content)
         except json.JSONDecodeError as e:

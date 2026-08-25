@@ -57,11 +57,31 @@ def chat_completion(messages: list[dict], json_mode: bool = False,
     else:
         return _ollama_chat(messages, json_mode, temperature, seed)
 
+# JSON-mode budget (2026-08-24 incident). gpt-oss-120b is a reasoning model
+# whose thinking tokens COUNT AGAINST the completion budget; with no explicit
+# cap Groq allowed ~3072 completion tokens, the Wave-4 prompt pushed medium-
+# effort reasoning to ~2800 of them, and the 7-day plan JSON truncated to
+# nothing -> HTTP 400 json_validate_failed with an empty failed_generation,
+# every single time. Two constraints fix it together:
+# - reasoning_effort "low": measured 325 reasoning tokens on the same prompt,
+#   full valid plan. Structured copy-the-menu output doesn't need deep
+#   thought, and the volume/pace gates catch slippage structurally.
+# - max_completion_tokens 5000: headroom above the ~3072 default WITHOUT
+#   tripping the free tier's 8000 tokens-per-minute limiter, which counts
+#   prompt + max_completion_tokens per request (30000 -> instant 413).
+JSON_MODE_REASONING_EFFORT = "low"
+JSON_MODE_MAX_COMPLETION_TOKENS = 5000
+
+
 def _build_groq_kwargs(model: str, messages: list[dict], json_mode: bool,
-                       temperature: float, seed: int | None) -> dict:
+                       temperature: float, seed: int | None,
+                       reasoning_effort: str | None = None,
+                       max_completion_tokens: int | None = None) -> dict:
     """Build the OpenAI-compatible request kwargs for a Groq chat call.
 
     Pure — tests verify the request shape here without a network call.
+    json_mode defaults reasoning_effort/max_completion_tokens (see above);
+    callers may override either explicitly.
     """
     kwargs = {
         "model": model,
@@ -72,6 +92,14 @@ def _build_groq_kwargs(model: str, messages: list[dict], json_mode: bool,
         kwargs["seed"] = seed
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
+        if reasoning_effort is None:
+            reasoning_effort = JSON_MODE_REASONING_EFFORT
+        if max_completion_tokens is None:
+            max_completion_tokens = JSON_MODE_MAX_COMPLETION_TOKENS
+    if reasoning_effort is not None:
+        kwargs["reasoning_effort"] = reasoning_effort
+    if max_completion_tokens is not None:
+        kwargs["max_completion_tokens"] = max_completion_tokens
     return kwargs
 
 def _groq_chat(messages: list[dict], json_mode: bool,
