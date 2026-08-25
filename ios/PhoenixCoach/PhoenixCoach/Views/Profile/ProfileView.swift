@@ -45,12 +45,25 @@ struct ProfileView: View {
     @State private var selectedBikeDays: Set<String> = []
     @State private var selectedRunDays: Set<String> = []
     @State private var selectedStrengthDays: Set<String> = []
-    
+
+    // Tune-up race state
+    @State private var hasTuneRaceDate = false
+    @State private var tuneRaceDateVal: Date = Date()
+    @State private var tuneDistanceName = "Half Marathon"
+    @State private var tuneTargetHours = 0
+    @State private var tuneTargetMinutes = 0
+    @State private var tuneTargetSeconds = 0
+    @State private var showTuneTargetPicker = false
+
     @FocusState private var activeField: Field?
-    
+
     enum Field: Hashable {
-        case name, age, weight, trainingStartDate, raceName, raceDate, targetTime, serverURL
+        case name, age, weight, trainingStartDate, raceName, raceDate, targetTime, serverURL, tuneRaceDate, tuneTargetTime
     }
+
+    let tuneDistances: [(name: String, km: Double)] = [
+        ("5k", 5.0), ("10k", 10.0), ("Half Marathon", 21.0975), ("Marathon", 42.195)
+    ]
     
     let daysOfWeek = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
     let dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -116,7 +129,10 @@ struct ProfileView: View {
                             
                             // Race Objectives Board Card
                             raceObjectivesSection
-                            
+
+                            // Tune-up Race Card (October half → Riegel verdict)
+                            tuneupRaceSection
+
                             // Weekly Constraints Availability Matrix Card
                             weeklyConstraintsSection
 
@@ -612,6 +628,222 @@ struct ProfileView: View {
         }
     }
     
+    // TUNE-UP RACE — the fitness-test race (e.g. the October half). Setting a
+    // date makes its week a race week on the backend; once the result is
+    // scraped the card shows the Riegel verdict and a proposed target, which
+    // Alex applies himself via the Target Time picker above.
+    private var tuneupRaceSection: some View {
+        GlassPanelCard {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 8) {
+                    Image(systemName: "flag.checkered")
+                        .font(.system(size: 15))
+                        .foregroundStyle(DS.Colors.outline)
+                    Text("TUNE-UP RACE")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(.white)
+                }
+                .padding(.bottom, 2)
+
+                HStack(spacing: 24) {
+                    // Race Date
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Race Date")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(activeField == .tuneRaceDate ? DS.Colors.accent : DS.Colors.outline)
+                            .tracking(1.5)
+                            .textCase(.uppercase)
+
+                        ZStack(alignment: .leading) {
+                            HStack {
+                                Text(hasTuneRaceDate ? Formatters.shortMonthDay.string(from: tuneRaceDateVal) : "Select Date")
+                                    .font(.system(size: 17, weight: .light))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(activeField == .tuneRaceDate ? DS.Colors.accent : DS.Colors.outline)
+                            }
+
+                            DatePicker("", selection: $tuneRaceDateVal, displayedComponents: .date)
+                                .labelsHidden()
+                                .blendMode(.destinationOver)
+                                .opacity(0.011)
+                                .onAppear { hasTuneRaceDate = true }
+                                .onChange(of: tuneRaceDateVal) { _ in Task { await saveProfile() } }
+                        }
+                        .padding(.vertical, 4)
+
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundStyle(activeField == .tuneRaceDate ? DS.Colors.accent : Color.white.opacity(0.1))
+                    }
+                    .focused($activeField, equals: .tuneRaceDate)
+
+                    // Target for the tune race itself (optional)
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showTuneTargetPicker.toggle()
+                            showDurationPicker = false
+                            activeField = showTuneTargetPicker ? .tuneTargetTime : nil
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Race Goal")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(showTuneTargetPicker ? DS.Colors.accent : DS.Colors.outline)
+                                .tracking(1.5)
+                                .textCase(.uppercase)
+
+                            HStack {
+                                Text(hasTuneTarget
+                                     ? String(format: "%02dh %02dm %02ds", tuneTargetHours, tuneTargetMinutes, tuneTargetSeconds)
+                                     : "Optional")
+                                    .font(.system(size: 17, weight: .light))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(showTuneTargetPicker ? DS.Colors.accent : DS.Colors.outline)
+                            }
+                            .padding(.vertical, 4)
+
+                            Rectangle()
+                                .frame(height: 1)
+                                .foregroundStyle(showTuneTargetPicker ? DS.Colors.accent : Color.white.opacity(0.1))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .focused($activeField, equals: .tuneTargetTime)
+                }
+
+                // Distance dropdown
+                ElegantDropdownField(
+                    label: "Distance",
+                    selection: Binding(
+                        get: { tuneDistanceName },
+                        set: {
+                            tuneDistanceName = $0
+                            Task { await saveProfile() }
+                        }
+                    ),
+                    options: tuneDistances.map { $0.name }
+                )
+
+                // Expandable goal wheels
+                if showTuneTargetPicker {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Select Goal (HH : MM : SS)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(DS.Colors.outline)
+                                .tracking(1.0)
+                            Spacer()
+                            Button("Done") {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    showTuneTargetPicker = false
+                                    activeField = nil
+                                }
+                                Task { await saveProfile() }
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(DS.Colors.accent)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+
+                        HStack(spacing: 0) {
+                            Picker("Hours", selection: $tuneTargetHours) {
+                                ForEach(0..<10) { h in
+                                    Text("\(h) h").tag(h)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+
+                            Picker("Minutes", selection: $tuneTargetMinutes) {
+                                ForEach(0..<60) { m in
+                                    Text("\(m) m").tag(m)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+
+                            Picker("Seconds", selection: $tuneTargetSeconds) {
+                                ForEach(0..<60) { s in
+                                    Text("\(s) s").tag(s)
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                        }
+                        .frame(height: 110)
+                    }
+                    .background(Color.white.opacity(0.02))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.top, 4)
+                }
+
+                // Verdict card — appears once the scrape finds the race
+                if let tu = profile.tuneup {
+                    if let result = tu.result {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("RESULT")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1.5)
+                                    .foregroundStyle(DS.Colors.outline)
+                                Spacer()
+                                Text(result.time ?? "—")
+                                    .font(.system(size: 17, weight: .light))
+                                    .foregroundStyle(DS.Colors.accent)
+                            }
+                            if let verdict = tu.verdict {
+                                if let predicted = verdict.predicted {
+                                    HStack {
+                                        Text("PREDICTED \(profile.raceDistance?.uppercased() ?? "RACE")")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .tracking(1.5)
+                                            .foregroundStyle(DS.Colors.outline)
+                                        Spacer()
+                                        Text(predicted)
+                                            .font(.system(size: 17, weight: .light))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                                if let summary = verdict.summary {
+                                    Text(summary)
+                                        .font(.system(size: 13, weight: .light))
+                                        .foregroundStyle(DS.Colors.onSurface)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                        .padding(12)
+                        .background(Color.white.opacity(0.02))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(DS.Colors.accent.opacity(0.25), lineWidth: 1)
+                        )
+                    } else if let days = tu.daysAway, days >= 0 {
+                        Text(days == 0 ? "Race day. Result appears here after the sync."
+                             : "In \(days) day\(days == 1 ? "" : "s") — result and verdict appear here after the race is synced.")
+                            .font(.system(size: 12, weight: .light))
+                            .foregroundStyle(DS.Colors.outline)
+                    }
+                }
+            }
+        }
+    }
+
+    private var hasTuneTarget: Bool {
+        tuneTargetHours != 0 || tuneTargetMinutes != 0 || tuneTargetSeconds != 0
+    }
+
     // WEEKLY CONSTRAINTS schedule matrix
     private var weeklyConstraintsSection: some View {
         GlassPanelCard {
@@ -735,7 +967,26 @@ struct ProfileView: View {
                 
                 // Parse target time
                 self.parseTargetDuration(prof.targetFinishTime)
-                
+
+                // Parse tune-up race
+                if let tuneDateStr = prof.tuneRaceDate {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "yyyy-MM-dd"
+                    if let d = formatter.date(from: tuneDateStr) {
+                        self.tuneRaceDateVal = d
+                        self.hasTuneRaceDate = true
+                    } else {
+                        self.hasTuneRaceDate = false
+                    }
+                } else {
+                    self.hasTuneRaceDate = false
+                }
+                if let km = prof.tuneRaceDistanceKm,
+                   let closest = tuneDistances.min(by: { abs($0.km - km) < abs($1.km - km) }) {
+                    self.tuneDistanceName = closest.name
+                }
+                self.parseTuneTarget(prof.tuneRaceTarget)
+
                 isLoading = false
             }
         } catch {
@@ -779,7 +1030,20 @@ struct ProfileView: View {
         let minsStr = String(format: "%02d", targetMinutes)
         let secsStr = String(format: "%02d", targetSeconds)
         profile.targetFinishTime = "\(hrsStr):\(minsStr):\(secsStr)"
-        
+
+        // Prepare tune-up race
+        if hasTuneRaceDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            profile.tuneRaceDate = formatter.string(from: tuneRaceDateVal)
+            profile.tuneRaceDistanceKm = tuneDistances.first(where: { $0.name == tuneDistanceName })?.km
+            profile.tuneRaceTarget = hasTuneTarget
+                ? String(format: "%02d:%02d:%02d", tuneTargetHours, tuneTargetMinutes, tuneTargetSeconds)
+                : nil
+        } else {
+            profile.tuneRaceDate = nil
+        }
+
         do {
             try await NetworkManager.shared.updateAthleteProfile(profile)
             await MainActor.run {
@@ -809,6 +1073,21 @@ struct ProfileView: View {
         daysOfWeek.filter { set.contains($0) }.joined(separator: ",")
     }
     
+    private func parseTuneTarget(_ timeStr: String?) {
+        guard let s = timeStr, !s.isEmpty else {
+            tuneTargetHours = 0
+            tuneTargetMinutes = 0
+            tuneTargetSeconds = 0
+            return
+        }
+        let parts = s.split(separator: ":").compactMap { Int($0) }
+        if parts.count == 3 {
+            tuneTargetHours = parts[0]
+            tuneTargetMinutes = parts[1]
+            tuneTargetSeconds = parts[2]
+        }
+    }
+
     private func parseTargetDuration(_ timeStr: String?) {
         guard let s = timeStr, !s.isEmpty else {
             self.targetHours = 3

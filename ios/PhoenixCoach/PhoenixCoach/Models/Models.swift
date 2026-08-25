@@ -310,9 +310,16 @@ struct AthleteProfile: Codable {
     /// IANA identifier for the device's current timezone, e.g. "America/Hermosillo".
     /// Stamped automatically on save — the backend uses it to decide what "today" is.
     var timezone: String?
+    var tuneRaceDate: String?
+    var tuneRaceDistanceKm: Double?
+    var tuneRaceTarget: String?
+    /// Read-only card state from the backend: result + Riegel verdict once
+    /// the race is scraped. Riding it back on PUT is harmless — the backend
+    /// only reads the tune_race_* fields.
+    var tuneup: TuneupStatus?
 
     enum CodingKeys: String, CodingKey {
-        case name, age, timezone
+        case name, age, timezone, tuneup
         case weightKg = "weight_kg"
         case raceName = "race_name"
         case raceType = "race_type"
@@ -324,6 +331,48 @@ struct AthleteProfile: Codable {
         case strengthDays = "strength_days"
         case targetFinishTime = "target_finish_time"
         case trainingStartDate = "training_start_date"
+        case tuneRaceDate = "tune_race_date"
+        case tuneRaceDistanceKm = "tune_race_distance_km"
+        case tuneRaceTarget = "tune_race_target"
+    }
+}
+
+struct TuneupStatus: Codable {
+    let raceDate: String?
+    let distanceKm: Double?
+    let target: String?
+    let daysAway: Int?
+    let result: TuneupResult?
+    let verdict: TuneupVerdict?
+
+    enum CodingKeys: String, CodingKey {
+        case raceDate = "race_date"
+        case distanceKm = "distance_km"
+        case target, result, verdict
+        case daysAway = "days_away"
+    }
+}
+
+struct TuneupResult: Codable {
+    let time: String?
+    let distanceKm: Double?
+    let date: String?
+
+    enum CodingKeys: String, CodingKey {
+        case time, date
+        case distanceKm = "distance_km"
+    }
+}
+
+struct TuneupVerdict: Codable {
+    let predicted: String?
+    let goal: String?
+    let deltaSec: Int?
+    let summary: String?
+
+    enum CodingKeys: String, CodingKey {
+        case predicted, goal, summary
+        case deltaSec = "delta_sec"
     }
 }
 

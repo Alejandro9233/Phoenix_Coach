@@ -46,7 +46,7 @@ from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyP
 from backend.services.constraint_enforcer import (
     SPORT_TO_AVAILABILITY_KEY, get_travel_day_names, parse_day_list,
 )
-from backend.services.pace_model import compute_pace_model
+from backend.services.pace_model import compute_pace_model, race_label
 from backend.utils.timezone import get_local_today
 
 # Weekly run-km progression (_get_weekly_run_target). Tunable in one place.
@@ -1165,11 +1165,31 @@ class PeriodizationEngine:
             race_distance=race_distance
         )
 
+        # Tune-up race (the October half). Its week is a race week: volume
+        # scales down and the race replaces the long run. Past races drop out
+        # of planning context — the Riegel verdict lives in /athlete/profile.
+        start_of_week = today - timedelta(days=today.weekday())
+        tuneup_week = bool(
+            athlete.tune_race_date
+            and start_of_week <= athlete.tune_race_date < start_of_week + timedelta(days=7)
+        )
+        tuneup = None
+        if athlete.tune_race_date and (athlete.tune_race_date - today).days >= 0:
+            tuneup = {
+                "race_date": athlete.tune_race_date.isoformat(),
+                "race_day_name": athlete.tune_race_date.strftime("%A"),
+                "distance_km": athlete.tune_race_distance_km,
+                "label": race_label(athlete.tune_race_distance_km),
+                "target": athlete.tune_race_target,
+                "days_away": (athlete.tune_race_date - today).days,
+                "is_race_week": tuneup_week,
+            }
+
         # THE weekly run-km target — actuals-derived, ramp-capped. The volume
         # gate enforces these numbers; the phase range above is only prose.
         volume_targets = self._get_weekly_run_target(
             db, self._phase_def(profile, phase_info),
-            cycle_info["is_recovery_week"], today,
+            cycle_info["is_recovery_week"], today, tuneup_week=tuneup_week,
         )
 
         # Python-derived training paces from the watch's LT pace (running
@@ -1196,7 +1216,6 @@ class PeriodizationEngine:
         # Travel days for the week being planned (context is always computed
         # for the current week). Carried inside availability so every
         # context-fed enforce_constraints call inherits the block unchanged.
-        start_of_week = today - timedelta(days=today.weekday())
         travel_day_names = get_travel_day_names(db, athlete.id, start_of_week)
         if travel_day_names:
             availability["travel_day_names"] = travel_day_names
@@ -1233,6 +1252,9 @@ class PeriodizationEngine:
             # Computed weekly run target (hard numbers — the volume gate
             # enforces run_km_hard_cap). None for profiles without a run range.
             "volume_targets": volume_targets,
+
+            # Upcoming tune-up race, None when unset or already run
+            "tuneup": tuneup,
 
             # How is the body?
             "recovery": recovery,
@@ -1688,15 +1710,18 @@ class PeriodizationEngine:
         else:
             long_run = min(long_run_cap, 70) if long_run_cap else 70
 
-        if is_recovery_week:
-            target *= 0.75
-            hard_cap *= 0.80
-            long_run *= 0.7
+        # A race week outranks a recovery week — 0.6x is already the deeper
+        # cut, and stacking both (0.6 x 0.75) would leave almost nothing.
         if tuneup_week:
             # C7 hook: race week — the tune-up race IS the long run.
             target *= 0.6
             hard_cap *= 0.65
             long_run = 0
+            basis += " — tune-up race week: 0.6x, the race is the long run"
+        elif is_recovery_week:
+            target *= 0.75
+            hard_cap *= 0.80
+            long_run *= 0.7
 
         return {
             "run_km_target": round(target, 1),

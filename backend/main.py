@@ -60,6 +60,17 @@ def _migrate_athletes(target_engine):
             conn.execute(text("ALTER TABLE athletes ADD COLUMN timezone VARCHAR"))
         print("✅ Migration: added athletes.timezone")
 
+    tune_columns = {
+        "tune_race_date": "DATE",
+        "tune_race_distance_km": "FLOAT",
+        "tune_race_target": "VARCHAR",
+    }
+    for col, sql_type in tune_columns.items():
+        if col not in existing:
+            with target_engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE athletes ADD COLUMN {col} {sql_type}"))
+            print(f"✅ Migration: added athletes.{col}")
+
     if "lthr" not in existing:
         # One-shot backfill: hr_max always held COROS LTHR (ingestion wrote it
         # there), so move the value and null the mislabeled column. All three
@@ -218,6 +229,65 @@ def get_athlete(db: Session = Depends(get_db)):
     return athlete
 
 
+def _find_tuneup_result(db, athlete):
+    """The scraped run that was the tune-up race: same date, distance within
+    10% of the declared race distance (GPS reads a half as ~21.3 km), closest
+    match wins. None until the scrape lands."""
+    from datetime import datetime as dt, timedelta
+
+    if not athlete.tune_race_date or not athlete.tune_race_distance_km:
+        return None
+    day_start = dt.combine(athlete.tune_race_date, dt.min.time())
+    runs = db.query(Activity).filter(
+        Activity.sport == "running",
+        Activity.start_time >= day_start,
+        Activity.start_time < day_start + timedelta(days=1),
+    ).all()
+    target_km = athlete.tune_race_distance_km
+    best = None
+    for a in runs:
+        km = (a.distance_m or 0) / 1000
+        if not a.duration_sec or abs(km - target_km) / target_km > 0.10:
+            continue
+        if best is None or abs(km - target_km) < abs(best[1] - target_km):
+            best = (a, km)
+    if not best:
+        return None
+    a, km = best
+    from backend.services.pace_model import fmt_hms
+    return {
+        "time": fmt_hms(a.duration_sec),
+        "duration_sec": a.duration_sec,
+        "distance_km": round(km, 2),
+        "date": a.start_time.date().isoformat(),
+    }
+
+
+def _tuneup_block(db, athlete):
+    """The Profile card's tune-up state: the race, its result once scraped,
+    and the Riegel verdict against the goal race. Read-only — proposing a
+    target never writes one; Alex edits the Profile picker himself."""
+    from backend.services.pace_model import tuneup_verdict
+
+    if not athlete.tune_race_date:
+        return None
+    result = _find_tuneup_result(db, athlete)
+    verdict = None
+    if result:
+        verdict = tuneup_verdict(
+            result["duration_sec"], result["distance_km"],
+            athlete.race_distance, athlete.target_finish_time,
+        )
+    return {
+        "race_date": athlete.tune_race_date.isoformat(),
+        "distance_km": athlete.tune_race_distance_km,
+        "target": athlete.tune_race_target,
+        "days_away": (athlete.tune_race_date - get_local_today()).days,
+        "result": result,
+        "verdict": verdict,
+    }
+
+
 @app.get("/athlete/profile")
 def get_athlete_profile(db: Session = Depends(get_db)):
     """Return the athlete's profile including race objectives and schedule."""
@@ -227,7 +297,7 @@ def get_athlete_profile(db: Session = Depends(get_db)):
         db.add(athlete)
         db.commit()
         db.refresh(athlete)
-    
+
     return {
         "name": athlete.name,
         "age": athlete.age,
@@ -244,6 +314,10 @@ def get_athlete_profile(db: Session = Depends(get_db)):
         "training_start_date": str(athlete.training_start_date) if athlete.training_start_date else None,
         "timezone": athlete.timezone,
         "active_timezone": get_timezone_name(),
+        "tune_race_date": str(athlete.tune_race_date) if athlete.tune_race_date else None,
+        "tune_race_distance_km": athlete.tune_race_distance_km,
+        "tune_race_target": athlete.tune_race_target,
+        "tuneup": _tuneup_block(db, athlete),
     }
 
 
@@ -322,7 +396,8 @@ def update_athlete_profile(body: dict, db: Session = Depends(get_db)):
     # Update only provided fields
     updatable = [
         "name", "age", "weight_kg", "race_name", "race_type", "race_distance",
-        "swim_days", "bike_days", "run_days", "strength_days", "target_finish_time"
+        "swim_days", "bike_days", "run_days", "strength_days", "target_finish_time",
+        "tune_race_distance_km", "tune_race_target"
     ]
     for field in updatable:
         if field in body:
@@ -336,6 +411,11 @@ def update_athlete_profile(body: dict, db: Session = Depends(get_db)):
         else:
             athlete.race_date = None
             
+    # Handle tune_race_date specially (string → date)
+    if "tune_race_date" in body:
+        td = body["tune_race_date"]
+        athlete.tune_race_date = date_type.fromisoformat(td) if td else None
+
     # Handle training_start_date specially (string → date)
     if "training_start_date" in body:
         tsd = body["training_start_date"]

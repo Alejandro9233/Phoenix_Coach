@@ -115,6 +115,26 @@ def _format_training_context(ctx: dict) -> str:
     if ctx.get("is_recovery_week"):
         lines.append("⚠️ THIS IS A RECOVERY WEEK — reduce all volumes 20-25%")
 
+    # Tune-up race. The race is prompted, never Python-injected — the LLM
+    # schedules it like any other session; the volume target above is already
+    # scaled for the race week.
+    tu = ctx.get("tuneup")
+    if tu:
+        if tu.get("is_race_week"):
+            target = f" Goal: {tu['target']}." if tu.get("target") else ""
+            lines.append(
+                f"\n🏁 TUNE-UP RACE WEEK: {tu['label']} on {tu['race_day_name']} "
+                f"{tu['race_date']}.{target} Schedule the race as that day's only "
+                f"workout — it replaces the week's long run. Days before it: "
+                f"short, easy, tapering. Day after: recovery or rest."
+            )
+        else:
+            lines.append(
+                f"\nTune-up race ahead: {tu['label']} on {tu['race_date']} "
+                f"({tu['days_away']} days away) — a fitness test, not the goal "
+                f"race. Train through it normally until race week."
+            )
+
     # Volume — the computed run target when the engine produced one (running
     # races), phase-range prose otherwise. The target numbers are enforced
     # post-generation; the LLM is told exactly what it will be graded on.
