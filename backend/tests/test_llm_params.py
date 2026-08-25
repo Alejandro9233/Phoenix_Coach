@@ -59,7 +59,9 @@ def test_json_mode_bounds_reasoning_and_completion():
         "some-model", MESSAGES, json_mode=True, temperature=0.3, seed=1042
     )
     assert kwargs["reasoning_effort"] == JSON_MODE_REASONING_EFFORT == "low"
-    assert kwargs["max_completion_tokens"] == JSON_MODE_MAX_COMPLETION_TOKENS == 5000
+    # 4000, not more: the real plan prompt measured 3145 tokens and the TPM
+    # limiter admits by prompt + cap against 8000 (5000 overflowed by 145).
+    assert kwargs["max_completion_tokens"] == JSON_MODE_MAX_COMPLETION_TOKENS == 4000
 
     # Callers may override; explicit values win over the defaults.
     kwargs = _build_groq_kwargs(
@@ -75,6 +77,56 @@ def test_json_mode_bounds_reasoning_and_completion():
     )
     assert "reasoning_effort" not in kwargs
     assert "max_completion_tokens" not in kwargs
+
+
+def test_tpm_rejection_waits_once_then_retries(monkeypatch):
+    """The free tier can't admit two plan-sized JSON calls in one minute —
+    a gate retry lands seconds after the first attempt. JSON-mode calls
+    wait out ONE TPM rejection; chat and non-TPM errors never wait."""
+    import backend.core.llm_client as lc
+
+    calls = []
+    sleeps = []
+
+    class _FakeCompletions:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                raise Exception(
+                    "Error code: 413 - {'message': 'Request too large ... "
+                    "on tokens per minute (TPM): Limit 8000, Requested 8145', "
+                    "'type': 'tokens', 'code': 'rate_limit_exceeded'}"
+                )
+            class R:
+                class _C:
+                    class _M:
+                        content = '{"ok": true}'
+                    message = _M()
+                    finish_reason = "stop"
+                choices = [_C()]
+            return R()
+
+    class _FakeClient:
+        class chat:
+            completions = _FakeCompletions()
+
+    monkeypatch.setattr(lc, "_get_groq_client", lambda: _FakeClient())
+    monkeypatch.setattr("time.sleep", lambda s: sleeps.append(s))
+
+    content = lc._groq_chat(MESSAGES, json_mode=True, temperature=0.3, seed=1)
+    assert content == '{"ok": true}'
+    assert len(calls) == 2
+    assert sleeps == [lc.TPM_RETRY_WAIT_SEC]
+
+    # Non-json_mode (chat) must NOT wait — the error propagates.
+    calls.clear()
+    sleeps.clear()
+    try:
+        lc._groq_chat(MESSAGES, json_mode=False, temperature=0.7, seed=None)
+        assert False, "chat calls must not swallow TPM errors"
+    except Exception:
+        pass
+    assert sleeps == []
 
 
 def test_json_validate_failed_retries_once(monkeypatch):

@@ -66,11 +66,26 @@ def chat_completion(messages: list[dict], json_mode: bool = False,
 # - reasoning_effort "low": measured 325 reasoning tokens on the same prompt,
 #   full valid plan. Structured copy-the-menu output doesn't need deep
 #   thought, and the volume/pace gates catch slippage structurally.
-# - max_completion_tokens 5000: headroom above the ~3072 default WITHOUT
-#   tripping the free tier's 8000 tokens-per-minute limiter, which counts
-#   prompt + max_completion_tokens per request (30000 -> instant 413).
+# - max_completion_tokens 4000: headroom above the ~3072 default WITHOUT
+#   tripping the free tier's 8000 tokens-per-minute limiter, which admits a
+#   request by prompt + max_completion_tokens (30000 -> instant 413). The
+#   REAL plan prompt measured 3145 tokens on 2026-08-24, so 5000 overflowed
+#   by 145; 4000 leaves ~850 margin while a plan needs ~2500 (JSON ~2100 +
+#   low reasoning ~350). If the prompt grows past ~3900 tokens the 413
+#   returns — trim the prompt, not this cap.
 JSON_MODE_REASONING_EFFORT = "low"
-JSON_MODE_MAX_COMPLETION_TOKENS = 5000
+JSON_MODE_MAX_COMPLETION_TOKENS = 4000
+
+# A second JSON call in the same minute (volume-gate retry, resample) can't
+# be admitted until the TPM window frees: first call consumes ~5600 of 8000.
+# One blocking wait is acceptable on the plan paths (iOS waits 180s) and
+# only there — never in chat streaming.
+TPM_RETRY_WAIT_SEC = 45
+
+
+def _is_tpm_limit_error(exc: Exception) -> bool:
+    text = str(exc)
+    return "rate_limit_exceeded" in text and ("TPM" in text or "tokens" in text)
 
 
 def _build_groq_kwargs(model: str, messages: list[dict], json_mode: bool,
@@ -104,11 +119,25 @@ def _build_groq_kwargs(model: str, messages: list[dict], json_mode: bool,
 
 def _groq_chat(messages: list[dict], json_mode: bool,
                temperature: float, seed: int | None) -> str:
-    """Call Groq via OpenAI-compatible SDK."""
+    """Call Groq via OpenAI-compatible SDK.
+
+    JSON-mode calls wait out one TPM rejection: the free tier's per-minute
+    budget can't admit two plan-sized requests back to back, and the second
+    request is usually a gate retry that deserves to run.
+    """
+    import time
+
     client = _get_groq_client()
     kwargs = _build_groq_kwargs(GROQ_MODEL, messages, json_mode, temperature, seed)
 
-    response = client.chat.completions.create(**kwargs)
+    try:
+        response = client.chat.completions.create(**kwargs)
+    except Exception as e:
+        if not (json_mode and _is_tpm_limit_error(e)):
+            raise
+        print(f"⏳ Groq TPM window full; waiting {TPM_RETRY_WAIT_SEC}s: {e}")
+        time.sleep(TPM_RETRY_WAIT_SEC)
+        response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content
 
 def _build_ollama_options(temperature: float, seed: int | None) -> dict:
