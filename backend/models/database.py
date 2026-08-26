@@ -196,6 +196,21 @@ class WeeklyPlan(Base):
     created_at = Column(DateTime, default=None)
     last_adapted = Column(DateTime, nullable=True)
 
+class RefreshEvent(Base):
+    """One row per smart-refresh run — the durable answer to "what happened
+    when I refreshed". Written as the FINAL stage of _run_smart_refresh (after
+    every swallowed-exception stage, so partial scrapes still record), pruned
+    to the newest REFRESH_EVENTS_KEEP rows on insert. payload_json is the
+    frozen event document (schema_version inside); history shows what was
+    true at sync time, never a recomputation."""
+    __tablename__ = "refresh_events"
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)  # UTC — ordering + pruning
+    local_day = Column(String)   # get_local_today() at write, frozen (feed grouping)
+    at_local = Column(String)    # get_local_now().isoformat(), frozen (display)
+    sync_status = Column(String)  # "ok" | "partial"
+    payload_json = Column(JSON)
+
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
     id = Column(Integer, primary_key=True, index=True)

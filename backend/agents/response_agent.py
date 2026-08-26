@@ -115,6 +115,18 @@ def _format_training_context(ctx: dict) -> str:
     if ctx.get("is_recovery_week"):
         lines.append("⚠️ THIS IS A RECOVERY WEEK — reduce all volumes 20-25%")
 
+    # GOAL race week — same contract as the tune-up: prompted, never
+    # Python-injected. The taper menu already forbids everything intense; this
+    # line makes the race itself explicit.
+    if ctx.get("race_week"):
+        lines.append(
+            f"\n🏁 RACE WEEK: {ctx.get('race_name', 'the goal race')} "
+            f"({ctx.get('race_distance', '')}) on {ctx.get('race_day_name', '')} "
+            f"{ctx.get('race_date', '')}. Schedule the race as that day's only "
+            f"workout. Days before: rest or very short easy runs with strides; "
+            f"the day after race day: full rest."
+        )
+
     # Tune-up race. The race is prompted, never Python-injected — the LLM
     # schedules it like any other session; the volume target above is already
     # scaled for the race week.

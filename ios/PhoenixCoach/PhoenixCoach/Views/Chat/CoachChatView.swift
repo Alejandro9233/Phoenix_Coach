@@ -77,6 +77,13 @@ struct CoachChatView: View {
             .task {
                 await network.checkConnection()
                 await loadSessions()
+                consumePrefill()
+            }
+            // "Discuss with coach" from the sync debrief. The holder (set
+            // before the notification) covers the first-open case: an
+            // unvisited tab has no live subscription when the post fires.
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenCoachChat"))) { _ in
+                consumePrefill()
             }
         }
         
@@ -140,6 +147,15 @@ struct CoachChatView: View {
         .padding(32)
     }
     
+    /// Consume-and-clear a pending "Discuss with coach" message, then send it
+    /// through the normal path (same shape as suggestionChip's auto-send).
+    private func consumePrefill() {
+        guard let pending = ChatPrefill.pending else { return }
+        ChatPrefill.pending = nil
+        inputText = pending
+        Task { await sendMessage() }
+    }
+
     private func suggestionChip(_ text: String) -> some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()

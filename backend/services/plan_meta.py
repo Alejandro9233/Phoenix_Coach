@@ -112,12 +112,18 @@ def finalize_plan_write(db, plan_json: dict, *, source: str, days_written,
         {d for d in (days_written or []) if d in VALID_DAYS},
         key=VALID_DAYS.index,
     )
+    # "after" is captured here, where the final plan is in hand — exact and
+    # free. Read-time reconstruction (chaining receipts) was rejected as the
+    # kind of code that shows a confidently wrong diff. Legacy receipts
+    # without it get a labeled fallback in the history feed.
+    after = capture_before(plan_json, days=days_key)
     entry = {
         "at": get_local_now().isoformat(timespec="seconds"),
         "source": source,
         "days": days_key,
         "reason": reason,
         "before": {d: before[d] for d in days_key if d in before} if before else None,
+        "after": after or None,
         "stripped": [
             {"day": v.get("day"), "title": v.get("title"), "reason": v.get("reason")}
             for v in (violations or [])
@@ -229,5 +235,18 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
     candidate, pace_fixes = enforce_paces(candidate, pace_model, days=days)
     if pace_fixes:
         print(f"🏃 [{source}] Pace targets set on {len(pace_fixes)} workout(s)")
+
+    # Fuel lines ride the same slot: Python-computed carb/fluid bands stamped
+    # on qualifying long runs, cleared when a replan shortens one. Workout
+    # fields only — sums and receipts above are unaffected.
+    from backend.models.database import Athlete
+    from backend.services.fueling import stamp_fuel
+
+    athlete = db.query(Athlete).first()
+    candidate, fuel_changes = stamp_fuel(
+        candidate, athlete.weight_kg if athlete else None, days=days
+    )
+    if fuel_changes:
+        print(f"🥤 [{source}] Fuel lines updated on {len(fuel_changes)} workout(s)")
 
     return candidate, violations

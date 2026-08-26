@@ -474,6 +474,25 @@ class NetworkManager: ObservableObject {
         let (data, _) = try await session.data(from: url)
         return try decoder.decode(WeeklyPlanStatusResponse.self, from: data)
     }
+
+    /// The History tab's merged feed (refresh events + plan changes).
+    /// `before` pages older events (pass the previous page's nextBefore).
+    func fetchHistory(before: String? = nil, limit: Int = 30) async throws -> HistoryFeedResponse {
+        var components = URLComponents(string: "\(baseURL)/history")
+        var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let before = before {
+            items.append(URLQueryItem(name: "before", value: before))
+        }
+        components?.queryItems = items
+        guard let url = components?.url else {
+            throw NetworkError.invalidURL
+        }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode(HistoryFeedResponse.self, from: data)
+    }
     
     func regenerateWeeklyPlan() async throws -> WeeklyPlanResponse {
         guard let url = URL(string: "\(baseURL)/weekly-plan/regenerate") else {

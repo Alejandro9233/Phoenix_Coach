@@ -124,6 +124,12 @@ struct TodayView: View {
     @State private var showLoadChart = false
     @State private var showAdaptationSheet = false
     @State private var preferOriginalProtocol = false
+
+    // Debrief card dismissal is its own flag — nil-ing refreshResponse would
+    // silently regress the recovery cards to stale dashboard values.
+    @State private var debriefDismissed = false
+    @State private var showDebriefSheet = false
+    @State private var showRacePlanSheet = false
     
     // Design system colors matching Quiet Performance HTML mockup
                                                    
@@ -194,12 +200,22 @@ struct TodayView: View {
                             .frame(maxWidth: .infinity, minHeight: 400)
                     } else {
                         VStack(spacing: 24) {
+                            // "What just happened" — the refresh that just ran,
+                            // same event the History tab keeps durably.
+                            if let event = refreshResponse?.event, !debriefDismissed, !isSyncing {
+                                debriefCard(event)
+                            }
+
                             VStack(spacing: 12) {
                                 HStack(spacing: 12) {
                                     hrvCard
                                     rhrCard
                                 }
                                 loadRatioCard
+                            }
+
+                            if let race = planStatus?.race {
+                                raceWeekCard(race)
                             }
 
                             timelineLink
@@ -804,17 +820,17 @@ struct TodayView: View {
                         .font(.system(size: 11, weight: .bold))
                         .tracking(1.1)
                         .foregroundStyle(DS.Colors.outline)
-                    
+
                     HStack(alignment: .center, spacing: 16) {
                         Text("\(score)")
                             .font(.system(size: 48, weight: .ultraLight))
                             .foregroundStyle(complianceColor(for: score))
-                        
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text("/ 100")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(DS.Colors.outline)
-                            
+
                             if let completed = planStatus?.weekProgress?.sessionsCompleted,
                                let planned = planStatus?.weekProgress?.sessionsPlanned {
                                 Text("\(completed) of \(planned) sessions completed")
@@ -824,9 +840,152 @@ struct TodayView: View {
                         }
                         Spacer()
                     }
+
+                    // Protected run km, week to date vs the Python target.
+                    // Hidden when the target is nil — a zero-denominator bar
+                    // would be a lie, not a chart.
+                    if let done = planStatus?.weekProgress?.runKmDone,
+                       let target = planStatus?.weekProgress?.runKmTarget,
+                       target > 0 {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("RUN KM")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1.2)
+                                    .foregroundStyle(DS.Colors.outline)
+                                Spacer()
+                                Text(String(format: "%.1f of %.0f km", done, target))
+                                    .font(.system(size: 12, weight: .light))
+                                    .foregroundStyle(DS.Colors.onSurface)
+                            }
+                            RunProgressBar(done: done, target: target)
+                        }
+                        .padding(.top, 2)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .glassCard()
+            }
+        }
+    }
+
+    // MARK: - Debrief card (what the refresh just did)
+
+    private func debriefCard(_ event: HistoryEvent) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("JUST SYNCED")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(DS.Colors.outline)
+                Spacer()
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        debriefDismissed = true
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(DS.Colors.outline)
+                }
+                .buttonStyle(.plain)
+            }
+            HStack {
+                StatusCapsule(
+                    label: event.syncStatus == "ok" ? "SYNCED" : "PARTIAL",
+                    color: event.syncStatus == "ok" ? DS.Colors.success : DS.Colors.warning
+                )
+                Text(HistoryFormat.refreshHeadline(event))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white)
+                Spacer()
+            }
+            if let stats = HistoryFormat.refreshStatLine(event) {
+                Text(stats)
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundStyle(DS.Colors.onSurface)
+                    .tracking(0.5)
+            }
+            HStack {
+                Button {
+                    showDebriefSheet = true
+                } label: {
+                    Text("DETAILS")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(DS.Colors.accent)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Button {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("OpenHistoryTab"), object: nil)
+                } label: {
+                    Text("VIEW IN HISTORY")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(DS.Colors.outline)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 2)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+        .sheet(isPresented: $showDebriefSheet) {
+            RefreshDebriefSheet(event: event)
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    // MARK: - Race week card (final two weeks)
+
+    private func raceWeekCard(_ race: RaceStatus) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "flag.checkered")
+                    .font(.system(size: 14))
+                    .foregroundStyle(DS.Colors.accent)
+                Text(race.isRaceWeek == true ? "RACE WEEK" : "RACE AHEAD")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(.white)
+                Spacer()
+            }
+            if let days = race.daysToRace {
+                Text(days == 0
+                     ? "\(race.raceName ?? "Race") — today."
+                     : "\(race.raceName ?? "Race") in \(days) day\(days == 1 ? "" : "s")")
+                    .font(.system(size: 22, weight: .ultraLight))
+                    .foregroundStyle(.white)
+            }
+            if race.pacing != nil {
+                Button {
+                    showRacePlanSheet = true
+                } label: {
+                    HStack {
+                        Image(systemName: "stopwatch")
+                            .font(.system(size: 12))
+                        Text("RACE PLAN")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(1.5)
+                    }
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(DS.Colors.accent)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+        .sheet(isPresented: $showRacePlanSheet) {
+            if let pacing = race.pacing {
+                RacePlanSheet(race: race, pacing: pacing)
             }
         }
     }
@@ -1098,6 +1257,7 @@ struct TodayView: View {
                     case "done":
                         if let result = status.result {
                             self.refreshResponse = result
+                            self.debriefDismissed = false  // fresh event, fresh card
                             if result.syncStatus == "partial" {
                                 let msg = result.syncMessage
                                 self.scraperErrorMessage = msg.isEmpty ? "Data could not be scraped." : msg
@@ -1281,7 +1441,17 @@ struct ProtocolCard: View {
                                 .font(.caption)
                                 .foregroundStyle(DS.Colors.outline)
                         }
-                        
+
+                        if let fuel = workout.fuel {
+                            HStack(spacing: 6) {
+                                Image(systemName: "fork.knife")
+                                    .font(.system(size: 10))
+                                Text(fuel)
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(DS.Colors.onSurface)
+                        }
+
                         if !workout.steps.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 ForEach(Array(workout.steps.enumerated()), id: \.offset) { index, step in

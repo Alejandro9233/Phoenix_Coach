@@ -189,6 +189,11 @@ def normalize_workout(workout: dict) -> dict:
     if workout.get("pace_target"):
         normalized["pace_target"] = str(workout["pace_target"])
 
+    # Set by fueling.stamp_fuel (Python-computed carb/fluid bands for long
+    # runs). Same carry rule as pace_target.
+    if workout.get("fuel"):
+        normalized["fuel"] = str(workout["fuel"])
+
     return normalized
 
 def normalize_plan(plan_json: dict) -> dict:

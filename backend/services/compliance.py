@@ -398,6 +398,25 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
         "compliance_score": compliance_score,
     }
 
+    # Protected run km, week to date vs THE computed target. Numerator uses
+    # the volume gate's own accounting so the bar and the gate can never
+    # disagree; denominator is the C3 target stamped into _context on every
+    # plan write (fresh compute only for pre-pipeline rows). All raw numbers —
+    # iOS formats; a formatted string here would fail the whole status decode.
+    from backend.services.volume_gate import completed_week_actuals
+
+    week_progress["run_km_done"] = completed_week_actuals(
+        db, start_of_week, today
+    )[0]
+    targets = (plan_json.get("_context") or {}).get("volume_targets")
+    if targets is None:
+        from backend.services.periodization_engine import PeriodizationEngine
+        targets = PeriodizationEngine().compute_context(db).get("volume_targets")
+    # None target (stub profile without a run range) -> nulls; iOS hides the
+    # bar rather than drawing a lying zero-denominator one.
+    week_progress["run_km_target"] = (targets or {}).get("run_km_target")
+    week_progress["run_km_hard_cap"] = (targets or {}).get("run_km_hard_cap")
+
     # Whole weeks left until race day. Rides along here so the iOS Today tab can
     # schedule the race-countdown notification without a second round trip —
     # the free tier's cold start makes extra calls expensive.
@@ -406,9 +425,32 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
     if athlete and athlete.race_date:
         weeks_to_race = max(0, (athlete.race_date - today).days // 7)
 
+    # Race-week mode: inside the final two weeks the status carries the race
+    # block — countdown always, pacing table when the goal is a running race
+    # with a parseable target (pace_model owns the math; None degrades the
+    # sheet to countdown-only).
+    race = None
+    if athlete and athlete.race_date and weeks_to_race is not None and weeks_to_race <= 1:
+        from backend.services.pace_model import race_pacing
+
+        race = {
+            "race_name": athlete.race_name,
+            "race_distance": athlete.race_distance,
+            "race_date": athlete.race_date.isoformat(),
+            "days_to_race": (athlete.race_date - today).days,
+            "is_race_week": bool(
+                start_of_week <= athlete.race_date < start_of_week + timedelta(days=7)
+            ),
+            "pacing": race_pacing(
+                athlete.target_finish_time, athlete.race_distance,
+                athlete.hr_zones,
+            ),
+        }
+
     return {
         "week_summary": plan_json.get("week_summary"),
         "days": enriched_days,
         "week_progress": week_progress,
         "weeks_to_race": weeks_to_race,
+        "race": race,
     }

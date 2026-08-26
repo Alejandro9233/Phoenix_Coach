@@ -44,6 +44,12 @@ GOAL_GAP_PCT = 3.0     # goal within 3% of fitness -> train at goal
 MP_CAP_AHEAD = 0.97    # else M-pace at most 3% faster than fitness pace
 GOAL_BAND_SEC = 5      # goal-anchored band is goal_mp +/- 5 s/km
 
+# Race-day pacing: the first 5K goes out deliberately slower — a 3:10 attempt
+# is mostly lost by going out at sub-3 pace. The lost seconds are made back by
+# a slightly faster cruise pace, so the table still lands on the target.
+FIRST_5K_EASE_SEC = 6  # s/km added to the first 5K
+EASE_MIN_RACE_KM = 10.1  # short races don't need a conservative-start table
+
 RIEGEL_EXP = 1.06
 # Threshold paces outside 3:00-7:00 /km are bad watch data, not fitness.
 T_BOUNDS_SEC = (180, 420)
@@ -81,6 +87,105 @@ def riegel(t_sec: float, d_from_km: float, d_to_km: float) -> float:
     """Riegel time prediction across distances (exponent 1.06). Validates
     Alex's own rule of thumb: 1:27 half -> ~3:01 marathon."""
     return t_sec * (d_to_km / d_from_km) ** RIEGEL_EXP
+
+
+def _fmt_mmss(sec: float) -> str:
+    sec = int(round(sec))
+    if sec >= 3600:
+        return fmt_hms(sec)
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def _zone_tops(hr_zones) -> dict:
+    """COROS lthrZone list -> {index: ceiling bpm}. Entries are {index, hr}
+    (0-based index, hr = the zone's boundary bpm; "ratio" may be absent and is
+    ignored). Malformed entries are skipped, never fatal."""
+    tops = {}
+    for z in hr_zones or []:
+        if not isinstance(z, dict):
+            continue
+        idx, hr = z.get("index"), z.get("hr")
+        if isinstance(idx, int) and isinstance(hr, (int, float)) and hr > 0:
+            tops[idx] = int(hr)
+    return tops
+
+
+def race_pacing(target_finish_time, race_distance, hr_zones=None) -> dict | None:
+    """Deterministic race-day pacing table from the stored target.
+
+    Per-5K splits with a positive-split-safe first 5K (+FIRST_5K_EASE_SEC
+    s/km, recovered by the cruise pace so the total still hits the target),
+    waypoint times, and HR caps from the watch's LTHR zones when present.
+    None when the target or distance can't produce a table (non-running goal,
+    unparseable time) — the caller degrades to a countdown without a table.
+    """
+    goal_km = RACE_KM.get(race_distance)
+    total = parse_hms(target_finish_time)
+    if not goal_km or not total:
+        return None
+
+    avg = total / goal_km
+    if goal_km > EASE_MIN_RACE_KM:
+        first_pace = avg + FIRST_5K_EASE_SEC
+        cruise_pace = (total - 5 * first_pace) / (goal_km - 5)
+    else:
+        first_pace = cruise_pace = avg
+
+    def cumulative(km: float) -> float:
+        if km <= 5:
+            return km * first_pace
+        return 5 * first_pace + (km - 5) * cruise_pace
+
+    splits = []
+    prev_t = 0.0
+    km = 5.0
+    while km < goal_km - 0.05:
+        t = cumulative(km)
+        splits.append({
+            "to_km": km,
+            "split": _fmt_mmss(t - prev_t),
+            "cumulative": fmt_hms(t),
+            "pace": fmt_pace(first_pace if km <= 5 else cruise_pace),
+        })
+        prev_t = t
+        km += 5.0
+    splits.append({
+        "to_km": round(goal_km, 1),
+        "split": _fmt_mmss(total - prev_t),
+        "cumulative": fmt_hms(total),
+        "pace": fmt_pace(cruise_pace),
+    })
+
+    if race_distance == "Marathon":
+        waypoint_marks = [("Half", RACE_KM["Half Marathon"]), ("30K", 30.0)]
+    elif race_distance == "Half Marathon":
+        waypoint_marks = [("10K", 10.0)]
+    else:
+        waypoint_marks = []
+    waypoints = [
+        {"label": label, "km": km_mark, "time": fmt_hms(cumulative(km_mark))}
+        for label, km_mark in waypoint_marks
+    ] + [{"label": "Finish", "km": round(goal_km, 1), "time": fmt_hms(total)}]
+
+    tops = _zone_tops(hr_zones)
+    hr_caps = None
+    if 1 in tops and 2 in tops:
+        hr_caps = {
+            "first_10k": tops[1],   # top of Z2 — settle in, spend nothing
+            "to_30k": tops[2],      # top of Z3 — marathon effort
+            "final": None,          # race effort, no cap
+        }
+
+    return {
+        "target": target_finish_time,
+        "distance_km": round(goal_km, 1),
+        "avg_pace": fmt_pace(avg),
+        "first_5k_pace": fmt_pace(first_pace),
+        "cruise_pace": fmt_pace(cruise_pace),
+        "splits": splits,
+        "waypoints": waypoints,
+        "hr_caps": hr_caps,
+    }
 
 
 def race_label(distance_km) -> str:

@@ -1169,6 +1169,13 @@ class PeriodizationEngine:
         # scales down and the race replaces the long run. Past races drop out
         # of planning context — the Riegel verdict lives in /athlete/profile.
         start_of_week = today - timedelta(days=today.weekday())
+        # Same window predicate for the GOAL race: the plan week that contains
+        # race day gets an explicit flag (phase=="taper" alone can't tell race
+        # week from taper week 3).
+        race_week = bool(
+            athlete.race_date
+            and start_of_week <= athlete.race_date < start_of_week + timedelta(days=7)
+        )
         tuneup_week = bool(
             athlete.tune_race_date
             and start_of_week <= athlete.tune_race_date < start_of_week + timedelta(days=7)
@@ -1228,6 +1235,8 @@ class PeriodizationEngine:
             "race_type": athlete.race_type or "Not set",
             "race_distance": athlete.race_distance or "Not set",
             "weeks_to_race": weeks_to_race,
+            "race_week": race_week,
+            "race_day_name": athlete.race_date.strftime("%A") if race_week else None,
 
             # What phase?
             "phase": phase_info["phase"],

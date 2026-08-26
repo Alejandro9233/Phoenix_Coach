@@ -694,6 +694,17 @@ def get_block_calendar(db: Session = Depends(get_db)):
 @app.get("/weekly-plan")
 def get_weekly_plan(db: Session = Depends(get_db)):
     """Retrieve the current week's training plan. Generates a new one if not found."""
+    return _get_or_generate_weekly_plan(db)
+
+
+def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
+                                 reason="Weekly plan generated"):
+    """The GET /weekly-plan body, callable with regenerate's extras.
+
+    A plain function so regenerate can pass carry_revisions/source without
+    FastAPI reading them as query params. `carry_revisions` seeds the raw
+    plan's _revisions before the pipeline, so a regenerated week keeps its
+    receipt history (finalize appends the new receipt on top and trims)."""
     from datetime import date, timedelta, datetime
     from backend.models.database import WeeklyPlan, Athlete
     from backend.agents.data_agent import DataAgent
@@ -766,10 +777,13 @@ def get_weekly_plan(db: Session = Depends(get_db)):
     response_agent = ResponseAgent()
 
     def _generate(feedback=None):
-        return response_agent.generate_weekly_plan(
+        raw = response_agent.generate_weekly_plan(
             summary, profile, training_context=training_context,
             feedback=feedback,
         )
+        if carry_revisions:
+            raw["_revisions"] = list(carry_revisions)
+        return raw
 
     from backend.services.constraint_enforcer import get_active_injuries
     from backend.services.plan_meta import run_plan_write_pipeline
@@ -778,10 +792,10 @@ def get_weekly_plan(db: Session = Depends(get_db)):
             db,
             generate=_generate,
             gate_ctx=training_context,
-            source="generate",
+            source=source,
             availability=training_context.get("availability", {}),
             active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
-            reason="Weekly plan generated",
+            reason=reason,
         )
     except Exception as e:
         raise HTTPException(
@@ -824,6 +838,12 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
 
+    # Receipt history must survive a regenerate — grab it before the delete.
+    old_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    carry = list((old_record.plan_json or {}).get("_revisions") or []) if old_record else None
+
     # Delete without committing: if generation fails, the rollback below
     # brings the old plan back. Committing the delete first meant a failed
     # regenerate left the athlete with no week at all.
@@ -833,7 +853,10 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
 
     # Reuse the GET /weekly-plan logic; it commits the delete + new plan together.
     try:
-        return get_weekly_plan(db)
+        return _get_or_generate_weekly_plan(
+            db, carry_revisions=carry, source="regenerate",
+            reason="Plan regenerated from scratch",
+        )
     except Exception:
         db.rollback()
         raise
@@ -1191,6 +1214,15 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     return adapted_day
 
 
+@app.get("/history")
+def get_history(limit: int = 30, before: str = None, db: Session = Depends(get_db)):
+    """The History tab's feed: refresh events + plan-change receipts, merged
+    newest-first. One request paints the tab; `before` pages older."""
+    from backend.services.history_feed import build_history_feed
+
+    return build_history_feed(db, limit=limit, before=before)
+
+
 @app.get("/weekly-plan/status")
 def get_weekly_plan_status(db: Session = Depends(get_db)):
     """Return the current weekly plan enriched with actual completion/compliance data."""
@@ -1308,6 +1340,7 @@ async def _run_smart_refresh(db: Session, progress=None):
 
     sync_status = "ok"
     sync_message = ""
+    new_activity_ids = []
 
     # 1. Scrape COROS — with history backfill when the DB is shallow, so a
     # wiped DB self-heals on the next morning refresh.
@@ -1316,7 +1349,7 @@ async def _run_smart_refresh(db: Session, progress=None):
         scraper = CorosScraper()
         data = await scraper.scrape_all(backfill_days=_backfill_days_needed(db))
         service = IngestionService()
-        service.ingest_coros_data(data)
+        new_activity_ids = service.ingest_coros_data(data) or []
         # A scrape can finish without the payloads ingestion needs (cold CPU,
         # COROS hiccup). Say so instead of claiming a clean sync — the phone
         # shows this string.
@@ -1349,51 +1382,95 @@ async def _run_smart_refresh(db: Session, progress=None):
         recovery_data_stale = True
         stale_reason = "No recovery snapshots found"
 
-    # 3. Deterministic recovery evaluation (only if data is fresh)
+    # 3. Deterministic recovery evaluation (only if data is fresh). Every
+    # trigger is recorded with its value and threshold, fired or clear — most
+    # refreshes adapt nothing, and "why did nothing happen" is half of what
+    # the History debrief exists to answer.
     needs_adaptation = False
     adaptation_reasons = []
+    triggers = []
+
+    def _trigger(name, fired, value, threshold):
+        triggers.append({
+            "name": name, "fired": bool(fired),
+            "value": value, "threshold": threshold,
+        })
 
     if latest and not recovery_data_stale:
         athlete = db.query(Athlete).first()
         # HRV check
         if latest.hrv_ms and athlete and athlete.hrv_baseline:
             hrv_drop_pct = (latest.hrv_ms - athlete.hrv_baseline) / athlete.hrv_baseline * 100
-            if hrv_drop_pct < -15:
+            fired = hrv_drop_pct < -15
+            _trigger("hrv_drop", fired, round(hrv_drop_pct, 1), -15)
+            if fired:
                 needs_adaptation = True
                 adaptation_reasons.append(f"HRV {hrv_drop_pct:.0f}% below baseline")
+        else:
+            _trigger("hrv_drop", False, None, -15)
         # RHR check
         rhr_snapshots = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).limit(7).all()
         rhr_values = [s.resting_hr for s in rhr_snapshots if s.resting_hr]
         if rhr_values and latest.resting_hr:
             avg_rhr = sum(rhr_values) / len(rhr_values)
-            if latest.resting_hr > avg_rhr + 5:
+            fired = latest.resting_hr > avg_rhr + 5
+            _trigger("rhr_elevated", fired, latest.resting_hr, round(avg_rhr + 5, 1))
+            if fired:
                 needs_adaptation = True
                 adaptation_reasons.append(f"RHR elevated: {latest.resting_hr} vs avg {avg_rhr:.0f}")
+        else:
+            _trigger("rhr_elevated", False, None, None)
         # Fatigue state check
-        if latest.fatigue_state and latest.fatigue_state >= 4:
+        fired = bool(latest.fatigue_state and latest.fatigue_state >= 4)
+        _trigger("fatigue_high", fired, latest.fatigue_state, 4)
+        if fired:
             needs_adaptation = True
             fatigue_labels = {4: "Fatigued", 5: "Overreaching"}
             adaptation_reasons.append(f"Fatigue zone: {fatigue_labels.get(latest.fatigue_state, 'High')}")
         # Load ratio check
-        if latest.load_ratio and latest.load_ratio > 1.4:
+        fired = bool(latest.load_ratio and latest.load_ratio > 1.4)
+        _trigger("load_ratio_high", fired,
+                 round(latest.load_ratio, 2) if latest.load_ratio is not None else None, 1.4)
+        if fired:
             needs_adaptation = True
             adaptation_reasons.append(f"Load ratio {latest.load_ratio:.2f} — high injury risk")
         # TIB check
-        if latest.tib is not None and latest.tib < -20:
+        fired = latest.tib is not None and latest.tib < -20
+        _trigger("tib_low", fired,
+                 round(latest.tib, 1) if latest.tib is not None else None, -20)
+        if fired:
             needs_adaptation = True
             adaptation_reasons.append(f"Form (TIB) at {latest.tib:.0f} — deep fatigue")
 
-    # 4. Auto-adapt if needed
+    # 4. Auto-adapt if needed. The failure is no longer swallowed silently —
+    # it rides the event as adaptation.error; the refresh itself still
+    # succeeds (a failed adapt must never fail the sync).
     adapted = False
+    adapt_error = None
+    adapt_receipt_at = None
+    adapt_week_start = None
     if needs_adaptation:
         try:
             report("Adapting today's plan...")
             adapt_today_workout(body=None, db=db)
             adapted = True
             print(f"🔄 Auto-adapted today's workout. Reasons: {adaptation_reasons}")
+            # Join key to the plan receipt this adapt just appended, so the
+            # History feed folds the two into one row instead of showing the
+            # same moment twice.
+            from datetime import timedelta as _td
+            today_local = get_local_today()
+            adapt_week_start = today_local - _td(days=today_local.weekday())
+            plan_row = db.query(WeeklyPlan).filter(
+                WeeklyPlan.week_start == adapt_week_start
+            ).order_by(WeeklyPlan.id.desc()).first()
+            revisions = (plan_row.plan_json or {}).get("_revisions") or [] if plan_row else []
+            if revisions and revisions[-1].get("source") == "adapt_today":
+                adapt_receipt_at = revisions[-1].get("at")
         except Exception as e:
             print(f"⚠️ Auto-adaptation failed: {e}")
             adapted = False
+            adapt_error = str(e)
 
     # 5. Build response
     recovery_summary = {
@@ -1408,17 +1485,52 @@ async def _run_smart_refresh(db: Session, progress=None):
         "stamina_level": latest.performance_index if latest else None,
     }
 
+    adaptation = {
+        "needed": needs_adaptation,
+        "adapted": adapted,
+        "reasons": adaptation_reasons,
+        "error": adapt_error,
+        "week_start": adapt_week_start.isoformat() if adapt_week_start else None,
+        "receipt_at": adapt_receipt_at,
+    }
+
+    # 6. Freeze the event — the durable answer to "what happened when I
+    # refreshed". Sits after every swallowed-exception stage so partial
+    # scrapes still record. A lost log line must never fail the sync.
+    from backend.services.refresh_events import (
+        build_refresh_event, record_refresh_event,
+    )
+
+    event = None
+    event_id = None
+    event_recorded = False
+    try:
+        event = build_refresh_event(
+            db,
+            sync_status=sync_status,
+            sync_message=sync_message,
+            new_activity_ids=new_activity_ids,
+            recovery=recovery_summary,
+            recovery_stale=recovery_data_stale,
+            stale_reason=stale_reason,
+            triggers=triggers,
+            adaptation=adaptation,
+        )
+        event_id = record_refresh_event(db, event)
+        event_recorded = True
+    except Exception as e:
+        print(f"⚠️ Refresh event not recorded: {e}")
+
     return {
         "sync_status": sync_status,
         "sync_message": sync_message,
         "recovery": recovery_summary,
         "recovery_data_stale": recovery_data_stale,
         "stale_reason": stale_reason,
-        "adaptation": {
-            "needed": needs_adaptation,
-            "adapted": adapted,
-            "reasons": adaptation_reasons
-        }
+        "adaptation": adaptation,
+        "event": event,
+        "event_id": event_id,
+        "event_recorded": event_recorded,
     }
 
 

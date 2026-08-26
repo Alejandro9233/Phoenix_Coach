@@ -156,7 +156,13 @@ struct WeekProgress: Codable {
     let hoursPlanned: Double
     let totalTrainingLoad: Int
     let complianceScore: Int?
-    
+    /// Week-to-date run km vs the Python-computed target. Optional — nil on
+    /// old backends or profiles without a run range (hide the bar, never
+    /// draw a zero-denominator one).
+    var runKmDone: Double?
+    var runKmTarget: Double?
+    var runKmHardCap: Double?
+
     enum CodingKeys: String, CodingKey {
         case sessionsCompleted = "sessions_completed"
         case sessionsPlanned = "sessions_planned"
@@ -165,6 +171,9 @@ struct WeekProgress: Codable {
         case hoursPlanned = "hours_planned"
         case totalTrainingLoad = "total_training_load"
         case complianceScore = "compliance_score"
+        case runKmDone = "run_km_done"
+        case runKmTarget = "run_km_target"
+        case runKmHardCap = "run_km_hard_cap"
     }
 }
 
@@ -173,12 +182,87 @@ struct WeeklyPlanStatusResponse: Codable {
     let days: [String: DayPlanWithActual]
     let weekProgress: WeekProgress?
     let weeksToRace: Int?
+    var race: RaceStatus?
 
     enum CodingKeys: String, CodingKey {
         case weekSummary = "week_summary"
         case days
         case weekProgress = "week_progress"
         case weeksToRace = "weeks_to_race"
+        case race
+    }
+}
+
+/// The final-two-weeks block on /weekly-plan/status: countdown always,
+/// deterministic pacing table when the goal is a running race.
+struct RaceStatus: Codable {
+    let raceName: String?
+    let raceDistance: String?
+    let raceDate: String?
+    let daysToRace: Int?
+    let isRaceWeek: Bool?
+    let pacing: RacePacing?
+
+    enum CodingKeys: String, CodingKey {
+        case raceName = "race_name"
+        case raceDistance = "race_distance"
+        case raceDate = "race_date"
+        case daysToRace = "days_to_race"
+        case isRaceWeek = "is_race_week"
+        case pacing
+    }
+}
+
+struct RacePacing: Codable {
+    let target: String?
+    let distanceKm: Double?
+    let avgPace: String?
+    let first5kPace: String?
+    let cruisePace: String?
+    let splits: [RaceSplit]?
+    let waypoints: [RaceWaypoint]?
+    let hrCaps: RaceHrCaps?
+
+    enum CodingKeys: String, CodingKey {
+        case target
+        case distanceKm = "distance_km"
+        case avgPace = "avg_pace"
+        case first5kPace = "first_5k_pace"
+        case cruisePace = "cruise_pace"
+        case splits, waypoints
+        case hrCaps = "hr_caps"
+    }
+}
+
+struct RaceSplit: Codable, Identifiable {
+    var id: Double { toKm ?? 0 }
+    let toKm: Double?
+    let split: String?
+    let cumulative: String?
+    let pace: String?
+
+    enum CodingKeys: String, CodingKey {
+        case toKm = "to_km"
+        case split, cumulative, pace
+    }
+}
+
+struct RaceWaypoint: Codable, Identifiable {
+    var id: String { label ?? "" }
+    let label: String?
+    let km: Double?
+    let time: String?
+}
+
+struct RaceHrCaps: Codable {
+    let first10k: Int?
+    let to30k: Int?
+    let final: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case first10k = "first_10k"
+        case to30k = "to_30k"
+        case final
     }
 }
 
@@ -190,13 +274,15 @@ struct Workout: Codable {
     let totalTime: String?
     let hrTarget: String?
     let muscleGroups: [String]?
-    
+    /// Python-computed carb/fluid line for long runs (fueling.stamp_fuel).
+    var fuel: String?
+
     var sportIcon: String {
         PhoenixCoach.sportIcon(for: sport)
     }
-    
+
     enum CodingKeys: String, CodingKey {
-        case sport, title, steps
+        case sport, title, steps, fuel
         case totalTime = "total_time"
         case hrTarget = "hr_target"
         case muscleGroups = "muscle_groups"
@@ -729,11 +815,16 @@ struct SmartRefreshResponse: Codable {
     let syncMessage: String
     let recovery: RecoverySummary
     let adaptation: AdaptationResult
-    
+    /// The frozen refresh event just recorded — byte-identical to the History
+    /// feed's row for this refresh (Today's debrief card reads it).
+    var event: HistoryEvent?
+    var eventRecorded: Bool?
+
     enum CodingKeys: String, CodingKey {
         case syncStatus = "sync_status"
         case syncMessage = "sync_message"
-        case recovery, adaptation
+        case recovery, adaptation, event
+        case eventRecorded = "event_recorded"
     }
 }
 

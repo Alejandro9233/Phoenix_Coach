@@ -415,6 +415,7 @@ def _audit_quality(plan_json: dict, ctx: dict, window, budget: dict,
     open_days = _open_run_days(list(VALID_DAYS), availability, active_injuries)
     if (phase in ("base", "build", "peak")
             and not ctx.get("is_recovery_week")
+            and not ((ctx.get("tuneup") or {}).get("is_race_week"))
             and (max_quality or 0) >= 2
             and "running" not in _injury_blocked_sports(active_injuries or [])
             and open_days >= 2
@@ -514,8 +515,15 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
             "ceiling": hours_high,
         })
 
+    # Tune-up race week: the run target scales 0.6x but phase_hours_range
+    # doesn't, so a deliberately light race week would trip the hours floor —
+    # and the race IS the week's quality, so the quality nudge is spurious
+    # too. Both checks are soft-only; hatching them costs nothing.
+    tuneup_race_week = bool((ctx.get("tuneup") or {}).get("is_race_week")) if ctx else False
+
     hours_low = budget.get("hours_low")
     if (hours_low is not None and open_days > 0
+            and not tuneup_race_week
             and week_hours < hours_low * HOURS_FLOOR_FRAC):
         report.soft.append({
             "kind": "hours_low",

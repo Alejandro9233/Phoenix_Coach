@@ -21,15 +21,19 @@ class IngestionService:
     def ingest_coros_data(self, data):
         """Populates the database from a COROS scrape — either the dict
         returned by CorosScraper.scrape_all or a path to its JSON dump
-        (rebuild_db.py and the tests pass files)."""
+        (rebuild_db.py and the tests pass files).
+
+        Returns the list of newly inserted Activity ids, so the caller can
+        say what a refresh actually found (refresh_events)."""
         if isinstance(data, (str, Path)):
             if not Path(data).exists():
                 print(f"Error: {data} not found.")
-                return
+                return []
             with open(data, 'r') as f:
                 data = json.load(f)
 
         session = self.Session()
+        new_activity_ids = []
         try:
             # 1. Ensure at least one athlete exists
             athlete = session.query(Athlete).first()
@@ -37,7 +41,7 @@ class IngestionService:
                 athlete = Athlete(name="Alejandro")
                 session.add(athlete)
                 session.flush()
-            
+
             athlete_id = athlete.id
 
             # 2. Ingest Activities
@@ -98,6 +102,7 @@ class IngestionService:
                     sub_mode=act.get("subMode")
                 )
                 session.add(new_act)
+                new_activity_ids.append(new_act.id)
 
             # 3. Ingest Recovery Snapshots (EvoLab Metrics)
             # From analyse_query -> dayList
@@ -240,6 +245,7 @@ class IngestionService:
 
             session.commit()
             print("Successfully ingested COROS data into the database.")
+            return new_activity_ids
         except Exception as e:
             session.rollback()
             print(f"Error during ingestion: {e}")
