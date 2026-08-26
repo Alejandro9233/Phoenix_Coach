@@ -46,7 +46,7 @@ from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyP
 from backend.services.constraint_enforcer import (
     SPORT_TO_AVAILABILITY_KEY, get_travel_day_names, parse_day_list,
 )
-from backend.services.pace_model import compute_pace_model, race_label
+from backend.services.pace_model import RACE_KM, compute_pace_model, race_label
 from backend.utils.timezone import get_local_today
 
 # Weekly run-km progression (_get_weekly_run_target). Tunable in one place.
@@ -55,6 +55,11 @@ RUN_RAMP_HARD_CAP = 1.15   # never plan >15% above demonstrated volume,
                            # even when the phase floor asks for more
 LONG_RUN_STEP_MIN = 12     # long run grows this many minutes per week
 RUN_NOISE_FLOOR_KM = 5.0   # weeks at or under this are noise, not capacity
+# Goal race week: the race is a fact, so the budget is the race distance plus
+# shakeout allowance — the taper ramp math would otherwise hard-cap the week
+# below the race itself and the gate would repair the marathon away.
+RACE_WEEK_EASY_KM = 8.0        # shakeout jogs + strides, target headroom
+RACE_WEEK_EASY_CAP_KM = 14.0   # hard-cap headroom above the race distance
 
 
 # ─── Shared workout menu building blocks ──────────────────────────────────────
@@ -1194,9 +1199,14 @@ class PeriodizationEngine:
 
         # THE weekly run-km target — actuals-derived, ramp-capped. The volume
         # gate enforces these numbers; the phase range above is only prose.
+        # On the goal race week of a running race, the budget must contain the
+        # race itself, or the gate would repair the marathon out of its own
+        # race week.
+        race_week_km = RACE_KM.get(race_distance) if race_week else None
         volume_targets = self._get_weekly_run_target(
             db, self._phase_def(profile, phase_info),
             cycle_info["is_recovery_week"], today, tuneup_week=tuneup_week,
+            race_week_km=race_week_km,
         )
 
         # Python-derived training paces from the watch's LT pace (running
@@ -1641,6 +1651,7 @@ class PeriodizationEngine:
     def _get_weekly_run_target(
         self, db: Session, phase_def: dict,
         is_recovery_week: bool, today: date, tuneup_week: bool = False,
+        race_week_km: float = None,
     ) -> Optional[dict]:
         """THE weekly run-km target, derived from what the athlete actually ran.
 
@@ -1721,7 +1732,16 @@ class PeriodizationEngine:
 
         # A race week outranks a recovery week — 0.6x is already the deeper
         # cut, and stacking both (0.6 x 0.75) would leave almost nothing.
-        if tuneup_week:
+        # The GOAL race week outranks everything: its budget IS the race.
+        if race_week_km:
+            target = race_week_km + RACE_WEEK_EASY_KM
+            hard_cap = race_week_km + RACE_WEEK_EASY_CAP_KM
+            long_run = 0
+            basis = (
+                f"goal race week: {race_week_km:g} km race + up to "
+                f"{RACE_WEEK_EASY_KM:g} km of shakeouts"
+            )
+        elif tuneup_week:
             # C7 hook: race week — the tune-up race IS the long run.
             target *= 0.6
             hard_cap *= 0.65

@@ -1452,21 +1452,34 @@ async def _run_smart_refresh(db: Session, progress=None):
     if needs_adaptation:
         try:
             report("Adapting today's plan...")
-            adapt_today_workout(body=None, db=db)
-            adapted = True
-            print(f"🔄 Auto-adapted today's workout. Reasons: {adaptation_reasons}")
-            # Join key to the plan receipt this adapt just appended, so the
-            # History feed folds the two into one row instead of showing the
-            # same moment twice.
             from datetime import timedelta as _td
             today_local = get_local_today()
-            adapt_week_start = today_local - _td(days=today_local.weekday())
-            plan_row = db.query(WeeklyPlan).filter(
-                WeeklyPlan.week_start == adapt_week_start
-            ).order_by(WeeklyPlan.id.desc()).first()
-            revisions = (plan_row.plan_json or {}).get("_revisions") or [] if plan_row else []
-            if revisions and revisions[-1].get("source") == "adapt_today":
-                adapt_receipt_at = revisions[-1].get("at")
+            week_start_local = today_local - _td(days=today_local.weekday())
+
+            # adapt_today_workout has a same-day idempotency guard that
+            # returns WITHOUT writing. Claim adapted (and the receipt join
+            # key) only when a NEW adapt receipt actually appeared — else the
+            # afternoon's no-op refresh would durably claim the morning's
+            # plan change as its own and corrupt the History fold.
+            def _last_adapt_at():
+                plan_row = db.query(WeeklyPlan).filter(
+                    WeeklyPlan.week_start == week_start_local
+                ).order_by(WeeklyPlan.id.desc()).first()
+                revs = ((plan_row.plan_json or {}).get("_revisions") or []) if plan_row else []
+                if revs and revs[-1].get("source") == "adapt_today":
+                    return revs[-1].get("at")
+                return None
+
+            before_at = _last_adapt_at()
+            adapt_today_workout(body=None, db=db)
+            after_at = _last_adapt_at()
+            if after_at is not None and after_at != before_at:
+                adapted = True
+                adapt_week_start = week_start_local
+                adapt_receipt_at = after_at
+                print(f"🔄 Auto-adapted today's workout. Reasons: {adaptation_reasons}")
+            else:
+                print("ℹ️ Adaptation needed but already adapted today — no new write.")
         except Exception as e:
             print(f"⚠️ Auto-adaptation failed: {e}")
             adapted = False

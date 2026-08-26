@@ -302,6 +302,20 @@ def _open_run_days(window, availability, active_injuries) -> int:
     return count
 
 
+def _race_day_exempt(ctx: dict, day_name: str) -> bool:
+    """The race itself is a fact, not a menu violation. On the goal race
+    week's race day — and a tune-up's — the title and quality audits stand
+    down for that one day; the rest of the week stays fully gated. Without
+    this, the taper rule + off-menu-quality check would hard-fail the
+    marathon the prompt itself scheduled and repair it into an Easy Run."""
+    if not ctx:
+        return False
+    if ctx.get("race_week") and day_name == ctx.get("race_day_name"):
+        return True
+    tu = ctx.get("tuneup") or {}
+    return bool(tu.get("is_race_week") and day_name == tu.get("race_day_name"))
+
+
 def _audit_titles(plan_json: dict, ctx: dict, window, report: GateReport) -> None:
     """B2: workout titles must come from the phase menu — the forbidden list
     used to be prompt prose only ('Marathon Pace Long Run' shipped in base
@@ -318,6 +332,8 @@ def _audit_titles(plan_json: dict, ctx: dict, window, report: GateReport) -> Non
     for day_name, w in _window_workouts(plan_json, window):
         sport = map_sport(w.get("sport") or "")
         if sport in ("rest", "strength"):
+            continue
+        if _race_day_exempt(ctx, day_name):
             continue
         title = w.get("title") or ""
         km, _ = workout_km(w)
@@ -388,7 +404,7 @@ def _audit_quality(plan_json: dict, ctx: dict, window, budget: dict,
     quality_sessions = [
         {"day": day_name, "title": w.get("title")}
         for day_name, w in _window_workouts(plan_json, None)
-        if is_quality(w)
+        if is_quality(w) and not _race_day_exempt(ctx, day_name)
     ]
     window_quality = [
         s for s in quality_sessions
@@ -515,15 +531,19 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
             "ceiling": hours_high,
         })
 
-    # Tune-up race week: the run target scales 0.6x but phase_hours_range
-    # doesn't, so a deliberately light race week would trip the hours floor —
-    # and the race IS the week's quality, so the quality nudge is spurious
-    # too. Both checks are soft-only; hatching them costs nothing.
-    tuneup_race_week = bool((ctx.get("tuneup") or {}).get("is_race_week")) if ctx else False
+    # Race weeks (goal or tune-up): the run target is race-shaped but
+    # phase_hours_range isn't, so a deliberately light race week would trip
+    # the hours floor — and the race IS the week's quality, so the quality
+    # nudge is spurious too. Both checks are soft-only; hatching them costs
+    # nothing.
+    race_week = bool(
+        ctx and (ctx.get("race_week")
+                 or (ctx.get("tuneup") or {}).get("is_race_week"))
+    )
 
     hours_low = budget.get("hours_low")
     if (hours_low is not None and open_days > 0
-            and not tuneup_race_week
+            and not race_week
             and week_hours < hours_low * HOURS_FLOOR_FRAC):
         report.soft.append({
             "kind": "hours_low",

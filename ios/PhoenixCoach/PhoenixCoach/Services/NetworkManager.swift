@@ -484,6 +484,13 @@ class NetworkManager: ObservableObject {
             items.append(URLQueryItem(name: "before", value: before))
         }
         components?.queryItems = items
+        // Foundation leaves '+' literal in query strings and the server
+        // form-decodes it to a space; the cursor uses 'Z' so this is belt
+        // and braces for any future '+' in a query value.
+        if let encodedQuery = components?.percentEncodedQuery {
+            components?.percentEncodedQuery = encodedQuery
+                .replacingOccurrences(of: "+", with: "%2B")
+        }
         guard let url = components?.url else {
             throw NetworkError.invalidURL
         }

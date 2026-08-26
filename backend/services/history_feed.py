@@ -39,8 +39,17 @@ def _as_utc(dt_or_str) -> datetime | None:
     if isinstance(dt_or_str, datetime):
         dt = dt_or_str
     else:
+        s = str(dt_or_str).strip()
+        # Cursors are emitted with a 'Z' suffix (no '+', because a literal
+        # '+' in a query string form-decodes to a space server-side). Repair
+        # both spellings defensively: Z -> +00:00 for any-Python fromisoformat,
+        # and a mid-string space back to the '+' it once was.
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        elif "T" in s and " " in s:
+            s = s.replace(" ", "+")
         try:
-            dt = datetime.fromisoformat(str(dt_or_str))
+            dt = datetime.fromisoformat(s)
         except ValueError:
             return None
     if dt.tzinfo is None:
@@ -115,6 +124,17 @@ def build_history_feed(db, limit: int = DEFAULT_LIMIT, before: str = None) -> di
     refresh_rows = q.order_by(
         RefreshEvent.created_at.desc(), RefreshEvent.id.desc()
     ).limit(limit).all()
+    # The SQL limit can cut mid-second; pull the rest of the boundary instant
+    # so the page-extension below (and the strict < cursor) never drop a
+    # same-second sibling between pages.
+    if len(refresh_rows) == limit and refresh_rows:
+        boundary = refresh_rows[-1].created_at
+        fetched = {r.id for r in refresh_rows}
+        refresh_rows += [
+            r for r in db.query(RefreshEvent).filter(
+                RefreshEvent.created_at == boundary
+            ).all() if r.id not in fetched
+        ]
 
     fold_keys = {}
     candidates = []
@@ -184,9 +204,20 @@ def build_history_feed(db, limit: int = DEFAULT_LIMIT, before: str = None) -> di
 
     candidates.sort(key=lambda c: c["_sort"], reverse=True)
     page = candidates[:limit]
+    # Receipts have seconds precision, so a page cut can land mid-second.
+    # Extend the page through the boundary instant — the strict `< cursor`
+    # comparison would otherwise drop same-second rows between pages.
+    while len(candidates) > len(page) and page \
+            and candidates[len(page)]["_sort"] == page[-1]["_sort"]:
+        page.append(candidates[len(page)])
     # Full page -> offer a cursor (older rows may exist; an empty follow-up
     # page ends paging cleanly). Short page -> both sources are exhausted.
-    next_before = page[-1]["_sort"].isoformat() if len(page) == limit else None
+    # 'Z' suffix, never '+00:00': a literal '+' in a query string arrives
+    # server-side as a space and the cursor would silently die in transit.
+    next_before = (
+        page[-1]["_sort"].isoformat().replace("+00:00", "Z")
+        if len(page) >= limit else None
+    )
     for c in page:
         c.pop("_sort", None)
     return {"events": page, "next_before": next_before}

@@ -134,6 +134,21 @@ def test_ingest_always_updates_weight(temp_db_url, mock_coros_json):
     assert _read_athlete(temp_db_url).weight_kg == 76.0
 
 
+def test_ingest_returns_new_ids_once(temp_db_url, mock_coros_json):
+    """The refresh-event contract: first ingest returns the new Activity ids,
+    a re-ingest of the same payload returns [] (dedupe means nothing new)."""
+    payload = dict(mock_coros_json)
+    payload["activities"] = [{
+        "labelId": 424242, "timestamp": 1787000000, "duration": 2520,
+        "distance": 7000, "sportType": 100, "avgSpeed": 360,
+    }]
+    first = IngestionService(db_url=temp_db_url).ingest_coros_data(payload)
+    assert first == ["424242"]
+
+    second = IngestionService(db_url=temp_db_url).ingest_coros_data(payload)
+    assert second == []
+
+
 def test_scrape_overwrites_app_entered_weight_by_design(client, temp_db_url, mock_coros_json):
     response = client.put("/athlete/profile", json={"weight_kg": 71})
     assert response.status_code == 200

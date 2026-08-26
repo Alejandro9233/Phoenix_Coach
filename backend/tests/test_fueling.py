@@ -47,7 +47,10 @@ def _plan(total_time, sport="running"):
 def test_bands():
     assert fuel_line("60 min", 78) is None
     assert fuel_line("89 min", 78) is None
+    assert fuel_line("90 min", 78) is not None   # threshold is inclusive
     assert fuel_line("100 min", 78).startswith("45-60 g carbs/h")
+    assert fuel_line("120 min", 78).startswith("45-60 g carbs/h")  # boundary
+    assert fuel_line("121 min", 78).startswith("60-90 g carbs/h")
     assert fuel_line("150 min", 78).startswith("60-90 g carbs/h")
 
 

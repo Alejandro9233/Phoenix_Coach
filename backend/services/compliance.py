@@ -429,8 +429,12 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
     # block — countdown always, pacing table when the goal is a running race
     # with a parseable target (pace_model owns the math; None degrades the
     # sheet to countdown-only).
+    # race_date >= today: weeks_to_race clamps past races to 0, so without
+    # this the block (and "Race in -1 days") would render forever after
+    # race day. Race day itself still shows; the morning after, it's gone.
     race = None
-    if athlete and athlete.race_date and weeks_to_race is not None and weeks_to_race <= 1:
+    if (athlete and athlete.race_date and athlete.race_date >= today
+            and weeks_to_race is not None and weeks_to_race <= 1):
         from backend.services.pace_model import race_pacing
 
         race = {

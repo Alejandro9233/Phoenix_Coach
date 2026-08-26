@@ -122,20 +122,38 @@ def test_status_carries_run_km_numbers(db, monkeypatch, client):
 
 
 def test_race_block_inside_final_two_weeks(db, monkeypatch, client):
+    """Deterministic on any weekday: Sunday of the current week is always in
+    the window; a date 8+ days out never is; a past race never shows."""
     _seed_plan(db, monkeypatch, client)
     athlete = db.query(Athlete).first()
+    start_of_week = get_local_today() - timedelta(days=get_local_today().weekday())
 
     status = client.get("/weekly-plan/status").json()
     assert status["race"] is None  # 10 weeks out
 
-    athlete.race_date = get_local_today() + timedelta(days=3)
+    # Sunday of the current week: in the window, race week True.
+    athlete.race_date = start_of_week + timedelta(days=6)
     db.commit()
     race = client.get("/weekly-plan/status").json()["race"]
-    assert race["days_to_race"] == 3
-    start_of_week = get_local_today() - timedelta(days=get_local_today().weekday())
-    in_window = start_of_week <= athlete.race_date < start_of_week + timedelta(days=7)
-    assert race["is_race_week"] is in_window
+    assert race["is_race_week"] is True
+    assert race["days_to_race"] == (athlete.race_date - get_local_today()).days
     assert race["pacing"]["splits"][-1]["cumulative"] == "3:10:00"
+
+    # Next week's Sunday: block present (weeks_to_race <= 1), not race week.
+    athlete.race_date = start_of_week + timedelta(days=13)
+    db.commit()
+    race = client.get("/weekly-plan/status").json()["race"]
+    assert race["is_race_week"] is False
+
+
+def test_race_block_expires_after_race_day(db, monkeypatch, client):
+    """weeks_to_race clamps past races to 0 — without the >= today guard the
+    block (and 'Race in -1 days') would render forever."""
+    _seed_plan(db, monkeypatch, client)
+    athlete = db.query(Athlete).first()
+    athlete.race_date = get_local_today() - timedelta(days=1)
+    db.commit()
+    assert client.get("/weekly-plan/status").json()["race"] is None
 
 
 # --- refresh events ---
@@ -201,6 +219,10 @@ def test_prune_keeps_newest(db):
         record_refresh_event(db, _minimal_event(
             get_local_now() - timedelta(minutes=REFRESH_EVENTS_KEEP + 5 - i)))
     assert db.query(RefreshEvent).count() == REFRESH_EVENTS_KEEP
+    # The SURVIVORS are the newest rows — pruning by created_at desc means
+    # the highest ids remain (inserted newest-last above).
+    surviving_ids = {r.id for r in db.query(RefreshEvent.id).all()}
+    assert min(surviving_ids) == 6  # rows 1-5 (the oldest inserts) pruned
 
 
 def test_partial_scrape_still_records_event(db, monkeypatch):
@@ -297,18 +319,73 @@ def test_feed_reconstructs_legacy_after(db, monkeypatch, client):
                                "total_time": "90 min"}]},
         "stripped": [],
     }  # no "after" — pre-upgrade receipt
-    pj["_revisions"] = [legacy] + list(pj["_revisions"])
+    # A NEWER receipt whose `before` covers Sunday: the legacy receipt's
+    # after must be reconstructed from exactly this, not the live plan.
+    newer = {
+        "at": (get_local_now() - timedelta(hours=1)).isoformat(timespec="seconds"),
+        "source": "replan_remaining", "days": ["Sunday"], "reason": "newer",
+        "before": {"Sunday": [{"sport": "running", "title": "Newer Before Run",
+                               "total_time": "50 min"}]},
+        "after": {"Sunday": [{"sport": "running", "title": "Final Run",
+                              "total_time": "45 min"}]},
+        "stripped": [],
+    }
+    pj["_revisions"] = [legacy] + list(pj["_revisions"]) + [newer]
     plan_row.plan_json = pj
     flag_modified(plan_row, "plan_json")
     db.commit()
 
     feed = build_history_feed(db, limit=30)
     legacy_ev = next(e for e in feed["events"] if e.get("reason") == "legacy")
-    assert legacy_ev["after_source"] in ("reconstructed", "current")
-    assert legacy_ev["after"]["Sunday"], "after must be filled from newer state"
+    assert legacy_ev["after_source"] == "reconstructed"
+    assert legacy_ev["after"]["Sunday"][0]["title"] == "Newer Before Run"
     modern = next(e for e in feed["events"]
                   if e["type"] == "plan_change" and e["source"] == "generate")
     assert modern["after_source"] == "receipt"
+
+
+def test_feed_same_second_page_boundary(db):
+    """Receipts and events share seconds precision; the page must extend
+    through the boundary instant or the strict < cursor drops rows."""
+    base = datetime.utcnow().replace(microsecond=0) - timedelta(hours=1)
+    for i, created in enumerate([base, base, base - timedelta(minutes=5)]):
+        ev = _minimal_event(get_local_now() - timedelta(minutes=i))
+        row = RefreshEvent(created_at=created, local_day=ev["local_day"],
+                           at_local=ev["at"], sync_status="ok", payload_json=ev)
+        db.add(row)
+    db.commit()
+
+    page1 = build_history_feed(db, limit=1)
+    assert len(page1["events"]) == 2  # both boundary-instant rows together
+    page2 = build_history_feed(db, limit=1, before=page1["next_before"])
+    assert len(page2["events"]) == 1
+    ids = {e["id"] for e in page1["events"]} | {e["id"] for e in page2["events"]}
+    assert len(ids) == 3  # nothing dropped, nothing duplicated
+
+
+def test_cursor_survives_http_and_mangling(db, monkeypatch, client):
+    """The cursor round-trips through the real endpoint, contains no '+'
+    (a literal '+' form-decodes to a space server-side), and _as_utc repairs
+    a mangled one anyway."""
+    from backend.services.history_feed import _as_utc
+    from datetime import timezone as tz
+
+    base = get_local_now() - timedelta(hours=10)
+    for i in range(5):
+        record_refresh_event(db, _minimal_event(base + timedelta(hours=i)))
+
+    page1 = client.get("/history", params={"limit": 3}).json()
+    assert "+" not in page1["next_before"]
+    page2 = client.get("/history",
+                       params={"limit": 3, "before": page1["next_before"]}).json()
+    assert len(page2["events"]) == 2
+    assert {e["id"] for e in page2["events"]}.isdisjoint(
+        {e["id"] for e in page1["events"]})
+
+    # A '+00:00' cursor whose '+' was form-decoded to a space still parses.
+    mangled = _as_utc("2026-08-25T20:00:00 00:00")
+    assert mangled == datetime(2026, 8, 25, 20, 0, 0, tzinfo=tz.utc)
+    assert _as_utc("2026-08-25T20:00:00Z") == mangled
 
 
 def test_feed_pagination(db):
@@ -345,6 +422,112 @@ def test_regenerate_preserves_receipts(db, monkeypatch, client):
     assert revisions[-1]["source"] == "regenerate"
 
 
+# --- fresh-recovery triggers + the adapted truth ---
+
+def _bad_recovery_today(db):
+    athlete = db.query(Athlete).first()
+    athlete.hrv_baseline = 70.0
+    db.add(RecoverySnapshot(date=get_local_today(), hrv_ms=50.0,
+                            resting_hr=60, fatigue_state=4,
+                            load_ratio=1.5, tib=-25.0))
+    db.commit()
+
+
+def _stub_scraper(monkeypatch):
+    import backend.main as main_mod
+
+    class _EmptyScraper:
+        async def scrape_all(self, backfill_days=0):
+            return {}
+
+    monkeypatch.setattr(main_mod, "CorosScraper", _EmptyScraper)
+    return main_mod
+
+
+def _fake_adapt(db, calls):
+    """First call writes a real adapt_today receipt through the pipeline
+    (like the real handler); later calls hit the same-day idempotency guard
+    and write NOTHING — the exact behavior the adapted-truth check guards."""
+    from sqlalchemy.orm.attributes import flag_modified
+    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    from backend.services.plan_normalizer import normalize_plan
+
+    def fake(body=None, db=db):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            return {"status": "already_adapted"}
+        today_name = get_local_today().strftime("%A")
+        week_start = get_local_today() - timedelta(days=get_local_today().weekday())
+        plan_row = db.query(WeeklyPlan).filter(
+            WeeklyPlan.week_start == week_start
+        ).order_by(WeeklyPlan.id.desc()).first()
+        pj = normalize_plan(plan_row.plan_json)
+        before = capture_before(pj, days=[today_name])
+        pj["days"][today_name]["workouts"][0]["title"] = "Recovery Run"
+        pj, _ = run_plan_write_pipeline(
+            db, pj, source="adapt_today",
+            availability={"run_days": "mon,tue,wed,thu,fri,sat,sun"},
+            active_injuries=[], days=[today_name],
+            reason="Today's workout adapted to recovery metrics.", before=before,
+        )
+        plan_row.plan_json = pj
+        flag_modified(plan_row, "plan_json")
+        db.commit()
+        return {"status": "adapted"}
+
+    return fake
+
+
+def test_fresh_triggers_recorded_and_adapt_joined(db, monkeypatch, client):
+    _seed_plan(db, monkeypatch, client)
+    _bad_recovery_today(db)
+    main_mod = _stub_scraper(monkeypatch)
+    calls = {"n": 0}
+    monkeypatch.setattr(main_mod, "adapt_today_workout", _fake_adapt(db, calls))
+
+    result = asyncio.run(_run_smart_refresh(db))
+    event = result["event"]
+    assert {t["name"] for t in event["triggers"]} == {
+        "hrv_drop", "rhr_elevated", "fatigue_high", "load_ratio_high", "tib_low"}
+    fired = {t["name"] for t in event["triggers"] if t["fired"]}
+    # RHR can't fire: the 7-day avg IS today's single snapshot.
+    assert fired == {"hrv_drop", "fatigue_high", "load_ratio_high", "tib_low"}
+    hrv = next(t for t in event["triggers"] if t["name"] == "hrv_drop")
+    assert hrv["value"] == -28.6 and hrv["threshold"] == -15
+
+    assert event["adaptation"]["adapted"] is True
+    week_start = get_local_today() - timedelta(days=get_local_today().weekday())
+    plan_row = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == week_start).order_by(WeeklyPlan.id.desc()).first()
+    assert event["adaptation"]["receipt_at"] == plan_row.plan_json["_revisions"][-1]["at"]
+
+    # The feed folds the receipt into this refresh — one row, not two.
+    feed = build_history_feed(db, limit=30)
+    refresh_ev = next(e for e in feed["events"] if e["type"] == "refresh")
+    assert refresh_ev["adaptation"]["receipt"]["source"] == "adapt_today"
+    assert not any(e["type"] == "plan_change" and e["source"] == "adapt_today"
+                   for e in feed["events"])
+
+
+def test_second_refresh_never_claims_the_mornings_adapt(db, monkeypatch, client):
+    """The idempotency guard writes nothing on refresh #2 — the event must
+    say adapted=False and carry NO join key, or the feed folds the morning's
+    receipt into an afternoon no-op."""
+    _seed_plan(db, monkeypatch, client)
+    _bad_recovery_today(db)
+    main_mod = _stub_scraper(monkeypatch)
+    calls = {"n": 0}
+    monkeypatch.setattr(main_mod, "adapt_today_workout", _fake_adapt(db, calls))
+
+    first = asyncio.run(_run_smart_refresh(db))
+    second = asyncio.run(_run_smart_refresh(db))
+
+    assert first["event"]["adaptation"]["adapted"] is True
+    assert second["event"]["adaptation"]["needed"] is True
+    assert second["event"]["adaptation"]["adapted"] is False
+    assert second["event"]["adaptation"]["receipt_at"] is None
+
+
 # --- gate hatches in a tune-up race week ---
 
 def test_gate_quiet_in_tuneup_race_week():
@@ -379,3 +562,91 @@ def test_gate_quiet_in_tuneup_race_week():
     kinds = [v["kind"] for v in report.soft]
     assert "hours_low" in kinds
     assert "quality_missing" in kinds
+
+
+# --- the goal race week: the gate must not repair the marathon away ---
+
+def _race_week_ctx():
+    return {
+        "phase": "taper", "phase_name": "Taper", "is_recovery_week": False,
+        "recovery": {"status": "green"},
+        "race_week": True, "race_day_name": "Sunday",
+        # What the engine now computes for a marathon race week:
+        # race km + shakeout allowance, not the taper ramp.
+        "volume_targets": {"run_km_target": 50.2, "run_km_hard_cap": 56.2},
+        "volume_references": {"phase_hours_range": "4-6",
+                              "max_quality_sessions": 1,
+                              "sport_sessions": {"running": {"sessions": 3}}},
+        "workout_menu": {"running": ["Easy Run (short)", "Strides/Openers"]},
+        "forbidden_workouts": [],
+        "tuneup": None,
+    }
+
+
+def _race_week_plan():
+    return {
+        "week_summary": {},
+        "days": {
+            "Tuesday": {"summary": "s", "workouts": [
+                {"sport": "running", "title": "Easy Run (short)",
+                 "total_time": "25 min", "distance_km": 4.0, "steps": []}]},
+            "Sunday": {"summary": "race", "workouts": [
+                {"sport": "running", "title": "Marathon Race",
+                 "total_time": "3:10:00", "distance_km": 42.2,
+                 "steps": [{"type": "main", "duration": "190:00", "zone": 3,
+                            "description": "Race at marathon pace"}]}]},
+        },
+    }
+
+
+def test_gate_lets_the_goal_race_through(db):
+    from backend.services import volume_gate
+
+    report = volume_gate.audit_plan(
+        _race_week_plan(), _race_week_ctx(),
+        availability={"run_days": "mon,tue,wed,thu,fri,sat,sun"},
+        active_injuries=[],
+    )
+    assert report.hard == [], [v["kind"] for v in report.hard]
+    assert "hours_low" not in [v["kind"] for v in report.soft]
+
+
+def test_same_plan_without_race_week_still_fails(db):
+    """Control: an off-menu 42 km 'race' in a NORMAL taper week must still be
+    hard-blocked — the exemption is the race week's race day only."""
+    from backend.services import volume_gate
+
+    ctx = _race_week_ctx()
+    ctx["race_week"] = False
+    ctx["race_day_name"] = None
+    ctx["volume_targets"] = {"run_km_target": 18.0, "run_km_hard_cap": 31.5}
+    report = volume_gate.audit_plan(
+        _race_week_plan(), ctx,
+        availability={"run_days": "mon,tue,wed,thu,fri,sat,sun"},
+        active_injuries=[],
+    )
+    kinds = [v["kind"] for v in report.hard]
+    assert "run_km_high" in kinds
+    assert "forbidden_title" in kinds
+
+
+def test_engine_race_week_budget_contains_the_race(db):
+    """The marathon race week's target is race + shakeouts, not the taper
+    ramp that would hard-cap the week below the race itself."""
+    from backend.services.periodization_engine import (
+        RACE_WEEK_EASY_CAP_KM, RACE_WEEK_EASY_KM,
+    )
+
+    athlete = db.query(Athlete).first()
+    start_of_week = get_local_today() - timedelta(days=get_local_today().weekday())
+    athlete.race_date = start_of_week + timedelta(days=6)
+    db.commit()
+
+    ctx = __import__("backend.services.periodization_engine",
+                     fromlist=["PeriodizationEngine"]).PeriodizationEngine().compute_context(db)
+    assert ctx["race_week"] is True
+    vt = ctx["volume_targets"]
+    assert vt["run_km_target"] == round(42.195 + RACE_WEEK_EASY_KM, 1)
+    assert vt["run_km_hard_cap"] == round(42.195 + RACE_WEEK_EASY_CAP_KM, 1)
+    assert vt["long_run_minutes"] == 0
+    assert "goal race week" in vt["basis"]
