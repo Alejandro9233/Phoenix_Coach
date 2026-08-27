@@ -39,6 +39,10 @@ wheels/
 # Vector DB
 chroma_db/
 
+# Raw COROS captures (personal GPS traces — sanitized fixtures live in
+# backend/tests/fixtures/)
+samples/
+
 # Session state (volatile, not shared)
 .claude/restart-brief.md
 .claude/design-notes/
