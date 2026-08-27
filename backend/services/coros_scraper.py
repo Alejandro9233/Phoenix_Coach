@@ -200,7 +200,18 @@ class CorosScraper:
         if not self.email or not self.password:
             raise Exception("COROS Login Failed: COROS_EMAIL / COROS_PASSWORD are not set")
 
-        await page.goto(f"{self.base_url}/admin/views/dash-board#/login")
+        # Same rules as _goto below: domcontentloaded (the `load` event waits
+        # on ~500KB of SPA assets) and a tolerated 60s — this is the coldest
+        # navigation of the run, and on Render's throttled CPU the 30s
+        # Playwright default lost the race three times on 2026-08-27 alone
+        # ("Scraper error: Page.goto: Timeout 30000ms"). The form/dashboard
+        # waits below are the real readiness judges.
+        try:
+            await page.goto(f"{self.base_url}/admin/views/dash-board#/login",
+                            wait_until="domcontentloaded", timeout=60000)
+        except PlaywrightTimeoutError:
+            print("  Login page still loading after 60s — continuing; the "
+                  "form wait below is the real verdict.")
 
         # A remembered session lands us straight on the dashboard, skipping the form.
         if await self._is_logged_in(page):
