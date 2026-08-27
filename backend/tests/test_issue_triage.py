@@ -31,8 +31,15 @@ FROZEN_WEEK_START = date(2026, 8, 17)  # the Monday of that week
 
 @pytest.fixture(autouse=True)
 def frozen_today():
-    """Pin the service's idea of today. It's the only clock the triage path reads."""
-    with patch("backend.services.issue_triage.get_local_today", return_value=FROZEN_TODAY):
+    """Pin 'today' for the whole apply path. issue_triage computes the injury
+    window from its clock, but apply also runs the plan pipeline, where
+    constraint_enforcer expires injuries against ITS clock — leave that one
+    real and every test starts failing the day the frozen window passes
+    (first seen 2026-08-26, when FROZEN_TODAY + 6 slipped into the past)."""
+    with patch("backend.services.issue_triage.get_local_today", return_value=FROZEN_TODAY), \
+         patch("backend.utils.timezone.get_local_today", return_value=FROZEN_TODAY):
+        # timezone-module patch covers constraint_enforcer, which imports
+        # get_local_today inside the function at call time.
         yield
 
 
@@ -395,9 +402,10 @@ def test_apply_endpoint_updates_the_plan(client, db):
 # summarize() reads injuries through constraint_enforcer.get_active_injuries,
 # so an injury past its expected_recovery_date must never reach the prompt as
 # ACTIVE — and the read has the enforcer's side effect of flipping the row to
-# Recovering. These use the real clock: dates are built relative to
-# get_local_today, so they hold on any run date (the frozen_today fixture only
-# pins issue_triage's clock, not data_agent's or the enforcer's).
+# Recovering. Dates here are built relative to get_local_today, which the
+# autouse frozen_today fixture pins everywhere (the timezone-module patch
+# covers the enforcer's and data_agent's late imports too), so relative
+# offsets from "today" hold on any run date.
 
 def _seed_injury(db, expected_recovery_date):
     from datetime import timedelta
