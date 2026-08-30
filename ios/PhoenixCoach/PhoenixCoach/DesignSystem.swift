@@ -7,6 +7,7 @@ enum DS {
         static let surface     = Color(red: 0.122, green: 0.122, blue: 0.129)
         static let primaryText = Color(red: 0.784, green: 0.776, blue: 0.780)
         static let accent      = Color.white                                    // Pure white per user request
+        static let onAccent    = Color.black                                    // Text/spinners ON an accent fill — accent is white, so .white here is invisible
         static let outline     = Color(red: 0.569, green: 0.565, blue: 0.580)
         static let onSurface   = Color(red: 0.780, green: 0.776, blue: 0.792)
         static let success     = Color.green
@@ -14,6 +15,18 @@ enum DS {
         static let danger      = Color.red                                      // Semantic danger
     }
     
+    // MARK: - Spacing (4/8 grid)
+    enum Spacing {
+        static let xs: CGFloat = 4
+        static let s: CGFloat  = 8
+        static let m: CGFloat  = 12
+        static let l: CGFloat  = 16
+        static let xl: CGFloat = 20
+        static let xxl: CGFloat = 24
+        static let page: CGFloat = 16      // screen edge insets
+        static let section: CGFloat = 24   // gap between cards
+    }
+
     // MARK: - Corner Radii
     enum Radius {
         static let small: CGFloat = 8
