@@ -76,7 +76,7 @@ def capture_before(plan_json: dict, days=None) -> dict:
 
 def finalize_plan_write(db, plan_json: dict, *, source: str, days_written,
                         violations, reason: str = None, before: dict = None,
-                        gate_report=None) -> dict:
+                        gate_report=None, inputs: dict = None) -> dict:
     """Refresh derived metadata and append the write receipt.
 
     Runs after enforcement and the gate, so the receipt records what they
@@ -129,6 +129,10 @@ def finalize_plan_write(db, plan_json: dict, *, source: str, days_written,
             for v in (violations or [])
         ],
     }
+    if inputs:
+        # The scalar data this write was based on — what a same-day
+        # "second opinion" compares against. Only adapt_today sets it.
+        entry["inputs"] = inputs
     revisions = list(plan_json.get(REVISIONS_KEY) or [])
     revisions.append(entry)
     plan_json[REVISIONS_KEY] = revisions[-MAX_REVISIONS:]
@@ -141,7 +145,8 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
                             generate=None, gate_ctx: dict = None,
                             completed_run_km: float = 0.0,
                             completed_hours: float = 0.0,
-                            required_run_km: float = None):
+                            required_run_km: float = None,
+                            inputs: dict = None):
     """[generate] -> normalize -> enforce -> [gate] -> finalize.
 
     Returns (plan_json, violations). Two calling modes:
@@ -223,6 +228,7 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
         reason=reason,
         before=before,
         gate_report=report,
+        inputs=inputs,
     )
 
     # Pace enforcement rides the fresh _context finalize just computed, so

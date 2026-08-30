@@ -1056,6 +1056,72 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     }
 
 
+# Same-day re-adaptation ("second opinion") thresholds: how far a recovery
+# number must move, after today's earlier adaptation already consumed it,
+# before a repeat LLM call is justified. Coarser on purpose than the
+# smart-refresh triggers — those gate the FIRST adaptation of the day.
+ADAPT_SUPERSEDE_THRESHOLDS = {
+    "hrv_ms": ("HRV", 5.0),                  # ms
+    "resting_hr": ("RHR", 3.0),              # bpm
+    "fatigue_state": ("fatigue zone", 0.0),  # any zone change
+    "load_ratio": ("load ratio", 0.15),
+    "tib": ("TIB", 5.0),
+}
+MAX_ADAPTS_PER_DAY = 2  # the first adaptation + one second opinion
+
+
+def _recovery_inputs(db):
+    """The scalar recovery picture an adaptation is based on — recorded on
+    its receipt so a later same-day call can see whether the data moved."""
+    from backend.models.database import RecoverySnapshot
+    snap = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).first()
+    if not snap:
+        return None
+    return {
+        "date": snap.date.isoformat() if hasattr(snap.date, "isoformat") else str(snap.date),
+        "hrv_ms": snap.hrv_ms,
+        "resting_hr": snap.resting_hr,
+        "fatigue_state": snap.fatigue_state,
+        "load_ratio": snap.load_ratio,
+        "tib": snap.tib,
+    }
+
+
+def _recovery_changed_since_adapt(db, plan_json, today):
+    """What materially moved since today's earlier adaptation, as a short
+    human-readable string — or None, meaning the idempotency guard holds.
+
+    Conservative by construction: no adapt receipt today, a legacy receipt
+    without recorded inputs, or the daily cap already reached all return
+    None. A same-day sync rewrites today's RecoverySnapshot row in place
+    (date is its primary key), so comparing values is the only change
+    detector there is.
+    """
+    revisions = (plan_json or {}).get("_revisions") or []
+    today_iso = today.isoformat()
+    todays_adapts = [
+        r for r in revisions
+        if r.get("source") == "adapt_today"
+        and str(r.get("at", "")).startswith(today_iso)
+    ]
+    if len(todays_adapts) >= MAX_ADAPTS_PER_DAY:
+        return None
+    prev = todays_adapts[-1].get("inputs") if todays_adapts else None
+    if not prev:
+        return None
+    now = _recovery_inputs(db)
+    if not now:
+        return None
+    moved = []
+    for field, (label, threshold) in ADAPT_SUPERSEDE_THRESHOLDS.items():
+        prev_v, now_v = prev.get(field), now.get(field)
+        if prev_v is None or now_v is None:
+            continue
+        if abs(now_v - prev_v) > threshold:
+            moved.append(f"{label} {prev_v:g}→{now_v:g}")
+    return ", ".join(moved) if moved else None
+
+
 @app.post("/weekly-plan/adapt-today")
 def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
@@ -1075,19 +1141,27 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Weekly plan not found for this week. Please fetch /weekly-plan first.")
     
     # --- Idempotency guard: prevent double adaptation on the same day ---
+    # One exception, the "second opinion": if a later sync materially moved
+    # the recovery numbers the earlier adaptation was based on, one
+    # superseding re-adaptation is allowed (MAX_ADAPTS_PER_DAY total).
+    is_simulated = bool(body and any(body.get(k) for k in ("hrv", "rhr", "soreness")))
+    supersede_reason = None
     if plan_record.last_adapted:
         last_adapted_date = plan_record.last_adapted.date() if hasattr(plan_record.last_adapted, 'date') else plan_record.last_adapted
         if last_adapted_date == today:
-            # Already adapted today — return the existing adapted workout instead of re-adapting
-            from backend.services.plan_normalizer import normalize_plan
-            existing_plan = normalize_plan(plan_record.plan_json)
-            existing_day = existing_plan.get("days", {}).get(today_day_name, {})
-            print(f"⚠️ Idempotency guard: already adapted today ({today}). Returning existing adaptation.")
-            return existing_day
-    
+            if not is_simulated:
+                supersede_reason = _recovery_changed_since_adapt(db, plan_record.plan_json, today)
+            if not supersede_reason:
+                # Already adapted today — return the existing adapted workout instead of re-adapting
+                from backend.services.plan_normalizer import normalize_plan
+                existing_plan = normalize_plan(plan_record.plan_json)
+                existing_day = existing_plan.get("days", {}).get(today_day_name, {})
+                print(f"⚠️ Idempotency guard: already adapted today ({today}). Returning existing adaptation.")
+                return existing_day
+            print(f"🔁 Second opinion: {supersede_reason} — superseding today's adaptation.")
+
     # --- Staleness guard: block adaptation if recovery data is not from today ---
     from backend.models.database import RecoverySnapshot
-    is_simulated = body and any(body.get(k) for k in ("hrv", "rhr", "soreness"))
     if not is_simulated:
         latest_snap = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).first()
         if not latest_snap:
@@ -1198,15 +1272,21 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
         availability=training_context.get("availability", {}),
         active_injuries=get_active_injuries(db, athlete_row.id) if athlete_row else [],
         days=[today_day_name],
-        reason="Today's workout adapted to recovery metrics.",
+        reason=(f"Second opinion — {supersede_reason} since today's earlier adaptation."
+                if supersede_reason
+                else "Today's workout adapted to recovery metrics."),
         before=before,
+        inputs=None if is_simulated else _recovery_inputs(db),
     )
     adapted_day = plan_json["days"][today_day_name]
 
     # We must explicitly flag the JSON as modified for SQLAlchemy to update it
     from sqlalchemy.orm.attributes import flag_modified
     plan_record.plan_json = plan_json
-    plan_record.last_adapted = datetime.now()
+    # Athlete-local clock, naive (the column is tz-naive). datetime.now() was
+    # UTC on Render: an evening adapt stamped tomorrow's date, so the guard
+    # missed the rest of the evening and wrongly blocked the next morning.
+    plan_record.last_adapted = get_local_now().replace(tzinfo=None)
     flag_modified(plan_record, "plan_json")
     
     db.commit()
