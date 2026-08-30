@@ -133,9 +133,20 @@ def _set_tune(session, race_date, km=HALF_KM, target="1:27:00"):
     session.commit()
 
 
-def test_context_race_week_scales_and_prompts(test_db_session):
-    today = get_local_today()
-    saturday = today - timedelta(days=today.weekday()) + timedelta(days=5)
+def test_context_race_week_scales_and_prompts(test_db_session, monkeypatch):
+    # A Saturday tune race that is still upcoming in the current week cannot
+    # be seeded on a real Sunday — this week's Saturday is already past, and
+    # a past tune race drops out of planning context by design (first seen
+    # 2026-08-30). Pin "today" to this week's Wednesday. The engine binds
+    # get_local_today at import, so patch its module reference; the timezone
+    # module too, for anything importing late.
+    import backend.services.periodization_engine as pe_mod
+    real_today = get_local_today()
+    frozen = real_today - timedelta(days=real_today.weekday()) + timedelta(days=2)
+    monkeypatch.setattr(pe_mod, "get_local_today", lambda: frozen)
+    monkeypatch.setattr("backend.utils.timezone.get_local_today", lambda: frozen)
+
+    saturday = frozen - timedelta(days=frozen.weekday()) + timedelta(days=5)
     _set_tune(test_db_session, saturday)
 
     ctx = PeriodizationEngine().compute_context(test_db_session)
