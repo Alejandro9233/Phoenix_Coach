@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -691,6 +692,12 @@ def get_block_calendar(db: Session = Depends(get_db)):
     return engine.compute_block_calendar(db)
 
 
+# Serializes weekly-plan generation. Endpoints are sync (FastAPI runs them
+# in a threadpool) and Render runs one process, so a module lock is the
+# whole story.
+_PLAN_GENERATION_LOCK = threading.Lock()
+
+
 @app.get("/weekly-plan")
 def get_weekly_plan(db: Session = Depends(get_db)):
     """Retrieve the current week's training plan. Generates a new one if not found."""
@@ -705,21 +712,41 @@ def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
     FastAPI reading them as query params. `carry_revisions` seeds the raw
     plan's _revisions before the pipeline, so a regenerated week keeps its
     receipt history (finalize appends the new receipt on top and trims)."""
+    from datetime import timedelta
+    from backend.models.database import WeeklyPlan
+    from backend.services.plan_normalizer import normalize_plan
+
+    today = get_local_today()
+    # Monday of the current week
+    start_of_week = today - timedelta(days=today.weekday())
+
+    # Fast path: the week already has a plan.
+    plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+    if plan_record:
+        return normalize_plan(plan_record.plan_json)
+
+    # One generation at a time. On Monday morning the app fires several
+    # requests at once; without the lock each saw "no plan", spent ~7k Groq
+    # tokens generating, and inserted its own row — a shadow plan beneath
+    # the served one, plus a self-inflicted TPM 429 (both seen 2026-08-31).
+    # Waiters block on their threadpool thread, then find the fresh row in
+    # the re-check. (regenerate arrives here with its delete pending in the
+    # same session, so its re-check still sees "no plan" — by design.)
+    with _PLAN_GENERATION_LOCK:
+        plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+        if plan_record:
+            return normalize_plan(plan_record.plan_json)
+        return _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason)
+
+
+def _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason):
+    """The generation body. Call only while holding _PLAN_GENERATION_LOCK —
+    it trusts that no plan row exists for start_of_week and inserts one."""
     from datetime import date, timedelta, datetime
     from backend.models.database import WeeklyPlan, Athlete
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
     from backend.services.periodization_engine import PeriodizationEngine
-    
-    today = get_local_today()
-    # Monday of the current week
-    start_of_week = today - timedelta(days=today.weekday())
-    
-    # Check if a plan already exists
-    plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
-    if plan_record:
-        from backend.services.plan_normalizer import normalize_plan
-        return normalize_plan(plan_record.plan_json)
 
     # No race, no plan. Without race_date + race_distance the periodization
     # engine invents weeks_to_race=99 and defaults to "Marathon", so an
