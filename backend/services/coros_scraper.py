@@ -419,8 +419,30 @@ class CorosScraper:
         capture_counts = {"activity_lists": 0}
         
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            # Container memory posture: /dev/shm is tiny on Render, and without
+            # the flag renderers bloat until the 512MB dyno OOMs mid-scrape
+            # (observed 2026-08-30 and 2026-08-31). Nothing here reads pixels,
+            # so the GPU path is pure overhead.
+            browser = await p.chromium.launch(headless=True, args=[
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+            ])
             context = await browser.new_context(viewport={'width': 1280, 'height': 800})
+
+            # Capture is passive JSON sniffing of teamapi.coros.com — pixels
+            # are never read. Dropping images/fonts/media cuts Chromium's peak
+            # heap (the OOM driver) and lightens cold-CPU page loads, so the
+            # long _settle waits bind less often. CSS/JS stay: the SPA must
+            # still boot and fire the API calls we sniff. If a payload stops
+            # arriving, the missing[] check at the end is the verdict — loosen
+            # this filter before touching timeouts.
+            async def _drop_heavy(route):
+                if route.request.resource_type in ("image", "media", "font"):
+                    await route.abort()
+                else:
+                    await route.continue_()
+            await context.route("**/*", _drop_heavy)
+
             page = await context.new_page()
             
             # Intercept network responses to catch the raw JSON data

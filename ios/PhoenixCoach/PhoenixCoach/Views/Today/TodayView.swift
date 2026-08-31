@@ -1239,17 +1239,34 @@ struct TodayView: View {
         await detachedFetch {
             do {
                 var status = try await network.startSmartRefresh()
+                var rejoined = false
 
-                // Poll until the job settles. The generous deadline is for the
-                // phone's patience, not the job's — on timeout the job keeps
-                // running server-side and a later refresh picks up its result.
-                let deadline = Date().addingTimeInterval(300)
-                while status.state == "running", Date() < deadline {
-                    try await Task.sleep(for: .seconds(2))
-                    status = try await network.smartRefreshStatus()
-                    if !status.stage.isEmpty {
-                        await MainActor.run { self.syncMessage = status.stage }
+                while true {
+                    // Poll until the job settles. The deadline is PER ATTEMPT
+                    // (worst case ~8 min across a retry) and is for the phone's
+                    // patience, not the job's — on timeout the job keeps
+                    // running server-side and a later refresh picks up its
+                    // result. The retry gets less: the instance is warm by then.
+                    let deadline = Date().addingTimeInterval(rejoined ? 180 : 300)
+                    while status.state == "running", Date() < deadline {
+                        try await Task.sleep(for: .seconds(2))
+                        status = try await network.smartRefreshStatus()
+                        if !status.stage.isEmpty {
+                            await MainActor.run { self.syncMessage = status.stage }
+                        }
                     }
+
+                    // "idle" mid-poll means the dyno restarted (OOM) and the
+                    // in-memory job died with it. The restart leaves the
+                    // instance warm — the retry that used to require a second
+                    // manual pull now happens once, automatically.
+                    if status.state == "idle", !rejoined {
+                        rejoined = true
+                        await MainActor.run { self.syncMessage = "Server restarted — retrying sync..." }
+                        status = try await network.startSmartRefresh()
+                        continue
+                    }
+                    break
                 }
 
                 await MainActor.run {
@@ -1268,14 +1285,23 @@ struct TodayView: View {
                         self.scraperErrorMessage = status.error ?? "Deep sync failed."
                         self.showScraperError = true
                     default:
-                        // Deadline hit, or the dyno restarted and lost the job.
-                        self.scraperErrorMessage = "Still syncing on the server. Pull to refresh in a minute."
+                        // Deadline hit, the dyno restarted and lost the job —
+                        // or the automatic retry died the same way.
+                        self.scraperErrorMessage = rejoined
+                            ? "Sync keeps getting interrupted — try again later."
+                            : "Still syncing on the server. Pull to refresh in a minute."
                         self.showScraperError = true
                     }
                 }
             } catch {
                 print("Smart refresh job error (non-fatal): \(error)")
-                // Don't abort — still fetch latest data below
+                // Don't abort — still fetch latest data below. But say so:
+                // after the UI announced a sync (or a retry), silence plus
+                // the success haptic would dress a dead sync as a good one.
+                await MainActor.run {
+                    self.scraperErrorMessage = "Deep sync was interrupted. Pull to refresh in a minute."
+                    self.showScraperError = true
+                }
             }
 
             // Always re-read from the backend, whatever the job did.
