@@ -197,6 +197,7 @@ class NetworkManager: ObservableObject {
     /// after the last token (see `issue_triage.py`), so the stream carries more
     /// than plain text.
     enum ChatStreamEvent {
+        case session(Int)
         case token(String)
         case proposal(IssueProposal)
         case recovery(RecoveryProposal)
@@ -241,10 +242,17 @@ class NetworkManager: ObservableObject {
 
                         guard let data = payload.data(using: .utf8) else { continue }
 
-                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let token = json["token"] as? String {
-                            continuation.yield(.token(token))
-                            continue
+                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            // First frame of the stream: the session this
+                            // exchange was filed under on the server.
+                            if let sid = json["session_id"] as? Int {
+                                continuation.yield(.session(sid))
+                                continue
+                            }
+                            if let token = json["token"] as? String {
+                                continuation.yield(.token(token))
+                                continue
+                            }
                         }
 
                         // An injury-triage or recovery proposal, sent after the

@@ -365,6 +365,11 @@ struct CoachChatView: View {
             for try await event in stream {
                 await MainActor.run {
                     switch event {
+                    case .session(let id):
+                        // Adopt the session the server filed this exchange
+                        // under, so the next message continues it instead of
+                        // starting a new one.
+                        currentSessionId = id
                     case .token(let token):
                         if !isStreaming {
                             isStreaming = true  // First token arrived — hide typing indicator

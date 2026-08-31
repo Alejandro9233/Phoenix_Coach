@@ -1975,6 +1975,12 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
         """Generator that yields SSE events with streamed tokens."""
         full_response = ""
         try:
+            # First frame: which session this exchange was filed under. A
+            # client that opened with no session_id can only continue the
+            # conversation if this comes back — without it every message
+            # minted its own one-message session. Unknown keys are ignored
+            # by clients that don't parse them.
+            yield f"data: {json.dumps({'session_id': session_id})}\n\n"
             from backend.core.llm_client import chat_completion_stream
             async for token in chat_completion_stream(messages):
                 full_response += token
@@ -2077,10 +2083,11 @@ async def chat_with_coach_sync(body: dict, db: Session = Depends(get_db)):
         db.add(ai_msg)
         db.commit()
         
-        return {"response": content}
+        return {"response": content, "session_id": session_id}
     except Exception as e:
         print(f"LLM ERROR in /chat-sync: {e}")
-        return {"response": f"I'm currently in offline mode. Error: {str(e)[:100]}"}
+        return {"response": f"I'm currently in offline mode. Error: {str(e)[:100]}",
+                "session_id": session_id}
 
 
 @app.post("/feedback")

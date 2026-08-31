@@ -110,3 +110,45 @@ def test_chat_sync_creates_session(client, test_db_session, monkeypatch):
     assert messages[0].content == "What is my tempo pace?"
     assert messages[1].role == "assistant"
     assert messages[1].content == "This is a mock response."
+
+
+def test_chat_stream_returns_session_id_and_continues(client, test_db_session, monkeypatch):
+    """The one-message-sessions bug: /chat's SSE stream must announce the
+    session it filed the exchange under as its FIRST frame, and a follow-up
+    carrying that id must land in the same session — not mint a new one."""
+    async def _fake_stream(messages):
+        yield "ok"
+
+    import backend.core.llm_client as llm
+    monkeypatch.setattr(llm, "chat_completion_stream", _fake_stream)
+    monkeypatch.setattr(
+        "backend.agents.data_agent.DataAgent.summarize", lambda self: "metrics")
+
+    class _KB:
+        def query(self, *a, **k):
+            return []
+
+    import backend.main as main_mod
+    monkeypatch.setattr(main_mod, "get_kb", lambda: _KB())
+
+    # First message: no session_id known yet.
+    resp = client.post("/chat", json={"message": "hello coach"})
+    assert resp.status_code == 200
+    frames = [json.loads(l[6:]) for l in resp.text.splitlines()
+              if l.startswith("data: ") and l != "data: [DONE]"]
+    assert "session_id" in frames[0], "session id must be the first frame"
+    sid = frames[0]["session_id"]
+
+    # Follow-up with the announced id: same session, no new one minted.
+    resp = client.post("/chat", json={"message": "and my long run?",
+                                      "session_id": sid})
+    assert resp.status_code == 200
+    frames = [json.loads(l[6:]) for l in resp.text.splitlines()
+              if l.startswith("data: ") and l != "data: [DONE]"]
+    assert frames[0]["session_id"] == sid
+
+    assert test_db_session.query(ChatSession).count() == 1
+    user_msgs = (test_db_session.query(ChatMessage)
+                 .filter(ChatMessage.session_id == sid,
+                         ChatMessage.role == "user").all())
+    assert [m.content for m in user_msgs] == ["hello coach", "and my long run?"]
