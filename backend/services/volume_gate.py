@@ -43,6 +43,9 @@ from backend.services.constraint_enforcer import (
 )
 from backend.services.plan_normalizer import VALID_DAYS, map_sport
 
+RUN_TARGET_SLACK_KM = 1.0   # under-target (soft) fires past this gap
+LONG_RUN_SLACK_MIN = 5.0    # long-run shortfall (soft) fires past this
+
 # Tolerances. The run-km hard cap already carries C3's headroom (ceiling*1.05
 # or ramp cap), so it gets only an absolute grace for step rounding — not
 # another multiplier.
@@ -257,6 +260,7 @@ def compute_budget(ctx: dict) -> dict | None:
         "run_km_hard_cap": vt.get("run_km_hard_cap"),
         "hours_low": hours_low,
         "hours_high": hours_high,
+        "long_run_minutes": vt.get("long_run_minutes"),
         "max_quality": refs.get("max_quality_sessions"),
         "phase_run_sessions": (refs.get("sport_sessions") or {})
         .get("running", {}).get("sessions"),
@@ -278,7 +282,7 @@ class GateReport:
 
     def feedback_text(self) -> str:
         lines = ["=== CORRECTIONS — YOUR PREVIOUS PLAN FAILED VALIDATION ==="]
-        for v in self.hard + self.soft:
+        for v in self.hard + [s for s in self.soft if not s.get("advisory")]:
             lines.append(f"- {v['detail']}")
         lines.append("Fix ONLY these problems. Keep everything else the same.")
         return "\n".join(lines)
@@ -517,6 +521,27 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
                 "floor": round(effective_floor, 1),
                 "target": target,
             })
+        elif days is None and week_run_km < target - RUN_TARGET_SLACK_KM:
+            # Full-week generations only: a mid-week replan is routinely
+            # under target because days were already missed — that is the
+            # athlete's history, not a plan defect (review 2026-08-31).
+            # Above the floor but short of the target. Targets are
+            # actuals-derived (best-of-3 x ramp), so habitually planning at
+            # the floor quietly flattens the ramp — 2026-08-31 shipped 40.0
+            # against 41.8 with 4.5 km of headroom, silently.
+            report.soft.append({
+                "kind": "run_km_under_target",
+                "detail": (
+                    f"Planned running totals {week_run_km:.1f} km; the "
+                    f"target is {target:.1f} km. Add "
+                    f"{target - week_run_km:.1f} km on open days — the "
+                    f"ramp is derived from actuals, so under-planning "
+                    f"compounds into next week's target."
+                ),
+                "week_run_km": round(week_run_km, 1),
+                "target": target,
+                "advisory": True,  # warns, never burns the gate retry
+            })
 
     hours_high = budget.get("hours_high")
     if hours_high is not None and week_hours > hours_high * HOURS_CEILING_FACTOR:
@@ -555,6 +580,33 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
             "week_hours": round(week_hours, 1),
             "floor": hours_low,
         })
+
+    # The long run is the phase's stated priority and the number with the
+    # least slack for the marathon goal, yet long_run_minutes was prompt-only
+    # advisory — 80 vs 86 shipped silently (2026-08-31). Soft on purpose.
+    lr_target = budget.get("long_run_minutes")
+    if (days is None and lr_target and lr_target > 0 and not race_week
+            and "running" not in blocked and open_days > 0):
+        # Full-week generations only — in a windowed replan the short long
+        # run may sit on a locked day, making the finding unfixable and the
+        # feedback an invitation to plant a duplicate long run.
+        longest_run_min = 0.0
+        for _d, w in _window_workouts(plan_json, None):  # whole week
+            if map_sport(w.get("sport") or "") == "running":
+                longest_run_min = max(
+                    longest_run_min, parse_minutes(w.get("total_time")) or 0.0)
+        if longest_run_min < lr_target - LONG_RUN_SLACK_MIN:
+            report.soft.append({
+                "kind": "long_run_short",
+                "detail": (
+                    f"The week's longest run is {longest_run_min:.0f} min; "
+                    f"the phase prescribes a {lr_target:.0f}-min long run. "
+                    f"Lengthen the long run."
+                ),
+                "longest_run_min": round(longest_run_min, 1),
+                "target_min": lr_target,
+                "advisory": True,  # warns, never burns the gate retry
+            })
 
     _audit_titles(plan_json, ctx or {}, window, report)
     _audit_quality(plan_json, ctx or {}, window, budget,

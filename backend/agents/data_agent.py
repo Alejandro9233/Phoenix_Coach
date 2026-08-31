@@ -109,12 +109,18 @@ class DataAgent:
             latest = snapshots[0]
             lines.append("")
             lines.append("CURRENT FITNESS MARKERS:")
+            _fresh = latest.date == get_local_today()
+            if not _fresh:
+                lines.append(f"  (all markers below are from {latest.date} — not yet synced today)")
             if latest.cti: lines.append(f"  Fitness (CTI): {latest.cti:.0f}")
             if latest.ati: lines.append(f"  Fatigue (ATI): {latest.ati:.0f}")
             if latest.tib: lines.append(f"  Form (TIB): {latest.tib:.0f}")
             if latest.load_ratio: lines.append(f"  Load Ratio: {latest.load_ratio:.2f}")
-            if latest.resting_hr: lines.append(f"  Today RHR: {latest.resting_hr} bpm")
-            if latest.hrv_ms: lines.append(f"  Today HRV: {latest.hrv_ms:.0f} ms")
+            # Honest data age: pre-sync, the newest snapshot is yesterday's —
+            # labeling it "Today" made the coach state stale numbers as fact.
+            _tag = "Today" if _fresh else f"Latest (from {latest.date} — not yet synced today)"
+            if latest.resting_hr: lines.append(f"  {_tag} RHR: {latest.resting_hr} bpm")
+            if latest.hrv_ms: lines.append(f"  {_tag} HRV: {latest.hrv_ms:.0f} ms")
             if latest.recovery_score is not None:
                 lines.append(f"  COROS Recovery: {latest.recovery_score:.0f}%")
             if latest.t7d_load: lines.append(f"  7-day Load: {latest.t7d_load:.0f}")

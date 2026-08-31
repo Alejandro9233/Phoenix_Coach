@@ -189,9 +189,13 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
             completed_hours=completed_hours,
             required_run_km=required_run_km,
         )
-        # Any violation earns the one retry (soft floors included — the LLM
-        # often can fix an undershoot); only hard ones block past it.
-        if (not report.hard and not report.soft) or attempt == attempts:
+        # Any actionable violation earns the one retry (soft floors included —
+        # the LLM often can fix an undershoot); only hard ones block past it.
+        # Advisory softs (under-target, long-run shortfall) surface as
+        # gate_warnings without burning a ~7k-token regeneration — two
+        # generations in one minute exceed the 8000 Groq TPM budget.
+        actionable_soft = [v for v in report.soft if not v.get("advisory")]
+        if (not report.hard and not actionable_soft) or attempt == attempts:
             break
         feedback = report.feedback_text()
         kinds = [v["kind"] for v in report.hard + report.soft]
@@ -254,5 +258,16 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
     )
     if fuel_changes:
         print(f"🥤 [{source}] Fuel lines updated on {len(fuel_changes)} workout(s)")
+
+    # Step reconciliation (pace enforcer) can lengthen total_time AFTER the
+    # sums were stamped above — re-stamp so week_summary describes the plan
+    # actually persisted (review 2026-08-31). Deltas are small and upward-only,
+    # so the audited bands stay honest; only the bookkeeping moves.
+    if any("step_from" in c for c in pace_fixes):
+        candidate.setdefault("week_summary", {})
+        candidate["week_summary"]["expected_total_hours"] = round(
+            volume_gate.planned_hours(candidate), 1)
+        candidate["week_summary"]["expected_run_km"] = round(
+            volume_gate.planned_run_km(candidate), 1)
 
     return candidate, violations

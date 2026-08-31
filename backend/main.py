@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import threading
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -724,6 +725,24 @@ def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
     plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
     if plan_record:
         return normalize_plan(plan_record.plan_json)
+
+    # Freshness: when a smart-refresh is mid-flight, wait (bounded) for its
+    # ingest before generating the week. 2026-08-31's plan generated from
+    # Sunday-night data while Monday's scrape was still running, and nothing
+    # ever reconciles a persisted week. Sync endpoint -> threadpool thread,
+    # so sleeping here blocks nobody else. 90s + generation stays inside the
+    # phone's 180s request timeout.
+    # Regenerate must NOT wait: it arrives holding an uncommitted DELETE on
+    # this week's plan row; sleeping here while the refresh job's adapt path
+    # blocks on that row lock would freeze the whole event loop (review
+    # 2026-08-31). Its delete/re-create window is seconds — acceptable.
+    if source == "generate" and _refresh_job["state"] == "running":
+        print("⏳ Weekly-plan generation waiting for the in-flight refresh...")
+        waited = 0.0
+        while _refresh_job["state"] == "running" and waited < 90.0:
+            time.sleep(2.0)
+            waited += 2.0
+        db.expire_all()  # drop this session's cache so the fresh rows are seen
 
     # One generation at a time. On Monday morning the app fires several
     # requests at once; without the lock each saw "no plan", spent ~7k Groq
@@ -1694,9 +1713,14 @@ async def _smart_refresh_job():
 
         result = await _run_smart_refresh(db, progress=set_stage)
         _refresh_job.update(state="done", stage="", result=result)
-    except Exception as e:
+    except BaseException as e:
+        # BaseException on purpose: a CancelledError that left state
+        # "running" forever would tax every future plan generation with the
+        # full 90s wait (and wedge /smart-refresh/start).
         print(f"⚠️ Smart-refresh job failed: {e}")
         _refresh_job.update(state="error", stage="", error=str(e))
+        if not isinstance(e, Exception):
+            raise
     finally:
         db.close()
 
@@ -1706,7 +1730,9 @@ async def smart_refresh_start():
     """Kick off a deep refresh; joins the running job if one exists."""
     if _refresh_job["state"] != "running":
         _refresh_job.update(state="running", stage="Starting...", result=None, error=None)
-        asyncio.create_task(_smart_refresh_job())
+        # Keep a reference — an unreferenced task may be garbage-collected
+        # mid-flight (documented asyncio pitfall).
+        _refresh_job["task"] = asyncio.create_task(_smart_refresh_job())
     return _refresh_job_status()
 
 
@@ -1743,7 +1769,9 @@ def _build_chat_context(db: Session, summary: str, rag_context: str) -> str:
     if plan_record:
         plan_json = normalize_plan(plan_record.plan_json)
         
-    context_str = f"TRAINING PHASE: {training_context.get('current_phase', 'Unknown')}\n"
+    # The engine emits 'phase' — reading 'current_phase' meant chat said
+    # "TRAINING PHASE: Unknown" since forever (found 2026-08-31).
+    context_str = f"TRAINING PHASE: {training_context.get('phase', 'Unknown')}\n"
     context_str += f"WEEKS TO RACE: {training_context.get('weeks_to_race', 'N/A')}\n"
     
     today_day_name = get_local_now().strftime("%A")
