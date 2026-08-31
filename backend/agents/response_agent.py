@@ -165,7 +165,7 @@ def _format_training_context(ctx: dict) -> str:
         run_note = vol.get("sport_sessions", {}).get("running", {}).get("volume_note")
         if run_note:
             lines.append(f"  Running: {run_note}")
-    lines.append(f"  Phase recommended hours: {vol.get('phase_hours_range', '?')}h/week")
+    lines.append(f"  Phase recommended hours: {vol.get('phase_hours_range', '?')}h/week (excluding strength)")
     if vol.get("coros_tl_range"):
         lines.append(f"  COROS recommended training load: {vol['coros_tl_range']['min']}-{vol['coros_tl_range']['max']} (from watch)")
     lines.append(f"  Intensity distribution: {vol.get('intensity_split', '80/20')}")
@@ -607,7 +607,7 @@ COACHING RULES:
 3. Include at least 1-2 rest days depending on fatigue.
 4. Scale total session time to fit the phase recommended hours range.
 5. If the race is approaching or is this week, apply tapering principles (short duration, light intensity, lots of rest).
-6. You may schedule double-workout days (e.g. morning swim, evening strength) if it makes sense to hit the recommended hours without violating the 80/20 rule or causing extreme fatigue. Let the recommended hours and availability guide this decision.
+6. You may schedule double-workout days (e.g. easy run + evening strength) when the recommended sessions don't all fit the available days. Never add sessions beyond a sport's recommended count just to fill the hours range — landing under the range beats padding it.
 
 OUTPUT FORMAT:
 You MUST respond with valid JSON in this exact structure:

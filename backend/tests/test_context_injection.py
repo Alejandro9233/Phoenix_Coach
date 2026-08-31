@@ -145,6 +145,55 @@ def test_sessions_capped_at_available_days(temp_db_session):
     assert "only 1 day(s) available" in strength["volume_note"]
 
 
+def test_hours_range_shrinks_when_swim_dropped(temp_db_session):
+    # Marathon foundation "5-7" budgets 2 swim sessions (~1h each); a
+    # non-swimmer's hours window must not keep the swim hours, or the LLM
+    # pads the remaining sports to close the gap.
+    athlete = _marathon_athlete(swim_days="")
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+
+    assert ctx["volume_references"]["phase_hours_range"] == "3-5"
+
+
+def test_hours_range_untouched_when_no_constraint(temp_db_session):
+    athlete = _marathon_athlete()  # availability None = unconstrained
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+
+    assert ctx["volume_references"]["phase_hours_range"] == "5-7"
+
+
+def test_hours_range_deducts_capped_sessions(temp_db_session):
+    # Foundation advertises cycling 2x/week; one open day keeps 1 session,
+    # so ~1.25h comes off both ends: 5-7 -> 4-6 after rounding.
+    athlete = _marathon_athlete(bike_days="mon")
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+
+    assert ctx["volume_references"]["phase_hours_range"] == "4-6"
+
+
+def test_recovery_week_scales_the_deducted_range(temp_db_session):
+    # The 25% recovery cut applies AFTER the availability deduction:
+    # (5-2)*0.75 = 2.25 -> "2"; (7-2)*0.75 = 3.75 -> "4".
+    athlete = _marathon_athlete(swim_days="")
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+
+    refs = PeriodizationEngine()._get_volume_references(
+        {"phase": "foundation"}, True, athlete, temp_db_session
+    )
+
+    assert refs["phase_hours_range"] == "2-4"
+
+
 def test_distance_profiles_never_mutated(temp_db_session):
     snapshot = copy.deepcopy(DISTANCE_PROFILES)
     athlete = _marathon_athlete(swim_days="", strength_days="mon")

@@ -19,7 +19,10 @@ Volume ceilings by distance (the numbers the LLM is not allowed to exceed):
     5k / 10k     25-35 km/wk,  5-7 h/wk   Speed Build -> Taper + Race
                  Enables VO2max intervals, tempo, reps.
                  Forbids marathon-pace long runs and any run over 15 km.
-    Marathon     40-55 km/wk, 10-11 h/wk  Foundation -> Base -> Build -> Peak -> Taper
+    Marathon     40-55 km/wk,  7-9 h/wk   Foundation -> Base -> Build -> Peak -> Taper
+                 Hours exclude strength and assume every listed sport is
+                 available; unavailable sports' hours are deducted at
+                 reference time (see _hours_range_for).
                  Heavy on marathon-pace long runs and aerobic volume.
     Sprint/Oly   dynamic, balances swim/bike/run plus strength.
     Unknown      FOUNDATION_ONLY_PROFILE (safety fallback).
@@ -48,6 +51,13 @@ from backend.services.constraint_enforcer import (
 )
 from backend.services.pace_model import RACE_KM, compute_pace_model, race_label
 from backend.utils.timezone import get_local_today
+
+# Estimated hours one weekly session of each sport contributes to a phase's
+# hours_range — used to shrink the range when availability drops or caps a
+# sport, so the hours window always describes sessions the athlete can hold.
+# Strength is absent on purpose: hours exclude strength everywhere
+# (volume_gate charter), so gym availability never moves the window.
+SESSION_HOURS_ESTIMATE = {"swimming": 1.0, "cycling": 1.25, "running": 1.0}
 
 # Weekly run-km progression (_get_weekly_run_target). Tunable in one place.
 RUN_RAMP = 1.08            # next week = 8% over the best recent week
@@ -465,7 +475,7 @@ DISTANCE_PROFILES = {
                 "weeks_range": (0, 3),
                 "total_weeks": 3,
                 "priorities": "Reduce volume progressively, maintain intensity touches, trust the taper",
-                "hours_range": "4-6",
+                "hours_range": "3-5",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 1,
                 "run_km_range": (15, 30),
@@ -483,7 +493,7 @@ DISTANCE_PROFILES = {
                 "weeks_range": (4, 6),
                 "total_weeks": 3,
                 "priorities": "Hold volume, sharpen race-pace fitness, final key workouts",
-                "hours_range": "10-11",
+                "hours_range": "7-9",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 2,
                 "run_km_range": (40, 55),
@@ -501,7 +511,7 @@ DISTANCE_PROFILES = {
                 "weeks_range": (7, 14),
                 "total_weeks": 8,
                 "priorities": "Marathon-specific fitness, race-pace work, long run to 28-32 km",
-                "hours_range": "10-12",
+                "hours_range": "7-9",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 2,
                 "run_km_range": (40, 55),
@@ -519,7 +529,7 @@ DISTANCE_PROFILES = {
                 "weeks_range": (15, 22),
                 "total_weeks": 8,
                 "priorities": "Build running volume safely, add long run, introduce 1 tempo/week",
-                "hours_range": "9-10",
+                "hours_range": "7-9",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 2,
                 "run_km_range": (28, 40),
@@ -537,7 +547,7 @@ DISTANCE_PROFILES = {
                 "weeks_range": (23, 999),
                 "total_weeks": 8,
                 "priorities": "Build consistency, establish the aerobic base, grow run volume gradually (10% rule)",
-                "hours_range": "7-8",
+                "hours_range": "5-7",
                 "intensity_split": "90/10",
                 "max_quality_sessions": 1,
                 "run_km_range": (20, 28),
@@ -1590,6 +1600,41 @@ class PeriodizationEngine:
                 return p
         return profile["phases"][-1]
 
+    @staticmethod
+    def _hours_range_for(phase_def: dict, filtered_sessions: dict,
+                         is_recovery_week: bool) -> str | None:
+        """The phase's hours window, shrunk to what availability kept.
+
+        hours_range budgets every sport in the phase's sport_sessions
+        (strength excluded — gym time never counts toward volume). When
+        availability drops a sport or caps its sessions, the lost sessions'
+        estimated hours come off both ends. Skipping this told the LLM
+        "hit 10-12h" beside a session list summing to ~7h, and it invented
+        volume in whichever sport was left to close the gap (2026-08-31: a
+        marathon build week for a non-swimmer grew 6h15 of cycling against
+        its own "one 60-75 min recovery ride" note). Recovery weeks then
+        take the standard 25% off.
+        """
+        try:
+            lo, hi = (float(x) for x in phase_def["hours_range"].split("-"))
+        except (KeyError, ValueError):
+            return phase_def.get("hours_range")
+        for sport, info in (phase_def.get("sport_sessions") or {}).items():
+            est = SESSION_HOURS_ESTIMATE.get(sport)
+            planned = (info or {}).get("sessions")
+            if not est or not isinstance(planned, int):
+                continue
+            kept = (filtered_sessions.get(sport) or {}).get("sessions")
+            lost = planned - (kept if isinstance(kept, int) else 0)
+            if lost > 0:
+                lo -= est * lost
+                hi -= est * lost
+        if is_recovery_week:
+            lo, hi = lo * 0.75, hi * 0.75
+        lo = max(lo, 0.0)
+        hi = max(hi, lo)
+        return f"{lo:.0f}-{hi:.0f}"
+
     def _get_volume_references(
         self, phase_info: dict, is_recovery_week: bool,
         athlete: Athlete, db: Session,
@@ -1622,7 +1667,9 @@ class PeriodizationEngine:
             phase_def["sport_sessions"], athlete
         )
         refs = {
-            "phase_hours_range": phase_def["hours_range"],
+            "phase_hours_range": self._hours_range_for(
+                phase_def, sport_sessions, is_recovery_week
+            ),
             "coros_tl_range": coros_tl_range,
             "intensity_split": phase_def["intensity_split"],
             "max_quality_sessions": phase_def["max_quality_sessions"],
@@ -1637,12 +1684,6 @@ class PeriodizationEngine:
                 "Keep training frequency but shorten sessions."
             )
             refs["max_quality_sessions"] = 1
-            # Adjust hours range
-            hours_parts = phase_def["hours_range"].split("-")
-            if len(hours_parts) == 2:
-                low = float(hours_parts[0]) * 0.75
-                high = float(hours_parts[1]) * 0.75
-                refs["phase_hours_range"] = f"{low:.0f}-{high:.0f}"
         else:
             refs["recovery_week_adjustment"] = None
 
