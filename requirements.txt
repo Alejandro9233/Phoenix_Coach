@@ -1,12 +1,16 @@
-fastapi
-uvicorn
-sqlalchemy
-psycopg2-binary
-requests
-python-dotenv
-chromadb
-openai
-pydantic
-pydantic-settings
-garmin-fit-sdk
-playwright
+# Pinned 2026-09-01 to the versions the local venv actually tests against
+# (P0 of docs/MIGRATE_ORACLE.md). Ubuntu 24.04 aarch64 needs reproducible
+# installs; every entry below has manylinux aarch64 wheels.
+fastapi==0.136.1
+uvicorn==0.46.0
+sqlalchemy==2.0.49
+psycopg2-binary==2.9.12
+requests==2.34.1
+python-dotenv==1.2.2
+chromadb==1.5.9
+openai==2.46.0
+ollama==0.6.2
+pydantic==2.13.4
+pydantic-settings==2.14.1
+garmin-fit-sdk==21.202.0
+playwright==1.59.0

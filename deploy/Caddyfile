@@ -1,0 +1,9 @@
+# Phoenix Coach — HTTPS front for the Oracle VM.
+# __DOMAIN__ is substituted by setup_server.sh when DOMAIN is set (Phase 3);
+# Caddy then provisions and renews Let's Encrypt certificates on its own.
+__DOMAIN__ {
+	reverse_proxy 127.0.0.1:8001 {
+		# Chat is SSE: stream every byte immediately, never buffer.
+		flush_interval -1
+	}
+}

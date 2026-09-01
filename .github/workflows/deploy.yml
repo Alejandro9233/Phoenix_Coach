@@ -1,0 +1,43 @@
+# Push-to-deploy for the Oracle VM (Phase 5 of docs/MIGRATE_ORACLE.md).
+#
+# Stays inert until ALL are configured in the repo settings:
+#   - repository variable DEPLOY_ENABLED = true    (the on/off switch)
+#   - secret DEPLOY_HOST         domain or IP of the VM
+#   - secret DEPLOY_SSH_KEY      private key for a DEDICATED deploy keypair;
+#                                its public half goes in authorized_keys on
+#                                the VM restricted to the one thing it does:
+#     command="/home/ubuntu/phoenix/deploy/deploy.sh",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA...
+#                                (a leaked key can then only trigger a deploy,
+#                                not open a shell on a NOPASSWD-sudo account)
+#   - secret DEPLOY_KNOWN_HOSTS  output of `ssh-keyscan -H <host>` captured
+#                                ONCE from a trusted session — pinning the
+#                                host key instead of trusting whatever the
+#                                network answers on each run
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/id_deploy -o ConnectTimeout=15 "ubuntu@$HOST" \
+            '~/phoenix/deploy/deploy.sh'

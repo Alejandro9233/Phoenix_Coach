@@ -1,0 +1,29 @@
+# Phoenix Coach backend — systemd unit for the Oracle VM.
+# Installed by deploy/setup_server.sh to /etc/systemd/system/phoenix.service.
+#
+# Config lives in /home/ubuntu/phoenix/.env, NOT here: main.py calls
+# load_dotenv(override=True), so .env values BEAT anything set below.
+# Setting DATABASE_URL here would be silently ignored.
+
+[Unit]
+Description=Phoenix Coach backend (FastAPI + COROS scraper)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/phoenix
+Environment=PYTHONPATH=/home/ubuntu/phoenix
+# uvicorn buffers stdout when non-interactive — without this, journalctl
+# shows nothing and "missing output" reads as "didn't run" (CLAUDE.md gotcha)
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ubuntu/phoenix/venv/bin/python3 backend/main.py
+# A paused Supabase at import time means crash + retry until it unpauses:
+# with RestartSec=5 the default start-limit window (5 starts / 10s) never
+# trips, so this retries forever and self-heals. Readiness is NOT gated
+# here (Type=simple) — deploy.sh's /health loop is the real gate.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
