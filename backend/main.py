@@ -1168,6 +1168,35 @@ def _recovery_changed_since_adapt(db, plan_json, today):
     return ", ".join(moved) if moved else None
 
 
+def _todays_training_done(db) -> bool:
+    """True when every planned non-rest workout today already has a matching
+    activity (compliance.day_training_done). No plan, or no entry for today,
+    counts as not-done — there is nothing to guard."""
+    from datetime import datetime, timedelta
+
+    from backend.models.database import Activity, WeeklyPlan
+    from backend.services.compliance import day_training_done
+    from backend.services.plan_normalizer import normalize_plan
+    from backend.utils.timezone import get_local_now, get_local_today
+
+    today = get_local_today()
+    week_start = today - timedelta(days=today.weekday())
+    plan_row = (db.query(WeeklyPlan)
+                .filter(WeeklyPlan.week_start == week_start)
+                .order_by(WeeklyPlan.id.desc()).first())
+    if not plan_row:
+        return False
+    day = normalize_plan(plan_row.plan_json).get("days", {}).get(
+        get_local_now().strftime("%A"))
+    if day is None:
+        return False
+    acts = db.query(Activity).filter(
+        Activity.start_time >= datetime.combine(today, datetime.min.time()),
+        Activity.start_time <= datetime.combine(today, datetime.max.time()),
+    ).all()
+    return day_training_done(day, acts)
+
+
 @app.post("/weekly-plan/adapt-today")
 def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
@@ -1191,6 +1220,24 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     # the recovery numbers the earlier adaptation was based on, one
     # superseding re-adaptation is allowed (MAX_ADAPTS_PER_DAY total).
     is_simulated = bool(body and any(body.get(k) for k in ("hrv", "rhr", "soreness")))
+
+    # --- Athlete override wins the day ---
+    # "Use original plan" is a decision, not a data point. After it, no
+    # automatic re-adaptation today — however the numbers move. Simulated
+    # calls (the visualizer's what-if tester) stay exempt.
+    if not is_simulated:
+        today_iso = today.isoformat()
+        overrides = [
+            r for r in ((plan_record.plan_json or {}).get("_revisions") or [])
+            if r.get("source") == "use_original"
+            and str(r.get("at", "")).startswith(today_iso)
+        ]
+        if overrides:
+            from backend.services.plan_normalizer import normalize_plan
+            existing_plan = normalize_plan(plan_record.plan_json)
+            print("⛔ Athlete override active — not re-adapting today.")
+            return existing_plan.get("days", {}).get(today_day_name, {})
+
     supersede_reason = None
     if plan_record.last_adapted:
         last_adapted_date = plan_record.last_adapted.date() if hasattr(plan_record.last_adapted, 'date') else plan_record.last_adapted
@@ -1224,6 +1271,15 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     days_dict = plan_json.get("days", {})
     if today_day_name not in days_dict:
         raise HTTPException(status_code=400, detail=f"Today's day name ({today_day_name}) not found in the weekly plan.")
+
+    # --- Completion gate: today's training already happened ---
+    # Adapting a finished day is circular — the workout's own load reads as
+    # fresh fatigue on the next sync and rewrites the session it came from
+    # (2026-09-02: a 9pm refresh re-adapted the day the athlete had already
+    # trained). Real calls only; the simulator may keep testing what-ifs.
+    if not is_simulated and _todays_training_done(db):
+        print(f"⛔ Completion gate: today's training is done — not adapting {today_day_name}.")
+        return days_dict[today_day_name]
 
     # Receipt snapshot — before the adaptation rewrites today.
     from backend.services.plan_meta import capture_before
@@ -1336,8 +1392,70 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     flag_modified(plan_record, "plan_json")
     
     db.commit()
-    
+
     return adapted_day
+
+
+@app.post("/weekly-plan/use-original-today")
+def use_original_today(db: Session = Depends(get_db)):
+    """Restore today's pre-adaptation workouts — the sheet's "Override & Use
+    Original Plan". The override is receipted (source "use_original") and
+    blocks further automatic re-adaptation today; the athlete outranks the
+    trigger math."""
+    from datetime import timedelta
+
+    from backend.models.database import WeeklyPlan
+    from backend.services.constraint_enforcer import get_active_injuries
+    from backend.services.periodization_engine import PeriodizationEngine
+    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    from backend.services.plan_normalizer import normalize_plan
+    from backend.utils.timezone import get_local_now, get_local_today
+
+    today = get_local_today()
+    start_of_week = today - timedelta(days=today.weekday())
+    today_day_name = get_local_now().strftime("%A")
+
+    plan_record = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == start_of_week
+    ).order_by(WeeklyPlan.id.desc()).first()
+    if not plan_record:
+        raise HTTPException(status_code=404, detail="Weekly plan not found for this week.")
+
+    plan_json = normalize_plan(plan_record.plan_json)
+    day = plan_json.get("days", {}).get(today_day_name)
+    if not day or not day.get("original_workouts"):
+        raise HTTPException(status_code=409, detail="Nothing to restore: today has no adaptation.")
+
+    before = capture_before(plan_json, days=[today_day_name])
+    restored = dict(day)
+    restored["workouts"] = day["original_workouts"]
+    restored.pop("original_workouts", None)
+    restored.pop("adaptation", None)
+    # The original summary died with the adaptation (only workouts were
+    # preserved) — say what happened instead of showing the adapted text.
+    restored["summary"] = "Original plan restored — athlete override."
+    plan_json["days"][today_day_name] = restored
+
+    # Constraints may have changed since the original was written (a new
+    # injury logged today) — the restored day passes the same gate as any
+    # other write.
+    training_context = PeriodizationEngine().compute_context(db)
+    athlete_row = db.query(Athlete).first()
+    plan_json, violations = run_plan_write_pipeline(
+        db, plan_json,
+        source="use_original",
+        availability=training_context.get("availability", {}),
+        active_injuries=get_active_injuries(db, athlete_row.id) if athlete_row else [],
+        days=[today_day_name],
+        reason="Athlete override — original workout restored over today's adaptation.",
+        before=before,
+    )
+
+    from sqlalchemy.orm.attributes import flag_modified
+    plan_record.plan_json = plan_json
+    flag_modified(plan_record, "plan_json")
+    db.commit()
+    return plan_json["days"][today_day_name]
 
 
 @app.get("/history")
@@ -1575,7 +1693,15 @@ async def _run_smart_refresh(db: Session, progress=None):
     adapt_error = None
     adapt_receipt_at = None
     adapt_week_start = None
-    if needs_adaptation:
+    adapt_skip_reason = None
+    # Completion gate (adapt_today_workout enforces it too, but the event
+    # must say WHY nothing happened — that's half of History's job): once
+    # today's training is done, the fatigue in this sync came from that
+    # training, and there is nothing left today to adapt.
+    if needs_adaptation and _todays_training_done(db):
+        adapt_skip_reason = "Today's training is already done — its load is what tripped the triggers."
+        print(f"⛔ Completion gate: {adapt_skip_reason}")
+    elif needs_adaptation:
         try:
             report("Adapting today's plan...")
             from datetime import timedelta as _td
@@ -1629,6 +1755,7 @@ async def _run_smart_refresh(db: Session, progress=None):
         "adapted": adapted,
         "reasons": adaptation_reasons,
         "error": adapt_error,
+        "skipped_reason": adapt_skip_reason,
         "week_start": adapt_week_start.isoformat() if adapt_week_start else None,
         "receipt_at": adapt_receipt_at,
     }

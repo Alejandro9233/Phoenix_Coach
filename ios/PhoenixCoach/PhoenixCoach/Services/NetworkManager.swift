@@ -478,6 +478,21 @@ class NetworkManager: ObservableObject {
         return try decoder.decode(DayPlan.self, from: data)
     }
     
+    /// Restore today's pre-adaptation workouts. The backend receipts the
+    /// override and blocks further automatic re-adaptation today.
+    func useOriginalPlanToday() async throws -> DayPlan {
+        guard let url = URL(string: "\(baseURL)/weekly-plan/use-original-today") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode(DayPlan.self, from: data)
+    }
+
     func fetchWeeklyPlanStatus() async throws -> WeeklyPlanStatusResponse {
         guard let url = URL(string: "\(baseURL)/weekly-plan/status") else {
             throw NetworkError.invalidURL

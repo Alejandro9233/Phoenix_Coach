@@ -301,7 +301,11 @@ struct TodayView: View {
                     AdaptationComparisonSheet(
                         todayPlan: todayPlan,
                         latestRecovery: latestRecovery,
-                        preferOriginal: $preferOriginalProtocol
+                        preferOriginal: $preferOriginalProtocol,
+                        onUseOriginal: {
+                            _ = try await network.useOriginalPlanToday()
+                            await refreshFromDatabase()
+                        }
                     )
                 }
             }
@@ -1543,6 +1547,11 @@ struct AdaptationComparisonSheet: View {
     let todayPlan: DayPlan
     let latestRecovery: RecoverySummary?
     @Binding var preferOriginal: Bool
+    /// Calls the backend to restore the original plan, then reloads. The
+    /// button was cosmetic before this existed — it only recolored a card.
+    var onUseOriginal: (() async throws -> Void)? = nil
+    @State private var isReverting = false
+    @State private var revertFailed = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -1728,12 +1737,28 @@ struct AdaptationComparisonSheet: View {
                         }
                         
                         Button {
+                            guard !isReverting else { return }
                             preferOriginal = true
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            dismiss()
+                            isReverting = true
+                            revertFailed = false
+                            Task {
+                                do {
+                                    try await onUseOriginal?()
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    dismiss()
+                                } catch {
+                                    isReverting = false
+                                    revertFailed = true
+                                }
+                            }
                         } label: {
                             HStack {
-                                Image(systemName: "arrow.counterclockwise")
+                                if isReverting {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.counterclockwise")
+                                }
                                 Text("Override & Use Original Plan")
                             }
                             .font(.system(size: 13, weight: .semibold))
@@ -1747,8 +1772,17 @@ struct AdaptationComparisonSheet: View {
                                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
                             )
                         }
+                        .disabled(isReverting)
+
+                        if revertFailed {
+                            Text("Couldn't restore the original plan — check the connection and try again.")
+                                .font(.system(size: 11, weight: .regular))
+                                .foregroundStyle(DS.Colors.danger)
+                                .transition(.opacity)
+                        }
                     }
                     .padding(.top, 6)
+                    .animation(DS.Animation.quick, value: revertFailed)
                 }
                 .padding(20)
             }

@@ -78,6 +78,31 @@ def _parse_hr_target(hr_str: str) -> Optional[tuple]:
     return None
 
 
+def day_training_done(day_plan: dict, activities) -> bool:
+    """True when every planned non-rest workout for the day already has a
+    same-sport activity — the day's training happened, so its load is
+    already baked into the recovery numbers. A rest day is trivially done.
+
+    The adaptation completion gate uses this: adapting a day AFTER its
+    training is circular (the workout's own load reads as fresh fatigue on
+    the next sync and rewrites the session it came from) and pointless
+    (nothing is left today to make easier).
+    """
+    workouts = (day_plan or {}).get("workouts") or []
+    non_rest = [w for w in workouts
+                if (w.get("sport") or "").lower() != "rest"]
+    if not non_rest:
+        return True
+    pool = [_normalize_sport(a.sport or "") for a in activities]
+    for w in non_rest:
+        sport = _normalize_sport(w.get("sport") or "")
+        if sport in pool:
+            pool.remove(sport)
+        else:
+            return False
+    return True
+
+
 def _compute_workout_compliance(
     planned_workout: dict,
     actual_activity: dict,
