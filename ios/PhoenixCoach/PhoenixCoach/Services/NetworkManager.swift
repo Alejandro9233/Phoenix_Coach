@@ -19,7 +19,7 @@ class NetworkManager: ObservableObject {
     private let decoder: JSONDecoder
     
     init() {
-        let defaultURL = "https://phoenix-coach.onrender.com"
+        let defaultURL = "https://phoenix-coach.duckdns.org"
         
         let lastDefault = UserDefaults.standard.string(forKey: "last_default_url")
         if lastDefault != defaultURL {
@@ -43,7 +43,7 @@ class NetworkManager: ObservableObject {
     
     /// Reset the base URL to its environment-appropriate default.
     func resetToDefaultURL() {
-        let defaultURL = "https://phoenix-coach.onrender.com"
+        let defaultURL = "https://phoenix-coach.duckdns.org"
         self.baseURL = defaultURL
         Task {
             await checkConnection()
@@ -72,9 +72,12 @@ class NetworkManager: ObservableObject {
                 isOllamaConnected = false
             }
         } catch {
-            let defaultURL = "https://phoenix-coach.onrender.com"
-            
-            if baseURL != defaultURL, let fallbackUrl = URL(string: "\(defaultURL)/health") {
+            // Cutover safety net: Render stays alive during the parallel week
+            // (same Supabase DB). If Oracle is unreachable, fall back — and
+            // persist it, so a later launch stays on the host that worked.
+            let fallbackURL = "https://phoenix-coach.onrender.com"
+
+            if baseURL != fallbackURL, let fallbackUrl = URL(string: "\(fallbackURL)/health") {
                 do {
                     let (data, response) = try await session.data(from: fallbackUrl)
                     if let http = response as? HTTPURLResponse, http.statusCode == 200 {
@@ -82,7 +85,7 @@ class NetworkManager: ObservableObject {
                             let llmObj = json["llm"] as? [String: Any]
                             let llmStatus = llmObj?["status"] as? String
                             await MainActor.run {
-                                self.baseURL = defaultURL
+                                self.baseURL = fallbackURL
                                 isConnected = true
                                 isOllamaConnected = llmStatus == "connected"
                             }
