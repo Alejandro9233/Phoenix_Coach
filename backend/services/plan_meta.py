@@ -189,6 +189,12 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
             completed_hours=completed_hours,
             required_run_km=required_run_km,
         )
+        # Per-step pace arithmetic rides the same audit (hard, unrepairable):
+        # a 4:00/km "easy jog" cooldown is generation garbage, not a plan.
+        from backend.services.pace_enforcer import audit_step_paces
+
+        report.hard.extend(audit_step_paces(
+            candidate, (gate_ctx or {}).get("pace_model"), days=days))
         # Any actionable violation earns the one retry (soft floors included —
         # the LLM often can fix an undershoot); only hard ones block past it.
         # Advisory softs (under-target, long-run shortfall) surface as
@@ -205,6 +211,17 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
         print(f"🚧 [{source}] Stripped {len(violations)} constraint violation(s):")
         for v in violations:
             print(f"   - {v['day']}: {v['title']} — {v['reason']}")
+
+    if report is not None:
+        # Internally contradictory workouts, implausible step paces and a
+        # long-run overshoot have no honest deterministic repair — rewriting
+        # the numbers would be Python authoring the week. Fail like a failed
+        # generation: raise, endpoint 502s, nothing persists (2026-09-05).
+        fatal = [v for v in report.hard
+                 if v["kind"] in volume_gate.UNREPAIRABLE_KINDS]
+        if fatal:
+            raise volume_gate.PlanIntegrityError(
+                "; ".join(v["detail"] for v in fatal))
 
     if report is not None and not report.ok:
         candidate, repairs = volume_gate.apply_terminal_repairs(

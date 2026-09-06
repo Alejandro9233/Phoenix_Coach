@@ -17,10 +17,11 @@ truth. Correction, not stripping — a wrong pace never deletes a session
 Runs inside run_plan_write_pipeline on every persist path. pace_model=None
 (no threshold, non-running race) -> no-op, plans stay HR-zone-based.
 """
+import copy
 import re
 
 from backend.services.plan_normalizer import VALID_DAYS, map_sport
-from backend.services.volume_gate import parse_minutes
+from backend.services.volume_gate import parse_minutes, strip_pace_refs
 
 # Order matters: "marathon pace long run" must classify as marathon, not
 # long_run. Vocabulary is closed — titles come from the phase menus and B2
@@ -106,7 +107,7 @@ def _reconcile_main_step(w, band):
     # single rep's duration. Continuous steps only.
     if re.search(r"\d\s*[x×]\s*\d", desc, re.I):
         return None
-    matches = _KM_RE.findall(desc)
+    matches = _KM_RE.findall(strip_pace_refs(desc))
     if not matches:
         return None
     km = max(float(x) for x in matches)
@@ -138,6 +139,110 @@ def _reconcile_main_step(w, band):
         w["total_time"] = f"{int(round(total_min + delta_min))} min"
     return {"step_from": old_txt, "step_to": main["duration"],
             "step_km": km}
+
+
+# --- Per-step pace plausibility (gate stage) ------------------------------
+# _reconcile_main_step corrects the FIRST main step, upward only — so a
+# 4:00/km "easy jog" cooldown and a 5:00/km "easy" warmup sailed through
+# (2026-09-05). This audit is the gate's tripwire over ALL steps that carry
+# both a km figure and a duration, both directions. Loose on purpose
+# (±STEP_PACE_MARGIN beyond the zone's band span): it catches arithmetic
+# nonsense, never a coaching choice. Violations are hard and unrepairable —
+# the pipeline raises rather than rewriting the step.
+
+STEP_PACE_MARGIN = 0.20
+# zone -> (band key for the fast edge, band key for the slow edge). Spans
+# are deliberately wide — adjacent bands overlap in real training.
+_ZONE_BAND_SPAN = {
+    1: ("easy", "recovery"),
+    2: ("long_run", "easy"),
+    3: ("marathon", "long_run"),
+    4: ("interval", "tempo"),
+    5: ("interval", "interval"),
+}
+# No band for the zone (or no pace model): any humanly plausible running
+# pace passes, same blanket window the volume gate uses (2.5-10.0 min/km).
+_GENEROUS_SPAN_SEC = (150.0, 600.0)
+
+
+def audit_step_paces(plan_json: dict, pace_model: dict, days=None) -> list:
+    """Hard violations for steps whose km + duration imply an impossible
+    pace for their zone. Returns volume-gate-shaped violation dicts; the
+    pipeline appends them to the gate report's hard list.
+
+    Audits each workout AFTER _reconcile_main_step would heal it (on a
+    copy): enforce_paces applies that heal to whatever persists, so a
+    healable main step is not a violation — flagging it would 502 the exact
+    shape the heal was built for (2026-08-31's "30:00 for 8 km tempo")."""
+    violations = []
+    bands = (pace_model or {}).get("bands") or {}
+    window = list(days) if days is not None else list(VALID_DAYS)
+    for day_name in window:
+        day = (plan_json.get("days") or {}).get(day_name)
+        if not isinstance(day, dict):
+            continue
+        for w in day.get("workouts") or []:
+            if not isinstance(w, dict):
+                continue
+            if map_sport(w.get("sport") or "") != "running":
+                continue
+            band_key = classify_run_workout(w.get("title"))
+            if band_key != "progressive" and bands.get(band_key):
+                healed = copy.deepcopy(w)
+                if _reconcile_main_step(healed, bands[band_key]):
+                    w = healed
+            declared = w.get("distance_km")
+            for s in w.get("steps") or []:
+                if not isinstance(s, dict):
+                    continue
+                desc = s.get("description") or ""
+                # Rep notation: the duration may cover one rep or the block.
+                if re.search(r"\d\s*[x×]\s*\d", desc, re.I):
+                    continue
+                matches = _KM_RE.findall(strip_pace_refs(desc))
+                if not matches:
+                    continue
+                km = max(float(x) for x in matches)
+                if not (0.5 <= km <= 60):
+                    continue
+                # parse_minutes reads every duration shape the normalizer
+                # emits ("8 min" included) — colon-only parsing let numeric
+                # durations skip the audit entirely.
+                dur_min = parse_minutes(s.get("duration"))
+                sec = dur_min * 60 if dur_min else None
+                if not sec:
+                    continue
+                pace = sec / km
+                span = _ZONE_BAND_SPAN.get(s.get("zone"))
+                lo = (bands.get(span[0]) or {}).get("lo") if span else None
+                hi = (bands.get(span[1]) or {}).get("hi") if span else None
+                if lo and hi:
+                    fast_limit = lo * (1 - STEP_PACE_MARGIN)
+                    slow_limit = hi * (1 + STEP_PACE_MARGIN)
+                else:
+                    fast_limit, slow_limit = _GENEROUS_SPAN_SEC
+                # A figure well under the declared distance is a segment
+                # ("last 3 km at MP") — its duration/km overstates the pace,
+                # so only the too-fast direction stays valid there.
+                is_segment = (isinstance(declared, (int, float))
+                              and declared > 0 and km < 0.6 * float(declared))
+                too_fast = pace < fast_limit
+                too_slow = pace > slow_limit and not is_segment
+                if too_fast or too_slow:
+                    violations.append({
+                        "kind": "step_pace_implausible",
+                        "day": day_name,
+                        "title": w.get("title"),
+                        "detail": (
+                            f'"{w.get("title")}" on {day_name}: step '
+                            f'"{desc}" is {km:g} km in '
+                            f"{s.get('duration')} — "
+                            f"{int(pace // 60)}:{int(pace % 60):02d}/km is "
+                            f"implausible for zone {s.get('zone')}. Make the "
+                            f"step's distance and duration agree."
+                        ),
+                    })
+    return violations
 
 
 def enforce_paces(plan_json: dict, pace_model: dict, days=None) -> tuple:

@@ -1197,6 +1197,49 @@ def _todays_training_done(db) -> bool:
     return day_training_done(day, acts)
 
 
+def _preserve_adapted_distances(adapted_day: dict, original_day: dict) -> None:
+    """adapt_daily's output format has no distance_km, so an adaptation
+    silently dropped it and downstream planned-km accounting counted the day
+    from step text or minutes/6 (2026-09-05: an adapted Wednesday read 2 km
+    against ~5 km of steps). Recompute from the adapted steps when they name
+    every distance; otherwise carry the original's figure, scaled down when
+    the session was trimmed. Never invent one the original didn't have."""
+    from backend.services.plan_normalizer import map_sport
+    from backend.services.volume_gate import parse_minutes, steps_sum_km
+
+    originals = [w for w in (original_day.get("workouts") or [])
+                 if isinstance(w, dict)]
+    for w in adapted_day.get("workouts") or []:
+        if not isinstance(w, dict) or w.get("distance_km") is not None:
+            continue
+        sport = map_sport(w.get("sport") or "")
+        if sport in ("rest", "strength"):
+            continue
+        total, complete = steps_sum_km(w)
+        if total and complete:
+            w["distance_km"] = round(total, 1)
+            continue
+        match = next(
+            (o for o in originals
+             if map_sport(o.get("sport") or "") == sport
+             and isinstance(o.get("distance_km"), (int, float))),
+            None,
+        )
+        if match is None:
+            continue
+        # Consume the match: two same-sport sessions must not both inherit
+        # the first original's distance.
+        originals.remove(match)
+        orig_min = parse_minutes(match.get("total_time"))
+        new_min = parse_minutes(w.get("total_time"))
+        if orig_min and new_min and new_min < orig_min:
+            # Trimmed session: the distance shrinks with the time.
+            w["distance_km"] = round(
+                float(match["distance_km"]) * new_min / orig_min, 1)
+        else:
+            w["distance_km"] = float(match["distance_km"])
+
+
 @app.post("/weekly-plan/adapt-today")
 def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
@@ -1354,7 +1397,8 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     # Adapt
     response_agent = ResponseAgent()
     adapted_day = response_agent.adapt_daily(planned_workout_day, today_metrics, training_context=training_context)
-    
+    _preserve_adapted_distances(adapted_day, planned_workout_day)
+
     # Update weekly plan
     if "original_workouts" not in planned_workout_day:
         adapted_day["original_workouts"] = planned_workout_day.get("workouts", [])

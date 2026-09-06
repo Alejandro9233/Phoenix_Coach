@@ -45,6 +45,12 @@ from backend.services.plan_normalizer import VALID_DAYS, map_sport
 
 RUN_TARGET_SLACK_KM = 1.0   # under-target (soft) fires past this gap
 LONG_RUN_SLACK_MIN = 5.0    # long-run shortfall (soft) fires past this
+# Overshoot direction is HARD: 2026-08-31 planned a 118-min long run against
+# an 86-min engine target (+37%) and only the shortfall direction existed.
+LONG_RUN_OVERSHOOT_FRAC = 0.25
+# Declared distance_km vs the km the steps describe: past this the workout
+# is internally contradictory and cannot be trusted in either direction.
+STEPS_DECLARED_TOLERANCE = 0.15
 
 # Tolerances. The run-km hard cap already carries C3's headroom (ceiling*1.05
 # or ramp cap), so it gets only an absolute grace for step rounding — not
@@ -58,8 +64,41 @@ TRAVEL_FLOOR_FRAC = 0.90
 TRAVEL_GRACE_KM = 0.5
 
 _KM_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:km|k)\b", re.I)
+# "NxM km" interval notation — N reps of M km, not an M-km step. The
+# lookbehind keeps a decimal's fraction digits out of the rep count
+# ("1.5x2 km" is not 5 reps).
+_INTERVAL_KM_RE = re.compile(
+    r"(?<![\d.])(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:km|k)\b", re.I)
+# Pace/effort references ("at 5k pace", "10 km effort") and speeds
+# ("28-30 km/h") name a benchmark, not a distance the step covers — counting
+# them turned honest workouts into hard contradictions in review.
+_PACE_REF_RE = re.compile(
+    r"\d+(?:\.\d+)?\s*(?:km|k)\b(?:[-\s]*race)?[-\s]*(?:pace|effort)"
+    r"|\d+(?:\.\d+)?\s*(?:km|k)\s*/\s*h\w*",
+    re.I)
+
+
+def strip_pace_refs(text: str) -> str:
+    """Remove race-pace/effort and speed phrases so their numbers never
+    parse as distance ("3 km at 5K pace" must read 3 km, not 8)."""
+    return _PACE_REF_RE.sub(" ", text)
 # Sports an Activity row may carry that count as gym time, not volume.
 _STRENGTH_ACTIVITY_SPORTS = {"training", "strength", "gym"}
+
+
+class PlanIntegrityError(Exception):
+    """A generated workout is internally contradictory (declared distance vs
+    its own steps, or step arithmetic that implies an impossible pace) and
+    the retry didn't fix it. Raised instead of repaired: rewriting the
+    numbers would be Python inventing the athlete's week. Endpoints turn
+    this into the same 502-and-persist-nothing as a failed generation."""
+
+
+# Hard kinds the terminal repair must NOT paper over — the pipeline raises
+# PlanIntegrityError when one survives the retry.
+UNREPAIRABLE_KINDS = {
+    "internal_contradiction", "long_run_overshoot", "step_pace_implausible",
+}
 
 # B3: titles that are quality (hard) sessions regardless of step zones.
 QUALITY_TITLES = {
@@ -155,17 +194,101 @@ def parse_minutes(val) -> float | None:
     return None
 
 
+def _step_km(text) -> float | None:
+    """km one step's description covers: the larger of the "NxM km" interval
+    reading (N*M) and the largest plain km figure — "14 km with 6x1 km at MP"
+    is a 14-km step, not 6 (a step's own total always bounds its pickups).
+    Pace references, durations and set counts never match."""
+    if not isinstance(text, str) or not text:
+        return None
+    text = strip_pace_refs(text)
+    candidates = []
+    m = _INTERVAL_KM_RE.search(text)
+    if m:
+        candidates.append(float(m.group(1)) * float(m.group(2)))
+    matches = _KM_RE.findall(text)
+    if matches:
+        candidates.append(max(float(x) for x in matches))
+    return max(candidates) if candidates else None
+
+
+def steps_sum_km(workout: dict) -> tuple:
+    """(sum of per-step km, complete) across the step descriptions.
+    complete=True only when EVERY step carries a km figure that plausibly
+    covers the whole step — otherwise the sum is a lower bound (time-only
+    warmups are normal). A figure that can't fill the step's own duration
+    (implied pace past the 10 min/km ceiling) — or, on a duration-less main
+    step, one naming a small slice of the declared distance — is a segment
+    reference ("steady, last 3 km at MP") and never proves completeness.
+    (None, False) when no step names a distance."""
+    declared = workout.get("distance_km")
+    steps = [s for s in workout.get("steps") or [] if isinstance(s, dict)]
+    total = 0.0
+    found = 0
+    covering = 0
+    for s in steps:
+        km = _step_km(s.get("description") or "")
+        if not km:
+            continue
+        total += km
+        found += 1
+        minutes = parse_minutes(s.get("duration"))
+        if minutes:
+            if minutes / km > 10.0:
+                continue
+        elif (s.get("type") == "main"
+                and isinstance(declared, (int, float)) and declared > 0
+                and km < 0.6 * float(declared)):
+            continue
+        covering += 1
+    if not found:
+        return None, False
+    return total, found == len(steps) and covering == len(steps)
+
+
+def internal_contradiction(workout: dict) -> dict | None:
+    """Declared distance_km vs the km its own steps describe (2026-09-05:
+    "Marathon Pace Long Run" declared 16 km over steps describing 23 — the
+    blanket pace-plausibility band let the lie through). Steps summing ABOVE
+    declared always contradict — the sum is a lower bound and a lower bound
+    over declared means declared understates. Below-declared contradicts
+    only when every step carries a km figure that covers its step. Running
+    only: rides and swims write speed-flavored text and the run gates are
+    what this check protects."""
+    sport = map_sport(workout.get("sport") or "")
+    if sport != "running":
+        return None
+    declared = workout.get("distance_km")
+    if not isinstance(declared, (int, float)) or declared <= 0:
+        return None
+    total, complete = steps_sum_km(workout)
+    if not total:
+        return None
+    high = float(declared) * (1 + STEPS_DECLARED_TOLERANCE)
+    low = float(declared) * (1 - STEPS_DECLARED_TOLERANCE)
+    if total > high or (complete and total < low):
+        return {"declared_km": float(declared), "steps_km": round(total, 1)}
+    return None
+
+
 def workout_km(workout: dict) -> tuple:
     """(km, source) for one workout. Three tiers:
     declared (the distance_km contract field, pace-plausibility-checked for
-    runs) -> parsed (km figures in title/step text, largest wins) ->
-    estimated (running only: minutes / 6.0, never persisted as truth)."""
+    runs) -> parsed (steps summed per step, title figures largest-wins) ->
+    estimated (running only: minutes / 6.0, never persisted as truth).
+    A declared/steps contradiction returns the LARGER figure with source
+    "contradictory" — the audit hard-fails it, and until then the sums must
+    not undercount."""
     sport = map_sport(workout.get("sport") or "")
     if sport in ("rest", "strength"):
         return 0.0, "none"
     minutes = parse_minutes(workout.get("total_time"))
 
     declared = workout.get("distance_km")
+    contradiction = internal_contradiction(workout)
+    if contradiction:
+        return max(contradiction["declared_km"],
+                   contradiction["steps_km"]), "contradictory"
     if isinstance(declared, (int, float)) and declared > 0:
         plausible = True
         if sport == "running" and minutes:
@@ -174,13 +297,13 @@ def workout_km(workout: dict) -> tuple:
         if plausible:
             return float(declared), "declared"
 
-    text_parts = [workout.get("title") or ""]
-    for s in workout.get("steps") or []:
-        if isinstance(s, dict):
-            text_parts.append(s.get("description") or "")
-    matches = _KM_RE.findall(" ".join(text_parts))
-    if matches:
-        km = max(float(m) for m in matches)
+    candidates = [float(m) for m in
+                  _KM_RE.findall(strip_pace_refs(workout.get("title") or ""))]
+    total, _complete = steps_sum_km(workout)
+    if total:
+        candidates.append(total)
+    if candidates:
+        km = max(candidates)
         if km > 0:
             return km, "parsed"
 
@@ -488,6 +611,24 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
     blocked = _injury_blocked_sports(active_injuries or [])
     open_days = _open_run_days(window, availability, active_injuries)
 
+    # A workout whose declared distance disagrees with its own steps poisons
+    # every number below — no band can be trusted over a lie. Hard, and
+    # unrepairable (the pipeline raises rather than rewriting distance_km).
+    for day_name, w in _window_workouts(plan_json, window):
+        c = internal_contradiction(w)
+        if c:
+            report.hard.append({
+                "kind": "internal_contradiction",
+                "day": day_name,
+                "title": w.get("title"),
+                "detail": (
+                    f'"{w.get("title")}" on {day_name} declares '
+                    f"{c['declared_km']:g} km but its steps describe "
+                    f"{c['steps_km']:g} km. Make distance_km, the steps and "
+                    f"total_time agree."
+                ),
+            })
+
     cap = budget.get("run_km_hard_cap")
     if cap is not None and week_run_km > cap + RUN_CEILING_GRACE_KM:
         report.hard.append({
@@ -606,6 +747,31 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
                 "longest_run_min": round(longest_run_min, 1),
                 "target_min": lr_target,
                 "advisory": True,  # warns, never burns the gate retry
+            })
+
+    # Overshoot direction is HARD and runs on every gated path, windowed
+    # replans included (the shortfall check can't — a short long run may sit
+    # on a locked day; an overshooting one in the WINDOW is always fixable).
+    # 118 min against an 86-min target shipped through the shortfall-only
+    # check (2026-09-05).
+    if lr_target and lr_target > 0 and not race_week:
+        window_longest = 0.0
+        for _d, w in _window_workouts(plan_json, window):
+            if map_sport(w.get("sport") or "") == "running":
+                window_longest = max(
+                    window_longest, parse_minutes(w.get("total_time")) or 0.0)
+        limit = lr_target * (1 + LONG_RUN_OVERSHOOT_FRAC) + LONG_RUN_SLACK_MIN
+        if window_longest > limit:
+            report.hard.append({
+                "kind": "long_run_overshoot",
+                "detail": (
+                    f"The plan's longest run is {window_longest:.0f} min; the "
+                    f"phase prescribes {lr_target:.0f} min (max "
+                    f"{limit:.0f}). Shorten the long run — the progression is "
+                    f"Python's, not yours."
+                ),
+                "longest_run_min": round(window_longest, 1),
+                "target_min": lr_target,
             })
 
     _audit_titles(plan_json, ctx or {}, window, report)
