@@ -1,5 +1,6 @@
 """
-Fuel lines for long runs — Python numbers, stamped post-generation.
+Fuel lines for long runs and long rides — Python numbers, stamped
+post-generation.
 
 At 3:10 marathon shape Alex is out ~3 hours; gut training on long runs is a
 top-3 marathon determinant, and today's plans never mention fuel. The numbers
@@ -14,7 +15,8 @@ carry every replan would erase the field (same trap as pace_target).
 
 Bands (per hour, mid-run):
 - 90-120 min: 45-60 g carbs — routine long-run fueling.
-- > 120 min: 60-90 g carbs — race-gut training territory.
+- > 120 min: 60-90 g carbs, glucose+fructose blend (SGLT1 saturates
+  around 60 g/h) — race-gut training territory.
 - Fluid: 8-10 ml/kg body weight when weight is known (rounded to 20 ml),
   500-750 ml otherwise; always phrased with a heat caveat rather than a
   location (the phone's timezone travels — the app never assumes Hermosillo).
@@ -22,9 +24,21 @@ Bands (per hour, mid-run):
 from backend.services.plan_normalizer import VALID_DAYS, map_sport
 from backend.services.volume_gate import parse_minutes
 
+# Endurance sports whose long sessions carry a fuel line. Cycling belongs here
+# for two reasons: the long ride is the low-consequence place to rehearse the
+# rate before transferring it to long runs, and a 70.3/Ironman block schedules
+# 2.5-5 h rides that were going out with no fuel line at all while the run of
+# the same length got one. Swimming and strength stay out.
+FUELED_SPORTS = frozenset({"running", "cycling"})
+
 FUEL_MIN_MINUTES = 90          # below this, no fuel line at all
 CARB_BAND_ROUTINE = "45-60 g carbs/h"     # 90-120 min
-CARB_BAND_LONG = "60-90 g carbs/h"        # > 120 min
+# Above ~60 g/h a single glucose transporter (SGLT1) saturates, so the rate is
+# only reachable with a glucose-fructose blend (fructose crosses on GLUT5).
+# Shipping the number without the rule is how an athlete takes 90 g/h of pure
+# glucose on a 2.5 h long run and blames the gut. "fructose" appeared nowhere
+# in the repo before this.
+CARB_BAND_LONG = "60-90 g carbs/h (glucose+fructose blend)"   # > 120 min
 CARB_LONG_THRESHOLD_MIN = 120
 FLUID_ML_PER_KG = (8, 10)      # ml per kg body weight per hour
 FLUID_DEFAULT = (500, 750)     # ml/h when weight is unknown
@@ -55,8 +69,8 @@ def stamp_fuel(plan_json: dict, weight_kg, days=None) -> tuple:
 
     Returns (plan_json, changes). Pure and idempotent: a qualifying run gets
     the computed line unconditionally (correction, not stripping); a run that
-    no longer qualifies loses a stale line. Non-running sports are never
-    touched — fuel is a long-run concern.
+    no longer qualifies loses a stale line. Swimming and strength are never
+    touched.
     """
     changes = []
     window = list(days) if days is not None else list(VALID_DAYS)
@@ -67,7 +81,7 @@ def stamp_fuel(plan_json: dict, weight_kg, days=None) -> tuple:
         for w in day.get("workouts") or []:
             if not isinstance(w, dict):
                 continue
-            if map_sport(w.get("sport") or "") != "running":
+            if map_sport(w.get("sport") or "") not in FUELED_SPORTS:
                 continue
             line = fuel_line(w.get("total_time"), weight_kg)
             if line is not None:

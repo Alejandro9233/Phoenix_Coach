@@ -80,11 +80,38 @@ def test_stamp_sets_clears_and_is_idempotent():
     assert changes[-1]["set"] is None
 
 
-def test_non_running_never_touched():
+def test_swim_and_strength_never_touched():
+    for sport in ("swimming", "strength"):
+        plan = _plan("3:00:00", sport=sport)
+        plan, changes = stamp_fuel(plan, 78)
+        assert changes == [], sport
+        assert "fuel" not in plan["days"]["Saturday"]["workouts"][0], sport
+
+
+def test_long_ride_gets_a_fuel_line():
+    """The long ride is where the rate is rehearsed before it is trusted on a
+    long run, and an Ironman block ships 4-5 h rides. Both used to go out with
+    nothing while a run of the same length got a line."""
     plan = _plan("3:00:00", sport="cycling")
     plan, changes = stamp_fuel(plan, 78)
-    assert changes == []
+    assert len(changes) == 1
+    assert plan["days"]["Saturday"]["workouts"][0]["fuel"].startswith(
+        "60-90 g carbs/h (glucose+fructose blend)")
+
+
+def test_short_ride_gets_nothing_and_a_stale_line_is_cleared():
+    plan = _plan("45 min", sport="cycling")
+    plan["days"]["Saturday"]["workouts"][0]["fuel"] = "60-90 g carbs/h · bogus"
+    plan, changes = stamp_fuel(plan, 78)
+    assert changes == [{"day": "Saturday", "title": "Long Run", "set": None}]
     assert "fuel" not in plan["days"]["Saturday"]["workouts"][0]
+
+
+def test_long_band_names_the_blend():
+    """90 g/h of single-source glucose is the textbook route to GI distress:
+    SGLT1 saturates near 60 g/h. The number must not ship without the rule."""
+    assert "glucose+fructose" in fuel_line("150 min", 78)
+    assert "glucose+fructose" not in fuel_line("100 min", 78)
 
 
 def test_normalizer_carries_fuel():
