@@ -550,13 +550,30 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
 #               injury*; NOTHING is written
 #   3. apply    athlete confirms -> status Resolved, those days regenerated
 
+# Deliberately GENEROUS. This gate only decides whether to pay for the
+# extraction call; `extract_recovery` is what rules partial-vs-resolved, and it
+# is explicitly briefed that "a bit better but still sore" keeps the
+# restriction. A false positive costs one cheap LLM call. A false negative
+# costs the whole feature — 2026-09-09: "my ankle injury it has gotten better,
+# but i still not confident that i will be able to run this week, just cycle"
+# never reached the classifier, so the coach answered from a 3-day-old
+# severity-8 row and told the athlete to stop cycling. Bias toward firing.
 _RECOVERY_PATTERN = re.compile(
     r"\b("
     r"recovered|recovery|healed|back to normal|good to go|all (good|better)|"
-    r"(feels?|feeling|is|are) (fine|good|great|better|normal|ok(ay)?)|"
     r"no (more )?pain|pain[ -]?free|doesn'?t hurt( anymore)?|stopped hurting|"
+    r"improv\w*|"
+    # "<verb> [intensifier] <adjective>". The optional intensifier is the gap
+    # that silently dropped "it feels much better" and "gotten a lot better".
+    r"(feels?|feeling|felt|is|are|was|got|gotten|getting|seems?) "
+    r"((much|a lot|way|a bit|a little|slightly|so much) )?"
+    r"(fine|good|great|better|normal|ok(ay)?)|"
+    r"(much|a lot|way) better|"
+    r"can (walk|run|train|ride|cycle)( now| again)?|"
     # Spanish — same athlete, same code-switching as the issue filter.
-    r"recuperad\w*|ya no (me )?duele|sin dolor|ya estoy bien|me siento (bien|mejor)|ya san\w*"
+    r"recuperad\w*|ya no (me )?duele|casi no (me )?duele|sin dolor|"
+    r"ya estoy bien|(me siento|se siente|lo siento) (much[oa] )?(bien|mejor)|ya san\w*|"
+    r"va mejor|est[aá] mejor|ya puedo (caminar|correr|andar|pedalear)"
     r")\b",
     re.IGNORECASE,
 )

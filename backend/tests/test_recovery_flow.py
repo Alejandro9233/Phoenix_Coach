@@ -147,6 +147,48 @@ def test_looks_like_recovery_negatives():
         assert not looks_like_recovery(msg), msg
 
 
+def test_looks_like_recovery_survives_tense_and_intensifiers():
+    """2026-09-09 regression. The gate required the adjective to sit directly
+    after `feels|feeling|is|are`, so every natural hedge fell through to plain
+    chat: the athlete wrote "about my ankle injury it has gotten better, but i
+    still not confident that i will be able to run this week, just cycle" and
+    `extract_recovery` — which is briefed to keep the restriction on a partial
+    report — was never called. The coach answered from a 3-day-old severity-8
+    row and told him to stop cycling too.
+    """
+    assert looks_like_recovery(
+        "about my ankle injury it has gotten better, but i still not confident "
+        "that i will be able to run this week, just cycle"
+    )
+    for msg in [
+        # tense the old alternation missed
+        "it has gotten better", "it is getting better", "the ankle improved a lot",
+        # intensifier between verb and adjective
+        "it feels much better", "my ankle feels a lot better", "the ankle is way better",
+        "much better today",
+        # able-to-do-X phrasing
+        "i can walk now", "ya puedo caminar",
+        # Spanish third person and hedges
+        "se siente mucho mejor", "el tobillo va mejor", "ya casi no me duele",
+    ]:
+        assert looks_like_recovery(msg), msg
+
+
+def test_looks_like_recovery_still_ignores_questions_and_complaints():
+    """The gate got broader, not indiscriminate — a question about running
+    again is the exact phrasing extract_recovery is told is NOT recovery, and
+    paying for that call on every "me duele" would be pure cost.
+    """
+    for msg in [
+        "when can i run again?",
+        "can i run tomorrow?",
+        "me duele el tobillo",
+        "i cannot walk",
+        "my ankle is worse",
+    ]:
+        assert not looks_like_recovery(msg), msg
+
+
 def test_extract_recovery_matches_active_injury(db_session, monkeypatch):
     injury = _seed_injury_and_week(db_session)
 

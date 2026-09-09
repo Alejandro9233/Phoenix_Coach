@@ -8,6 +8,13 @@ from backend.models.database import Athlete, Activity, RecoverySnapshot, InjuryL
 from backend.services.constraint_enforcer import get_active_injuries
 from backend.utils.timezone import get_local_today
 
+# An injury row records how the body part felt on `date_reported`, not today.
+# Past this many days the prompt says so out loud: 2026-09-09 the coach read a
+# 3-day-old "severity 8/10, can't even walk" row as current, told the athlete
+# to stop cycling, and invented a clinical reason for a session the enforcer
+# had removed off that same stale row.
+INJURY_STALE_DAYS = 2
+
 
 class DataAgent:
     def __init__(self, db_session: Session):
@@ -53,8 +60,23 @@ class DataAgent:
                 lines.append(f"  - {inj.body_part} (Severity: {inj.severity}/10)")
                 if inj.affected_sports:
                     lines.append(f"    Affected sports to avoid/limit: {inj.affected_sports}")
+                age = None
+                if inj.date_reported:
+                    age = (today - inj.date_reported).days
+                    stamp = f"    Reported {inj.date_reported} ({age}d ago)"
+                    if inj.expected_recovery_date:
+                        stamp += f"; expected recovery {inj.expected_recovery_date}"
+                    lines.append(stamp)
                 if inj.notes:
                     lines.append(f"    Notes: {inj.notes}")
+                if age is not None and age >= INJURY_STALE_DAYS:
+                    lines.append(
+                        f"    STALE ({age}d): severity, notes and blocked sports "
+                        f"describe {inj.date_reported}, not today. Ask how it feels "
+                        "now before restricting further, and never cite this row as "
+                        "the reason a session was removed — say the record is old "
+                        "and offer to update it."
+                    )
 
         # Recently expired injuries: ease back in, don't restrict.
         recovering = self.db.query(InjuryLog).filter(
