@@ -1,30 +1,25 @@
-# Running Training — Daniels' VDOT System + Marathon Preparation
+# Running Training — Intensity Bands + Marathon Preparation
 
-## Athlete Context
-- Current volume: ~20 km/week
-- Nearest competition: Marathon
-- History: Max 115 km/month (injury occurred — respect progressive overload)
-- LT Pace from COROS: 4:23/km
-- LTHR: 177 bpm
+<!-- No `## Athlete Context` block here, on purpose. Athlete state is
+injected live by `backend/agents/data_agent.py` (actuals from the watch)
+and by `periodization_engine.compute_context`. Hand-copying it into this
+static corpus produced a coach reading "~20 km/week" and "static bike
+only" months after both stopped being true, in the same prompt that
+carried the real numbers. Keep this file to method that stays true
+regardless of who is reading it. -->
 
-## The VDOT System (Jack Daniels)
+## Race-time conversions — do not do them here
 
-### How to Determine VDOT
-- Use a recent race result (5K, 10K, or half marathon) or time trial
-- Input into a VDOT calculator to get your score
-- Your VDOT determines exact training paces for every zone
-- Re-test every 4-6 weeks as fitness improves
-- IMPORTANT: Use current fitness, NOT goal race pace
+Conversions between distances are computed in
+`backend/services/pace_model.py` (Riegel, exponent 1.06), and training paces
+come from the watch's measured lactate-threshold pace, not from a race result.
+Never quote a VDOT number and never convert a time by hand: a VDOT table that
+used to live in this file paired 3:10 with a 1:32:33 half while Riegel gives
+1:31:08, and the coach had no way to know which one the app had used.
 
-### VDOT Reference Table (Selected Values)
-| VDOT | 5K | 10K | Half Marathon | Marathon |
-|---|---|---|---|---|
-| 30 | 30:40 | 63:46 | 2:21:04 | 4:49:17 |
-| 35 | 27:00 | 56:03 | 2:04:13 | 4:16:03 |
-| 40 | 24:08 | 50:03 | 1:50:59 | 3:49:45 |
-| 45 | 21:55 | 45:26 | 1:40:41 | 3:28:26 |
-| 50 | 20:09 | 41:45 | 1:32:33 | 3:10:49 |
-| 55 | 18:41 | 38:43 | 1:25:46 | 2:56:01 |
+Two rules that survive from that system and still hold:
+- Anchor paces to CURRENT fitness, never to goal race pace.
+- Re-check threshold every 4-6 weeks; the watch does this continuously.
 
 ### Daniels Training Zones
 | Zone | Name | Purpose | % VO2max | Feel |

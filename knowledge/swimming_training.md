@@ -1,10 +1,16 @@
 # Swimming Training — Beginner to 70.3 Triathlon
 
-## Athlete Context
-- Level: Beginner — 2 km in 60 min (~3:00/100m) in 25m pool
-- Goal: Comfortable 1.9 km open water swim for 70.3 (target: under 45 min)
-- Current CSS (estimated): ~2:45-3:00/100m
-- Priority: Technique first, then endurance, then speed
+<!-- No `## Athlete Context` block here, on purpose. Athlete state is
+injected live by `backend/agents/data_agent.py` (actuals from the watch)
+and by `periodization_engine.compute_context`. Hand-copying it into this
+static corpus produced a coach reading "~20 km/week" and "static bike
+only" months after both stopped being true, in the same prompt that
+carried the real numbers. Keep this file to method that stays true
+regardless of who is reading it. -->
+
+Priority order for a beginner: technique first, then endurance, then speed.
+Swimming is unbudgeted during a marathon block — it is optional cross-training
+there, and becomes race-specific again only when the goal race includes a swim.
 
 ## Critical Swim Speed (CSS) — Your Core Metric
 

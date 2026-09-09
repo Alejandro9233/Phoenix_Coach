@@ -77,7 +77,7 @@ When prescribing a workout, select from this library based on:
 
 ---
 
-## CYCLING WORKOUTS (Static Bike, HR-Based)
+## CYCLING WORKOUTS (HR-Based, No Power Meter)
 
 ### Endurance Ride
 - Zone: Z2 (143-157 bpm)

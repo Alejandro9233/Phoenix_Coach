@@ -1,13 +1,17 @@
-# Periodization — Marathon (7 months) → 70.3 Triathlon (~12 months)
+# Periodization — Marathon block, then 70.3
 
-## Athlete Context
-- Marathon: ~7 months away (December 2026)
-- 70.3 Half Ironman: ~12 months away (May/June 2027)
-- Current running volume: ~20 km/week (max was 115 km/month — injury occurred)
-- Swimming: Beginner (2 km in 60 min)
-- Cycling: Static bike only (no power meter, no outdoor bike)
-- Strength: Hypertrophy-focused, flexible on days
-- Strategy: Use swim + bike as CROSS-TRAINING during marathon block — builds tri fitness without extra running impact
+<!-- No `## Athlete Context` block here, on purpose. Athlete state is
+injected live by `backend/agents/data_agent.py` (actuals from the watch)
+and by `periodization_engine.compute_context`. Hand-copying it into this
+static corpus produced a coach reading "~20 km/week" and "static bike
+only" months after both stopped being true, in the same prompt that
+carried the real numbers. Keep this file to method that stays true
+regardless of who is reading it. -->
+
+Strategy: the bike is CROSS-TRAINING during a marathon block — it adds aerobic
+hours without extra running impact. It does not replace running km. Below about
+80 km/week there is no running to spare, so the bike is added on top; the
+substitution case only starts above that.
 
 ## 12-Month Phase Plan
 
@@ -17,7 +21,7 @@
 |---|---|---|---|
 | Running | 3x | 20→28 km/week | Easy runs, build gradually (10% rule) |
 | Swimming | 2x | 2-3 km/session | Technique drills, CSS test, build comfort |
-| Cycling | 2x | 60-75 min/session | Z2 endurance on static bike |
+| Cycling | 2x | 60-75 min/session | Z2 endurance, road |
 | Strength | 3x | Push/Pull/Legs | Hypertrophy focus — this is the best window for muscle building |
 
 - Intensity: 90% Zone 1-2, 10% Zone 3

@@ -1,10 +1,15 @@
-# Cycling Training — HR-Based (No Power Meter, Static Bike)
+# Cycling Training — HR-Based (No Power Meter)
 
-## Athlete Context
-- Equipment: Static/indoor bike only (no outdoor bicycle yet)
-- Power meter: None — all zones based on Heart Rate
-- LTHR from COROS: 177 bpm
-- Goal: Build cycling fitness for 70.3 triathlon (90 km bike leg)
+<!-- No `## Athlete Context` block here, on purpose. Athlete state is
+injected live by `backend/agents/data_agent.py` (actuals from the watch)
+and by `periodization_engine.compute_context`. Hand-copying it into this
+static corpus produced a coach reading "~20 km/week" and "static bike
+only" months after both stopped being true, in the same prompt that
+carried the real numbers. Keep this file to method that stays true
+regardless of who is reading it. -->
+
+Road bike, outdoor. No power meter, so every zone below is heart rate. An
+indoor trainer is a substitute for weather, not the default.
 
 ## Heart Rate Zones for Cycling (Friel 7-Zone, Based on LTHR)
 
@@ -26,14 +31,43 @@
 
 Note: Zones recalculate automatically if LTHR changes.
 
-## Indoor Cycling Workouts
+## The bike inside a marathon block
+
+Seven randomised trials found no significant difference in VO2max or race time
+when 20-50% of running was swapped for cycling. But running economy is
+running-specific and does not transfer: over-relying on the bike costs an
+estimated 3-5% of economy, which is 8-15 minutes over a marathon. So the bike
+buys aerobic fitness, not marathon legs.
+
+What follows from that:
+
+- ADD, don't swap. Substitution earns its keep around 80 km/week and above,
+  where there is running to spare. Below that the bike goes on top of the runs.
+- Never substitute the long run, marathon-pace work, or threshold running.
+  Tolerance to impact only comes from impact. The bike takes easy days and
+  recovery days.
+- Converting a run to a ride: roughly 1.5:1 by TIME, about 3x the distance.
+- Long-run cross-training ceiling is about 15-20% of total volume before
+  measurable loss.
+- The long RIDE goes the day AFTER the long run, never before it. It flushes
+  the legs without adding impact. Hold it strictly in Z2 and use it to practise
+  race fuelling (see `knowledge/nutrition.md`). Shorten it when the long run
+  passes 30 km.
+- Any easy run that starts a niggle becomes a 60-75 min spin the same day. That
+  is a substitution rule, not a rest rule — the aerobic hours still happen.
+
+Expect heart rate to sit 5-10 beats lower on the bike at the same perceived
+effort. If HR refuses to rise on an easy ride, that is the correct outcome, not
+a problem to fix.
+
+## Cycling Workouts
 
 ### Endurance Ride (Foundation)
 - Duration: 60-120 min
 - Intensity: Z2 (143-157 bpm)
 - Purpose: Build aerobic base, fat oxidation
 - When: 1-2x/week, especially early in training
-- Tip: Use entertainment (music, video) — indoor rides feel longer
+- Outdoors, pick rolling terrain over stop-start traffic — interruptions break Z2
 
 ### Sweet Spot Intervals
 - Warm-up: 10 min Z1-Z2
@@ -63,7 +97,7 @@ Note: Zones recalculate automatically if LTHR changes.
 - Purpose: Leg speed, power development, neuromuscular activation
 - When: Supplement to endurance rides, 1x/2 weeks
 
-## Cycling for 70.3 — Static Bike Considerations
+## Indoor Trainer — when weather forces it
 
 ### Indoor Training Advantages
 - Consistent environment — no traffic, weather, or terrain variables
@@ -75,12 +109,12 @@ Note: Zones recalculate automatically if LTHR changes.
 - Heat buildup (use a fan!)
 - Mental monotony on long rides
 - No drafting/pack riding experience
-- When you get an outdoor bike: transition to outdoor rides for long sessions
+- Outdoors is the default; the trainer is for weather, darkness or an unsafe road
 
 ### Building Toward 90 km Race
 - 70.3 bike leg takes 2.5-3.5 hours for most athletes
 - Build longest ride gradually: start at 60 min, add 10-15 min/week
-- Peak long ride: 2.5-3 hours on the static bike (8-10 weeks before race)
+- Peak long ride: 2.5-3 hours (8-10 weeks before race)
 - Long rides at Z2 (143-157 bpm) — resist going harder
 - Practice nutrition on the bike during rides >90 min
 

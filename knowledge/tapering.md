@@ -1,6 +1,17 @@
 # Tapering & Race Preparation
 
-## Sources: Iñigo Mujika (taper research), Joe Friel (Triathlete's Training Bible)
+## Sources: Bosquet et al. 2007 (27-study meta-analysis), Smyth & Lawlor 2021
+## (158,000 marathon finishers), Wang et al. 2023, Mujika, Friel
+
+### How much this is worth
+The taper is the largest single performance lever left once the training is
+done, and the evidence is unusually consistent:
+
+- Most effective across 27 studies: volume down 41-60%, intensity and frequency UNCHANGED.
+- In 158,000 recreational marathoners, a strict 3-week taper beat a minimal one
+  by a median 5 min 32 s (2.6%). 64% of that field tapered too loosely.
+- Neither VO2max nor running economy changes during a taper. The entire gain is
+  recovery — which is why cutting intensity buys nothing and costs sharpness.
 
 ## Marathon Taper Protocol
 
@@ -59,8 +70,9 @@
 
 ### During Race (70.3)
 - Swim: nothing (hydrate before start)
-- Bike (90 km): 60-90g carbs/hour (gels, sports drink), 500-750 ml fluid/hour
-- Run (21.1 km): 30-60g carbs/hour (gels at aid stations), water at every station
+- Bike leg of a 70.3 (90 km): 60-90 g carbs/hour, glucose+fructose blend, 500-750 ml fluid/hour
+- Run leg of a 70.3 (21.1 km): 60-90 g carbs/hour, glucose+fructose blend, water at every station
+- Standalone marathon: 60-90 g carbs/hour, same blend — see `knowledge/nutrition.md`
 - Practice this EXACT nutrition plan in training on long brick sessions
 
 ## Post-Race Recovery

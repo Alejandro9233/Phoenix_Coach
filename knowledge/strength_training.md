@@ -1,9 +1,60 @@
-# Strength Training — Hypertrophy + Triathlon Concurrent Training
+# Strength Training — Running Economy First, Hypertrophy Second
 
-## Athlete Context
-- Goal: Build muscle mass (hypertrophy) while training for marathon + 70.3 triathlon
-- Flexible on days per week
-- Current sports: running, swimming, cycling, gym (training sessions show up as most frequent activity)
+<!-- No `## Athlete Context` block here, on purpose. Athlete state is
+injected live by `backend/agents/data_agent.py` (actuals from the watch)
+and by `periodization_engine.compute_context`. Hand-copying it into this
+static corpus produced a coach reading "~20 km/week" and "static bike
+only" months after both stopped being true, in the same prompt that
+carried the real numbers. Keep this file to method that stays true
+regardless of who is reading it. -->
+
+## What actually improves running economy
+
+This is the one non-running input with consistent evidence for economy, but
+only in a specific form. A 2024 meta-analysis (652 runners, 6-24 week
+programmes) found:
+
+- HIGH-LOAD training: small improvement in running economy (ES -0.27)
+- HIGH-LOAD + PLYOMETRIC combined: moderate improvement (ES -0.43)
+- Submaximal-load and isometric work: no measurable effect
+
+A 2025 umbrella review agrees on the direction — moderate-to-large effects on
+economy, none on VO2max — while noting most underlying reviews were rated low
+confidence.
+
+The practical consequence is uncomfortable if the goal is muscle size: classic
+hypertrophy rep ranges (3-4 x 8-12 to failure) are submaximal load, the band
+that did nothing measurable for economy. Hypertrophy is a legitimate goal and
+the programming below serves it. It is just not the same goal as running
+faster, and during a race block the heavy-plus-plyometric shape wins.
+
+### Session shape during a race block
+Two 30-40 minute sessions a week, placed AFTER a quality run rather than on
+their own day, so easy days stay easy.
+
+- Session A — heavy split squat or trap-bar deadlift 3-4 x 5; single-leg hip
+  thrust; hops or pogo jumps 3 x 15.
+- Session B — the calf protocol below; step-downs; skipping.
+
+Plyometrics measurably help at speeds up to about 12 km/h, which covers
+marathon pace for most amateurs.
+
+## Calf and Achilles protocol
+
+Load both heads or you have trained half the muscle:
+
+- Straight-knee calf raise (gastrocnemius), 3-4 x 6-8, slow eccentric
+- Bent-knee calf raise (soleus), 3-4 x 6-8, slow eccentric
+- Step-downs, controlled
+- Skipping or pogo hops for stiffness
+
+This is the shin and Achilles insurance for a runner with that history, and it
+improves economy as a side effect. Keep it through the taper at reduced sets —
+it is the one thing worth not dropping — but respect the rule below about
+stopping heavy lifting before race day. On an acute injury, load nothing that
+hurts: this protocol is for prevention and for a settled tendon, not for the
+first week of a sprain. Loading numbers are coaching practice, not a study
+finding; adjust them with a physiotherapist.
 
 ## The Core Challenge: Hypertrophy + Endurance
 Building muscle while doing significant endurance training requires careful management of the "interference effect" — the tendency for endurance work to blunt hypertrophy signals. The research shows this is manageable with proper programming.
