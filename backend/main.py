@@ -550,6 +550,24 @@ def update_athlete_injury(injury_id: int, body: dict, db: Session = Depends(get_
     return {"status": "ok", "message": "Injury updated"}
 
 
+@app.delete("/athlete/injuries/{injury_id}")
+def delete_athlete_injury(injury_id: int, db: Session = Depends(get_db)):
+    """Remove an injury row outright.
+
+    Distinct from resolving: Resolved keeps the history `data_agent` reads back,
+    delete is for a row logged by mistake. iOS offered a Delete swipe from the
+    start and only ever removed it from the local array, so the row returned on
+    the next fetch — and, if it was Active, kept stripping sessions.
+    """
+    from backend.models.database import InjuryLog
+    injury = db.query(InjuryLog).filter(InjuryLog.id == injury_id).first()
+    if not injury:
+        raise HTTPException(status_code=404, detail="Injury not found")
+    db.delete(injury)
+    db.commit()
+    return {"status": "ok", "message": "Injury deleted"}
+
+
 @app.post("/coach/issue/preview")
 def preview_issue(body: dict, db: Session = Depends(get_db)):
     """

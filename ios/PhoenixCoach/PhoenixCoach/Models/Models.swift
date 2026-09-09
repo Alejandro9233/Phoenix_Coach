@@ -368,7 +368,13 @@ struct Injury: Codable, Identifiable {
     var severity: Int?
     var notes: String?
     var affectedSports: String?
-    
+    /// "2026-09-20", or nil meaning the injury blocks training until it is
+    /// resolved by hand. `get_active_injuries` flips a row past this date to
+    /// Recovering, which stops it constraining the plan — so it is the
+    /// difference between a restriction that lifts itself and one that waits
+    /// for the athlete.
+    var expectedRecoveryDate: String?
+
     enum CodingKeys: String, CodingKey {
         case id
         case dateReported = "date_reported"
@@ -377,6 +383,7 @@ struct Injury: Codable, Identifiable {
         case severity
         case notes
         case affectedSports = "affected_sports"
+        case expectedRecoveryDate = "expected_recovery_date"
     }
 }
 

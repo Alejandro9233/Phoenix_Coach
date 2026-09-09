@@ -367,6 +367,46 @@ class NetworkManager: ObservableObject {
             throw NetworkError.serverError
         }
     }
+
+    /// Patch named fields on one injury, sending an explicit JSON null for any
+    /// value being cleared.
+    ///
+    /// `updateInjury` cannot do this: PUT /athlete/injuries/{id} only writes a
+    /// field when the key is PRESENT in the body, and a synthesized Codable
+    /// encoder omits nil optionals entirely. Encoding an Injury whose
+    /// expectedRecoveryDate is nil therefore leaves the stored date untouched —
+    /// the field would look editable and silently refuse to clear.
+    func updateInjuryFields(id: Int, fields: [String: Any?]) async throws {
+        guard let url = URL(string: "\(baseURL)/athlete/injuries/\(id)") else {
+            throw NetworkError.invalidURL
+        }
+        var body: [String: Any] = [:]
+        for (key, value) in fields {
+            body[key] = value ?? NSNull()
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+    }
+
+    /// Delete an injury row outright. Resolving keeps the history the coach
+    /// reads back; this is for a row logged by mistake.
+    func deleteInjury(id: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/athlete/injuries/\(id)") else {
+            throw NetworkError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+    }
     
     // MARK: - Activity Analysis
     
