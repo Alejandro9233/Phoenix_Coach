@@ -70,6 +70,15 @@ RUN_NOISE_FLOOR_KM = 5.0   # weeks at or under this are noise, not capacity
 # below the race itself and the gate would repair the marathon away.
 RACE_WEEK_EASY_KM = 8.0        # shakeout jogs + strides, target headroom
 RACE_WEEK_EASY_CAP_KM = 14.0   # hard-cap headroom above the race distance
+# Taper: fraction of demonstrated peak run volume to hold, indexed by
+# weeks_to_race 3 / 2 / 1. From knowledge/tapering.md's own ramp (-20-25%,
+# -35-40%, -50-60%), which sits inside the 41-60% band Bosquet's 27-study
+# meta-analysis identifies — NOT the 25/45/65% a report proposed, whose final
+# week falls outside the evidence it cites. Without this the phase ceiling
+# binds every taper week to the same number: off a 55 km peak all three
+# computed to exactly 30.0 km, one flat step instead of a ramp-down.
+TAPER_RUN_RETAIN = {3: 0.78, 2: 0.62, 1: 0.45}
+TAPER_LONG_RUN_MIN = {3: 110, 2: 80, 1: 50}
 
 
 # ─── Shared workout menu building blocks ──────────────────────────────────────
@@ -94,20 +103,30 @@ _FOUNDATION_MENU = {
     "reason": "Foundation phase — build aerobic base and consistency before adding intensity. 90% of work should be Zone 1-2.",
 }
 
+# Shortened quality survives; long quality does not. The km conditions are read
+# by volume_gate._audit_titles (_COND_KM_RE), so these are enforced numbers, not
+# prompt prose. Phase caps quality at ONE session a week — "repeats become
+# fewer, never slower" — and pace_model keeps the peak band, so the session that
+# survives runs at goal pace, just shorter.
 _TAPER_MENU = {
     "allowed": {
-        "running": ["Easy Run (short)", "Strides/Openers"],
+        "running": [
+            "Easy Run (short)", "Strides/Openers",
+            "Tempo Run (short)", "Marathon Pace Long Run (short)",
+        ],
         "cycling": ["Endurance Ride (short, Z2)"],
         "swimming": ["Technique Session (short)"],
         "strength": [],
     },
     "forbidden": [
-        "ALL intense or long sessions", "Tempo Run", "Cruise Intervals",
-        "Marathon Pace Long Run", "VO2max Intervals", "Sweet Spot",
+        "ALL long sessions and any second quality session",
+        "Tempo Run (>8 km)", "Cruise Intervals (>6 km)",
+        "Marathon Pace Long Run (>12 km)",
+        "VO2max Intervals", "Sweet Spot",
         "Threshold Intervals", "Long Run (full length)",
         "Strength (stop 7-10 days before race)",
     ],
-    "reason": "Taper — reduce volume progressively, maintain short intensity touches (strides). Trust the process.",
+    "reason": "Taper — cut volume hard, keep ONE short session at race pace. Fewer, never slower. Trust the process.",
 }
 
 
@@ -478,11 +497,13 @@ DISTANCE_PROFILES = {
                 "hours_range": "3-5",
                 "intensity_split": "80/20",
                 "max_quality_sessions": 1,
-                "run_km_range": (15, 30),
-                "long_run_cap_min": 90,
+                # Sanity clamp only — TAPER_RUN_RETAIN sets the actual target.
+                # Left at (15, 30) the ceiling flattened the ramp to 30 km flat.
+                "run_km_range": (12, 50),
+                "long_run_cap_min": 110,
                 "sport_sessions": {
-                    "running": {"sessions": 3, "volume_note": "Short easy runs + strides, last long run 3 weeks out"},
-                    "swimming": {"sessions": 1, "volume_note": "1 easy technique session for blood flow"},
+                    "running": {"sessions": 4, "volume_note": "Volume down 22/38/55% across the three weeks; ONE short session stays at race pace"},
+                    "swimming": {"sessions": 0, "volume_note": "Optional — not budgeted"},
                     "cycling": {"sessions": 1, "volume_note": "1 short easy spin"},
                     "strength": {"sessions": 0, "volume_note": "Stop all lifting 7-10 days before race"},
                 },
@@ -499,9 +520,9 @@ DISTANCE_PROFILES = {
                 "run_km_range": (40, 55),
                 "long_run_cap_min": 150,
                 "sport_sessions": {
-                    "running": {"sessions": 4, "volume_note": "40-55 km/week, M-pace + cruise intervals"},
-                    "swimming": {"sessions": 2, "volume_note": "3-4 km/session, maintain CSS work"},
-                    "cycling": {"sessions": 1, "volume_note": "60-75 min easy Z2 — recovery only"},
+                    "running": {"sessions": 5, "volume_note": "40-55 km/week, M-pace + cruise intervals"},
+                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
+                    "cycling": {"sessions": 2, "volume_note": "One easy spin + one Z2 ride — hours the legs cannot take on foot"},
                     "strength": {"sessions": 2, "volume_note": "Maintenance — 2 sets, heavy compounds, no accessories"},
                 },
             },
@@ -517,9 +538,9 @@ DISTANCE_PROFILES = {
                 "run_km_range": (40, 55),
                 "long_run_cap_min": 160,
                 "sport_sessions": {
-                    "running": {"sessions": 4, "volume_note": "40-55 km/week, long run + M-pace + tempo"},
-                    "swimming": {"sessions": 2, "volume_note": "3-4 km/session, maintain — don't increase"},
-                    "cycling": {"sessions": 1, "volume_note": "60-75 min easy Z2 — recovery cross-training"},
+                    "running": {"sessions": 5, "volume_note": "40-55 km/week, long run + M-pace + tempo"},
+                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
+                    "cycling": {"sessions": 2, "volume_note": "One easy spin + one longer Z2 ride the day AFTER the long run"},
                     "strength": {"sessions": 2, "volume_note": "Shift to maintenance — 2 sets, keep compounds, drop accessories"},
                 },
             },
@@ -535,9 +556,9 @@ DISTANCE_PROFILES = {
                 "run_km_range": (28, 40),
                 "long_run_cap_min": 110,
                 "sport_sessions": {
-                    "running": {"sessions": 4, "volume_note": "28-40 km/week, add long run 60-90 min"},
-                    "swimming": {"sessions": 2, "volume_note": "3-4 km/session, CSS intervals"},
-                    "cycling": {"sessions": 2, "volume_note": "75-90 min/session, Z2-Z3 + 1x sweet spot"},
+                    "running": {"sessions": 5, "volume_note": "28-40 km/week, add long run 60-90 min"},
+                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
+                    "cycling": {"sessions": 2, "volume_note": "75-90 min/session, Z2 — adds aerobic hours without impact"},
                     "strength": {"sessions": 3, "volume_note": "Hypertrophy but watch total fatigue — reduce sets if running suffers"},
                 },
             },
@@ -553,8 +574,8 @@ DISTANCE_PROFILES = {
                 "run_km_range": (20, 28),
                 "long_run_cap_min": 90,
                 "sport_sessions": {
-                    "running": {"sessions": 3, "volume_note": "20-28 km/week, easy runs, build gradually (10% rule)"},
-                    "swimming": {"sessions": 2, "volume_note": "2-3 km/session, technique drills, CSS test"},
+                    "running": {"sessions": 4, "volume_note": "20-28 km/week, easy runs, build gradually (10% rule)"},
+                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
                     "cycling": {"sessions": 2, "volume_note": "60-75 min/session, Z2 endurance"},
                     "strength": {"sessions": 3, "volume_note": "Hypertrophy focus — best window for muscle building"},
                 },
@@ -1174,15 +1195,6 @@ class PeriodizationEngine:
         menu_info = menus.get(phase_info["phase"], menus.get("foundation", _FOUNDATION_MENU))
         menu_allowed = self._filter_by_availability(menu_info["allowed"], athlete)
 
-        # Volume references
-        volume_refs = self._get_volume_references(
-            phase_info, cycle_info["is_recovery_week"], athlete, db,
-            race_distance=race_distance
-        )
-
-        # Tune-up race (the October half). Its week is a race week: volume
-        # scales down and the race replaces the long run. Past races drop out
-        # of planning context — the Riegel verdict lives in /athlete/profile.
         start_of_week = today - timedelta(days=today.weekday())
         # Same window predicate for the GOAL race: the plan week that contains
         # race day gets an explicit flag (phase=="taper" alone can't tell race
@@ -1195,6 +1207,25 @@ class PeriodizationEngine:
             athlete.tune_race_date
             and start_of_week <= athlete.tune_race_date < start_of_week + timedelta(days=7)
         )
+
+        # A deload never lands on a race week. Both cut volume, and stacking
+        # them shrank phase_hours_range 3-5 -> 2-4, under which a sane race
+        # week (marathon + three shakeouts = 4.7 h) HARD-failed hours_high —
+        # the gate forcing sessions out of race week. The prompt also carried
+        # "THIS IS A RECOVERY WEEK, reduce all volumes 20-25%" beside
+        # "RACE WEEK". _get_weekly_run_target already resolves the same
+        # collision in favour of the race; references have to agree with it.
+        deload_week = cycle_info["is_recovery_week"] and not race_week
+
+        # Volume references
+        volume_refs = self._get_volume_references(
+            phase_info, deload_week, athlete, db,
+            race_distance=race_distance
+        )
+
+        # Tune-up race (the October half). Its week is a race week: volume
+        # scales down and the race replaces the long run. Past races drop out
+        # of planning context — the Riegel verdict lives in /athlete/profile.
         tuneup = None
         if athlete.tune_race_date and (athlete.tune_race_date - today).days >= 0:
             tuneup = {
@@ -1217,6 +1248,7 @@ class PeriodizationEngine:
             db, self._phase_def(profile, phase_info),
             cycle_info["is_recovery_week"], today, tuneup_week=tuneup_week,
             race_week_km=race_week_km,
+            phase_id=phase_info.get("id"), weeks_to_race=weeks_to_race,
         )
 
         # Python-derived training paces from the watch's LT pace (running
@@ -1267,7 +1299,7 @@ class PeriodizationEngine:
 
             # Build or recovery week?
             "cycle_week": cycle_info["cycle_week"],
-            "is_recovery_week": cycle_info["is_recovery_week"],
+            "is_recovery_week": deload_week,
             "recovery_note": cycle_info["recovery_note"],
 
             # Workout toolbox
@@ -1465,7 +1497,13 @@ class PeriodizationEngine:
                 "phase": phase_info["phase"],
                 "phase_name": phase_info["phase_name"],
                 "cycle_week": cycle_info["cycle_week"],
-                "is_recovery_week": cycle_info["is_recovery_week"],
+                # Same rule as compute_context: a race week is never also a
+                # deload week, or the calendar labels race week "recovery".
+                "is_recovery_week": (
+                    cycle_info["is_recovery_week"]
+                    and not (athlete.race_date
+                             and week_start <= athlete.race_date <= week_end)
+                ),
                 "is_current_week": is_current,
                 "has_plan": has_plan,
                 "plan_summary": plan_summary,
@@ -1531,8 +1569,16 @@ class PeriodizationEngine:
                 "recovery_note": "Build week 1/3 (training start date not set)",
             }
 
-        days_elapsed = (current_date - training_start_date).days
-        weeks_elapsed = days_elapsed // 7
+        # Snap the anchor to its Monday first. training_start_date is the
+        # earliest activity's date (main.py) — an arbitrary weekday — while plan
+        # weeks are Monday-start, so dividing from it let the cycle roll over
+        # MID-WEEK: a Wednesday anchor put 2026-09-28 (Mon) in cycle week 4 and
+        # 2026-09-30 (Wed, same plan week) in week 1. Every regeneration
+        # recomputes this, so a deload rebuilt mid-week silently became a build
+        # week from Wednesday on — target 0.75x -> 1.0x, quality 1 -> 2, banner
+        # gone, mid-deload. get_planned_weeks already anchors to Monday.
+        anchor_monday = training_start_date - timedelta(days=training_start_date.weekday())
+        weeks_elapsed = (current_date - anchor_monday).days // 7
         cycle_week = (weeks_elapsed % 4) + 1  # 1-indexed: 1, 2, 3, 4
 
         is_recovery = cycle_week == 4
@@ -1693,6 +1739,7 @@ class PeriodizationEngine:
         self, db: Session, phase_def: dict,
         is_recovery_week: bool, today: date, tuneup_week: bool = False,
         race_week_km: float = None,
+        phase_id: str = None, weeks_to_race: int = None,
     ) -> Optional[dict]:
         """THE weekly run-km target, derived from what the athlete actually ran.
 
@@ -1770,6 +1817,19 @@ class PeriodizationEngine:
                 long_run = min(long_run_cap, long_run)
         else:
             long_run = min(long_run_cap, 70) if long_run_cap else 70
+
+        # Taper: step down from demonstrated peak instead of sitting on the
+        # phase ceiling. ramp_base is best-of-last-3-weeks, so through the whole
+        # taper it still reaches back to the last peak week.
+        taper_pct = TAPER_RUN_RETAIN.get(weeks_to_race) if phase_id == "taper" else None
+        if taper_pct and ramp_base > 0:
+            target = max(floor, ramp_base * taper_pct)
+            hard_cap = target * 1.05
+            long_run = min(long_run, TAPER_LONG_RUN_MIN.get(weeks_to_race, long_run))
+            basis = (
+                f"taper week {weeks_to_race} to go: {taper_pct:.0%} of the "
+                f"{ramp_base:.1f} km peak — volume down, pace unchanged"
+            )
 
         # A race week outranks a recovery week — 0.6x is already the deeper
         # cut, and stacking both (0.6 x 0.75) would leave almost nothing.

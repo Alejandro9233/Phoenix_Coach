@@ -519,3 +519,51 @@ def test_gate_warnings_survive_renormalization(client, test_db_session, monkeypa
     # The stored-plan path re-normalizes on every read.
     again = client.get("/weekly-plan").json()
     assert again["week_summary"].get("gate_warnings")
+
+
+# ─── B2: the taper keeps SHORT quality ──────────────────────────────────────
+
+
+def _taper_ctx(**kw):
+    """Real Marathon taper menu, so the test moves if _TAPER_MENU moves."""
+    from backend.services.periodization_engine import _TAPER_MENU
+    ctx = _ctx(phase="taper", quality=1, hours="3-5", **kw)
+    ctx["workout_menu"] = dict(_TAPER_MENU["allowed"])
+    ctx["forbidden_workouts"] = list(_TAPER_MENU["forbidden"])
+    return ctx
+
+
+def test_taper_allows_a_shortened_quality_session():
+    """Bosquet (27 studies): cut volume 41-60%, leave intensity and frequency
+    alone. knowledge/tapering.md says the same in prose. The gate said
+    otherwise — a blanket taper rule hard-failed every quality title whatever
+    its length, so the last three weeks carried no race-pace running at all and
+    race day was the first time the athlete ran goal pace."""
+    plan = _week({"Thursday": (8, "Tempo Run")})
+    report = audit_plan(plan, _taper_ctx(), availability=AVAIL)
+    assert not [v for v in report.hard if v["kind"] == "forbidden_title"], report.hard
+
+
+def test_taper_still_rejects_a_long_quality_session():
+    plan = _week({"Thursday": (14, "Tempo Run")})
+    report = audit_plan(plan, _taper_ctx(), availability=AVAIL)
+    assert any(v["kind"] == "forbidden_title" and v["day"] == "Thursday"
+               for v in report.hard)
+
+
+def test_taper_marathon_pace_threshold():
+    ok = audit_plan(_week({"Saturday": (12, "Marathon Pace Long Run")}),
+                    _taper_ctx(), availability=AVAIL)
+    assert not [v for v in ok.hard if v["kind"] == "forbidden_title"]
+
+    too_long = audit_plan(_week({"Saturday": (20, "Marathon Pace Long Run")}),
+                          _taper_ctx(), availability=AVAIL)
+    assert any(v["kind"] == "forbidden_title" for v in too_long.hard)
+
+
+def test_taper_never_admits_vo2max():
+    """Shortening does not rehabilitate everything: VO2max work carries no km
+    condition, so it stays banned at any length."""
+    plan = _week({"Tuesday": (5, "VO2max Intervals")})
+    report = audit_plan(plan, _taper_ctx(), availability=AVAIL)
+    assert any(v["kind"] == "forbidden_title" for v in report.hard)

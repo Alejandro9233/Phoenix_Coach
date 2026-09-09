@@ -37,6 +37,7 @@ from datetime import datetime
 
 from backend.services.constraint_enforcer import (
     DAY_ABBR,
+    SPORT_TO_AVAILABILITY_KEY,
     _injury_blocked_sports,
     _rest_workout,
     parse_day_list,
@@ -429,6 +430,47 @@ def _open_run_days(window, availability, active_injuries) -> int:
     return count
 
 
+def _is_race_week(ctx: dict) -> bool:
+    """Goal race week or tune-up race week. The hours CEILING needs this as
+    much as the floor did: a marathon plus three shakeouts is ~4.7 h against a
+    3-5 h taper range, so race week hard-failed hours_high and the gate pushed
+    the coach to cut sessions out of race week."""
+    return bool(
+        ctx and (ctx.get("race_week")
+                 or (ctx.get("tuneup") or {}).get("is_race_week"))
+    )
+
+
+def _open_aerobic_days(window, availability, active_injuries) -> int:
+    """Days where some hours-bearing sport can still happen — running, cycling
+    or swimming, minus travel and injury blocks. Strength is excluded because
+    it never counts toward the hours budget.
+
+    Distinct from `_open_run_days`, which returns 0 the moment running is
+    injury-blocked. Gating the total-hours FLOOR on that made an injured week
+    invisible: skipping the run floor under injury is deliberate and
+    documented, but skipping the hours floor is backwards — a calf week is
+    exactly when the bike has to carry the hours. A 2 h ankle-blocked week
+    produced zero findings, soft or hard.
+    """
+    avail = availability or {}
+    blocked = _injury_blocked_sports(active_injuries or [])
+    travel = set(avail.get("travel_day_names") or [])
+    sports = [sp for sp in ("running", "cycling", "swimming") if sp not in blocked]
+    if not sports:
+        return 0
+    count = 0
+    for day in window:
+        if day in travel:
+            continue
+        for sport in sports:
+            allowed = parse_day_list(avail.get(SPORT_TO_AVAILABILITY_KEY.get(sport)))
+            if allowed is None or DAY_ABBR.get(day) in allowed:
+                count += 1
+                break
+    return count
+
+
 def _race_day_exempt(ctx: dict, day_name: str) -> bool:
     """The race itself is a fact, not a menu violation. On the goal race
     week's race day — and a tune-up's — the title and quality audits stand
@@ -480,8 +522,17 @@ def _audit_titles(plan_json: dict, ctx: dict, window, report: GateReport) -> Non
             else:
                 forbidden_hit = entry
             break
-        # Taper rule: any quality session beyond strides is off the table.
-        if (forbidden_hit is None and phase == "taper"
+        # Taper rule: quality beyond strides is off the table UNLESS the menu
+        # sanctioned it conditionally above. Without the conditionally_allowed
+        # term this fired on every quality title regardless of length — it runs
+        # before the `if conditionally_allowed: continue` below, so a shortened
+        # tempo the menu explicitly permits was still hard-failed, and editing
+        # _TAPER_MENU alone changed nothing. That deleted ALL intensity from the
+        # last three weeks, inverting Bosquet (27 studies: cut volume 41-60%,
+        # leave intensity and frequency alone) and contradicting
+        # knowledge/tapering.md "Reduce VOLUME, NOT intensity".
+        if (forbidden_hit is None and not conditionally_allowed
+                and phase == "taper"
                 and is_quality(w)
                 and _norm_title(title) != _norm_title("Strides/Openers")):
             forbidden_hit = title
@@ -610,6 +661,7 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
 
     blocked = _injury_blocked_sports(active_injuries or [])
     open_days = _open_run_days(window, availability, active_injuries)
+    open_aerobic_days = _open_aerobic_days(window, availability, active_injuries)
 
     # A workout whose declared distance disagrees with its own steps poisons
     # every number below — no band can be trusted over a lie. Hard, and
@@ -685,7 +737,9 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
             })
 
     hours_high = budget.get("hours_high")
-    if hours_high is not None and week_hours > hours_high * HOURS_CEILING_FACTOR:
+    if (hours_high is not None
+            and not _is_race_week(ctx)
+            and week_hours > hours_high * HOURS_CEILING_FACTOR):
         report.hard.append({
             "kind": "hours_high",
             "detail": (
@@ -702,13 +756,10 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
     # the hours floor — and the race IS the week's quality, so the quality
     # nudge is spurious too. Both checks are soft-only; hatching them costs
     # nothing.
-    race_week = bool(
-        ctx and (ctx.get("race_week")
-                 or (ctx.get("tuneup") or {}).get("is_race_week"))
-    )
+    race_week = _is_race_week(ctx)
 
     hours_low = budget.get("hours_low")
-    if (hours_low is not None and open_days > 0
+    if (hours_low is not None and open_aerobic_days > 0
             and not race_week
             and week_hours < hours_low * HOURS_FLOOR_FRAC):
         report.soft.append({

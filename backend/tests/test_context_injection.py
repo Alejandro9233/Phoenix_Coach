@@ -146,16 +146,36 @@ def test_sessions_capped_at_available_days(temp_db_session):
 
 
 def test_hours_range_shrinks_when_swim_dropped(temp_db_session):
-    # Marathon foundation "5-7" budgets 2 swim sessions (~1h each); a
+    # Half Marathon foundation "6-7" budgets 2 swim sessions (~1h each); a
     # non-swimmer's hours window must not keep the swim hours, or the LLM
-    # pads the remaining sports to close the gap.
+    # pads the remaining sports to close the gap. (Tested on Half Marathon
+    # because the Marathon profile no longer budgets swimming at all — see
+    # test_marathon_non_swimmer_keeps_the_full_window.)
+    athlete = _marathon_athlete(race_distance="Half Marathon", swim_days="")
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+
+    assert ctx["volume_references"]["phase_hours_range"] == "4-5"
+
+
+def test_marathon_non_swimmer_keeps_the_full_window(temp_db_session):
+    """Swimming is unbudgeted for a marathon goal, so not swimming costs
+    nothing.
+
+    It used to cost 2 h: the profile budgeted 2 swims, the athlete swims none,
+    and _hours_range_for deducted them — build dropped 7-9 to 5-7 and the
+    ceiling then hard-failed a week the athlete could actually hold. Deducting
+    is right; budgeting a sport he does not do was not.
+    """
     athlete = _marathon_athlete(swim_days="")
     temp_db_session.add(athlete)
     temp_db_session.commit()
 
     ctx = PeriodizationEngine().compute_context(temp_db_session)
 
-    assert ctx["volume_references"]["phase_hours_range"] == "3-5"
+    assert ctx["volume_references"]["phase_hours_range"] == "5-7"
 
 
 def test_hours_range_untouched_when_no_constraint(temp_db_session):
@@ -181,17 +201,21 @@ def test_hours_range_deducts_capped_sessions(temp_db_session):
 
 
 def test_recovery_week_scales_the_deducted_range(temp_db_session):
-    # The 25% recovery cut applies AFTER the availability deduction:
-    # (5-2)*0.75 = 2.25 -> "2"; (7-2)*0.75 = 3.75 -> "4".
-    athlete = _marathon_athlete(swim_days="")
+    # Half Marathon foundation is "6-7" and budgets 2 swims. The 25% recovery
+    # cut applies AFTER the availability deduction:
+    # (6-2)*0.75 = 3.0 -> "3"; (7-2)*0.75 = 3.75 -> "4".
+    # race_distance must be passed explicitly — the parameter defaults to
+    # "Marathon", which no longer budgets swimming and so deducts nothing.
+    athlete = _marathon_athlete(race_distance="Half Marathon", swim_days="")
     temp_db_session.add(athlete)
     temp_db_session.commit()
 
     refs = PeriodizationEngine()._get_volume_references(
-        {"phase": "foundation"}, True, athlete, temp_db_session
+        {"phase": "foundation"}, True, athlete, temp_db_session,
+        race_distance="Half Marathon",
     )
 
-    assert refs["phase_hours_range"] == "2-4"
+    assert refs["phase_hours_range"] == "3-4"
 
 
 def test_distance_profiles_never_mutated(temp_db_session):
