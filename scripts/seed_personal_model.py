@@ -50,6 +50,16 @@ def main():
 
     engine = create_engine(os.environ["DATABASE_URL"])
     print(f"target: {engine.url.render_as_string(hide_password=True)}")
+
+    # Same ALTER main._migrate_athletes runs at startup, so the seed can land
+    # before the new server has booted once. Idempotent.
+    from sqlalchemy import inspect, text
+    existing = {c["name"] for c in inspect(engine).get_columns("athletes")}
+    if "personal_model" not in existing:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE athletes ADD COLUMN personal_model JSON"))
+        print("added athletes.personal_model")
+
     db = sessionmaker(bind=engine)()
     athlete = db.query(Athlete).first()
     if not athlete:
