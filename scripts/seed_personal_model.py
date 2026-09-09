@@ -15,15 +15,23 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Fitted 2026-09-09 on 76 steady outdoor runs, temperature from watch laps.
 # HR = intercept + speed*(m/s) + temp*(°C) + ascent*(m per km). RMSE 5.7 bpm.
 SEED = {
     "hr_model": {"intercept": 91.5, "speed": 17.6, "temp": 0.68, "ascent": 0.22,
                  "n": 76, "rmse": 5.7, "lthr": 185},
+    # Fallback only: get_model() replaces it with the watch's LTHR when set.
     "lthr": 185,
     "lthr_source": "fit_export",
+    # Race-effort bests from the GPS tracks, for the predictor until the
+    # scraper history holds a race of its own.
+    "bests": [
+        {"km": 21.0975, "sec": 5928, "date": "2026-03-15"},   # half 1:38:48
+        {"km": 10.0, "sec": 2766, "date": "2026-03-15"},      # 10k 46:06 inside it
+        {"km": 5.0, "sec": 1259, "date": "2025-11-02"},       # 5k 20:59
+    ],
     "source": "fit_export_2026-09-09",
 }
 
@@ -64,7 +72,7 @@ def main():
     athlete = db.query(Athlete).first()
     if not athlete:
         sys.exit("no athlete row")
-    now = datetime.utcnow().isoformat(timespec="seconds")
+    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
     athlete.personal_model = {**SEED, "fitted_at": now, "checked_at": now}
     db.commit()
     print("seeded:", json.dumps(athlete.personal_model))

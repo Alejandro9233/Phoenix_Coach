@@ -301,7 +301,7 @@ def _prediction_block(db, athlete):
     if not model or not model.get("lthr"):
         return None
     return race_prediction(activities, model["lthr"], athlete.race_distance,
-                           athlete.target_finish_time)
+                           athlete.target_finish_time, bests=model.get("bests"))
 
 
 def _personal_block(db, athlete):

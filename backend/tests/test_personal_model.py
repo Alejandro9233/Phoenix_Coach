@@ -68,6 +68,8 @@ def test_residual_only_on_steady_runs():
     assert pm.hr_residual(m, race, 185) is None
     treadmill = _run(97, datetime(2026, 6, 14), 8, 8 * 360, 150, ascent=0)
     assert pm.hr_residual(m, treadmill, 185) is None
+    no_speed = _run(96, datetime(2026, 6, 10), 8, 8 * 360, 166); no_speed.avg_speed_ms = 0
+    assert pm.hr_residual(m, no_speed, 185) == r                # distance/duration fallback
 
 
 def test_residual_labels():
@@ -105,9 +107,17 @@ def test_prediction_prefers_longest_race_effort():
         _run(3, datetime(2026, 5, 1), 21.1, 124 * 60, 150),            # easy half-distance jog
     ]
     p = pm.race_prediction(acts, 185, "Marathon", "3:10:00", today)
-    assert p["basis_km"] == 21.0975
+    assert p["basis_km"] == 21.12
     assert p["predicted"].startswith("3:2")          # ~3:26, not the 5k's 3:16
     assert p["gap_pct"] > 5
+    # seeded bests count too, and a longer seeded race beats a shorter scraped one
+    only_5k = [acts[0]]
+    p2 = pm.race_prediction(only_5k, 185, "Marathon", "3:10:00", today,
+                            bests=[{"km": 21.0975, "sec": 5928, "date": "2026-03-15"}])
+    assert p2["basis_km"] == 21.1 and p2["basis_date"] == "2026-03-15"
+    # a stale best outside the lookback is ignored
+    assert pm.race_prediction([], 185, "Marathon", "3:10:00", today,
+                              bests=[{"km": 21.0975, "sec": 5928, "date": "2025-03-15"}]) is None
     assert pm.race_prediction(acts, None, "Marathon", "3:10:00", today) is None
     assert pm.race_prediction(acts, 185, "Olympic", "3:10:00", today) is None
 
@@ -124,6 +134,8 @@ def test_get_model_keeps_seed_when_refit_cannot_fit(db):
     assert m["hr_model"]["n"] == 76 and m["source"] == "fit_export"
     assert m["checked_at"] > "2026"
     assert m["lthr"] == 185 and m["lthr_source"] == "coros"   # watch LTHR wins
+    athlete.lthr = 177                                          # watch updates its LTHR
+    assert pm.get_model(db, athlete)["lthr"] == 177             # applied on read, no refit needed
 
 
 def test_get_model_refits_from_scraped_runs(db):
@@ -186,7 +198,7 @@ def test_endpoints_carry_model_fields(db):
         assert dash["personal"]["ledger"]["easy_long_runs"] == 1
 
         prof = client.get("/athlete/profile").json()
-        assert prof["prediction"]["basis_km"] == 21.0975
+        assert prof["prediction"]["basis_km"] == 21.1
         assert prof["prediction"]["gap_pct"] > 0
 
         steady = client.get("/activity/a5/analysis").json()

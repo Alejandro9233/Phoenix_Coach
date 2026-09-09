@@ -64,9 +64,7 @@ LEDGER_WEEKS = 16
 
 RACE_EFFORT_FRAC = 0.95    # avg_hr / LTHR at/above this counts as a race effort
 PREDICTION_LOOKBACK_DAYS = 365
-# (nominal km, lower bound m, upper bound m) — longest bucket with a hit wins
-RACE_BUCKETS = [(5.0, 4900, 5600), (10.0, 9800, 11000),
-                (21.0975, 20500, 22500), (42.195, 41500, 43500)]
+PREDICTION_MIN_KM = 5.0
 
 ZONES = [(0.85, "Z1", "easy"), (0.90, "Z2", "steady"), (0.95, "Z3", "tempo"),
          (1.00, "Z4", "threshold")]
@@ -78,11 +76,21 @@ def _is_run(a):
     return (a.sport or "").lower() == "running"
 
 
+def _speed(a):
+    """Ingestion stores 0 when COROS omits avgSpeed (two thirds of prod runs
+    on 2026-09-08); distance / duration is the same quantity."""
+    if a.avg_speed_ms:
+        return float(a.avg_speed_ms)
+    if a.distance_m and a.duration_sec:
+        return a.distance_m / a.duration_sec
+    return None
+
+
 def _is_outdoor_run(a):
     return (_is_run(a) and a.start_time is not None
             and (a.distance_m or 0) >= MIN_RUN_M
             and (a.duration_sec or 0) >= MIN_RUN_SEC
-            and a.avg_hr and a.avg_speed_ms
+            and a.avg_hr and _speed(a)
             and (a.total_ascent_m or 0) > 0)
 
 
@@ -97,7 +105,7 @@ def month_temp(dt):
 
 def _features(a):
     km = (a.distance_m or 0) / 1000.0
-    return [1.0, float(a.avg_speed_ms), float(month_temp(a.start_time)),
+    return [1.0, _speed(a), float(month_temp(a.start_time)),
             (a.total_ascent_m or 0.0) / km if km else 0.0]
 
 
@@ -231,34 +239,40 @@ def long_run_ledger(activities, lthr, today=None):
 
 # ---------------------------------------------------------------- prediction
 
-def race_prediction(activities, lthr, race_distance, target_finish_time, today=None):
-    """Riegel from the longest race-effort bucket in the last year. Longest
-    bucket, not fastest prediction: a 5k best extrapolates a marathon 10 min
-    too optimistic (FIT analysis, 2026-09-09)."""
+def race_prediction(activities, lthr, race_distance, target_finish_time, today=None, bests=None):
+    """Riegel from the LONGEST race effort in the last year. Longest, not the
+    fastest prediction: a 5k best extrapolates a marathon 10 min too optimistic
+    (FIT analysis, 2026-09-09). Candidates are scraped runs at/above
+    RACE_EFFORT_FRAC of LTHR plus `bests` seeded from the FIT export — prod's
+    scrape history starts 2026-05-20, after the March half that is the real
+    basis. Each best is {km, sec, date}."""
     if not lthr:
         return None
     target_km = RACE_KM.get(race_distance)
     if not target_km:
         return None
     today = today or get_local_today()
-    cutoff = datetime.combine(today - timedelta(days=PREDICTION_LOOKBACK_DAYS), datetime.min.time())
-    efforts = [a for a in activities
-               if _is_run(a) and a.start_time and a.start_time >= cutoff
-               and a.avg_hr and a.avg_hr >= RACE_EFFORT_FRAC * lthr
-               and a.distance_m and a.duration_sec]
-    basis = None
-    for km, lo, hi in RACE_BUCKETS:
-        hits = [a for a in efforts if lo <= a.distance_m <= hi]
-        if hits:
-            best = min(hits, key=lambda a: a.duration_sec / a.distance_m)
-            # scale the actual time to the nominal distance (a 21.3 km file is a half)
-            basis = (km, best.duration_sec * (km * 1000 / best.distance_m), best.start_time)
-    if basis is None:
+    cutoff = today - timedelta(days=PREDICTION_LOOKBACK_DAYS)
+    cands = []
+    for a in activities:
+        if (_is_run(a) and a.start_time and a.start_time.date() >= cutoff
+                and a.avg_hr and a.avg_hr >= RACE_EFFORT_FRAC * lthr
+                and (a.distance_m or 0) >= PREDICTION_MIN_KM * 1000 and a.duration_sec):
+            cands.append((a.distance_m / 1000.0, float(a.duration_sec), a.start_time.date()))
+    for b in bests or []:
+        try:
+            d = datetime.fromisoformat(b["date"]).date()
+        except (KeyError, ValueError, TypeError):
+            continue
+        if d >= cutoff and b.get("km", 0) >= PREDICTION_MIN_KM and b.get("sec"):
+            cands.append((float(b["km"]), float(b["sec"]), d))
+    if not cands:
         return None
-    km, sec, when = basis
+    # longest distance wins; among equals, the faster one
+    km, sec, when = max(cands, key=lambda c: (round(c[0], 1), -c[1] / c[0]))
     pred = riegel(sec, km, target_km)
     out = {
-        "basis_km": km, "basis_time": fmt_hms(sec), "basis_date": when.date().isoformat(),
+        "basis_km": round(km, 2), "basis_time": fmt_hms(sec), "basis_date": when.isoformat(),
         "distance": race_distance, "predicted": fmt_hms(pred), "predicted_sec": round(pred),
         "exponent": RIEGEL_EXP, "target": target_finish_time, "gap_pct": None,
     }
@@ -300,6 +314,11 @@ def get_model(db, athlete, activities=None, force=False, commit=True):
     if athlete is None:
         return None
     stored = dict(athlete.personal_model or {})
+    if athlete.lthr and stored.get("lthr") != int(athlete.lthr):
+        # The watch's LTHR is what the rest of the app (zones, pace model,
+        # coach context) already uses; the seed's estimate must not compete.
+        stored["lthr"], stored["lthr_source"] = int(athlete.lthr), "coros"
+        force = True
     if not force and not _stale(stored):
         return stored
     activities = activities if activities is not None else _run_activities(db)
@@ -360,7 +379,8 @@ def coach_lines(db, athlete, today=None):
     if ledger:
         lines.append(f"  Long-run ledger, last {ledger['weeks']} wk: {ledger['easy_long_runs']} easy runs"
                      f" >= {ledger['min_km']:.0f} km under 90% LTHR ({ledger['long_runs']} total that distance)")
-    pred = race_prediction(activities, lthr, athlete.race_distance, athlete.target_finish_time, today)
+    pred = race_prediction(activities, lthr, athlete.race_distance, athlete.target_finish_time, today,
+                           bests=model.get("bests"))
     if pred:
         gap = f"; target {pred['target']} -> {pred['gap_pct']:+.0f}% gap" if pred.get("gap_pct") is not None else ""
         lines.append(f"  Race prediction: {pred['distance']} {pred['predicted']} from"
