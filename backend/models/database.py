@@ -48,6 +48,9 @@ class Athlete(Base):
     pace_zones = Column(JSON, nullable=True)
     hr_zones = Column(JSON, nullable=True)
     head_pic_url = Column(String, nullable=True)
+    # personal_model: JSON of fitted per-athlete numbers (HR baseline, LTHR).
+    # Written only by services/personal_model.get_model; see its docstring.
+    personal_model = Column(JSON, nullable=True)
 
 class Activity(Base):
     __tablename__ = "activities"

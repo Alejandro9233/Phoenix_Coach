@@ -278,29 +278,39 @@ struct ActivityDetailView: View {
                 }
             }
             
-            GlowBorderCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("EFFICIENCY")
-                            .font(.system(size: 10, weight: .medium))
-                            .tracking(2.0)
-                            .foregroundStyle(DS.Colors.outline.opacity(0.5))
-                        HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text("\(Int(efficiencyValue * 100))")
-                                .font(.system(size: 32, weight: .ultraLight))
-                                .tracking(-1.0)
-                                .foregroundStyle(DS.Colors.primaryText)
-                            Text("%")
-                                .font(.system(size: 14))
-                                .foregroundStyle(DS.Colors.primaryText)
+            // HR vs the athlete's own baseline (personal_model.py). Replaces a
+            // gauge that mapped the coach's letter grade to a fake percent.
+            // Omitted, not zeroed, when the run has no residual.
+            if let r = analysis?.hrResidualBpm {
+                GlowBorderCard {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("HR vs baseline")
+                                .font(.system(size: 10, weight: .medium))
+                                .textCase(.uppercase)
+                                .tracking(2.0)
+                                .foregroundStyle(DS.Colors.outline)
+                            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                Text(String(format: "%+.0f", r))
+                                    .font(.system(size: 32, weight: .ultraLight))
+                                    .monospacedDigit()
+                                    .tracking(-1.0)
+                                    .foregroundStyle(.white)
+                                Text("bpm")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(DS.Colors.outline)
+                            }
+                            Text(analysis?.hrResidualLabel ?? "")
+                                .font(.system(size: 10))
+                                .textCase(.uppercase)
+                                .foregroundStyle(DS.Colors.onSurface)
                         }
-                        Text("OPTIMIZED")
-                            .font(.system(size: 10))
-                            .foregroundStyle(DS.Colors.primaryText.opacity(0.4))
+                        Spacer()
+                        // Fuller ring = fitter. ±10 bpm spans the dial.
+                        CircularProgressGauge(value: max(0, min(1, 0.5 - r / 20)), color: DS.Colors.accent, icon: "heart")
                     }
-                    Spacer()
-                    CircularProgressGauge(value: efficiencyValue, color: DS.Colors.primaryText, icon: "checkmark.circle")
                 }
+                .accessibilityElement(children: .combine)
             }
         }
     }
@@ -434,42 +444,57 @@ struct ActivityDetailView: View {
                     }
                     .padding(.bottom, 48)
                     
-                    Divider().background(Color.white.opacity(0.05)).padding(.bottom, 32)
-                    
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("INTENSITY FOCUS")
-                                .font(.system(size: 9, weight: .medium))
-                                .tracking(2.0)
-                                .foregroundStyle(DS.Colors.outline.opacity(0.3))
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(DS.Colors.accent)
-                                    .frame(width: 6, height: 6)
-                                Text("Zone 2 Aerobic")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .tracking(-0.5)
-                                    .foregroundStyle(DS.Colors.primaryText)
+                    // Intensity and baseline verdict are personal-model numbers
+                    // (personal_model.py). Until 2026-09 both were hardcoded
+                    // strings ("Zone 2 Aerobic", "Fully Recovered") on every run.
+                    if coach.intensity != nil || coach.hrResidualLabel != nil {
+                        Divider().background(Color.white.opacity(0.05)).padding(.bottom, 32)
+
+                        HStack(alignment: .top, spacing: DS.Spacing.m) {
+                            if let z = coach.intensity {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Intensity")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .textCase(.uppercase)
+                                        .tracking(2.0)
+                                        .foregroundStyle(DS.Colors.outline)
+                                    Text("\(z.zone ?? "") \(z.label ?? "")")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .tracking(-0.5)
+                                        .foregroundStyle(.white)
+                                    if let pct = z.pctLthr {
+                                        Text("\(pct)% of threshold HR")
+                                            .font(.system(size: 10))
+                                            .monospacedDigit()
+                                            .foregroundStyle(DS.Colors.onSurface)
+                                    }
+                                }
+                                .accessibilityElement(children: .combine)
                             }
-                        }
-                        
-                        Spacer()
-                        
-                        Rectangle()
-                            .fill(Color.white.opacity(0.05))
-                            .frame(width: 1, height: 32)
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("SYSTEM STATUS")
-                                .font(.system(size: 9, weight: .medium))
-                                .tracking(2.0)
-                                .foregroundStyle(DS.Colors.outline.opacity(0.3))
-                            Text("Fully Recovered")
-                                .font(.system(size: 14, weight: .medium))
-                                .tracking(-0.5)
-                                .foregroundStyle(DS.Colors.primaryText)
+
+                            Spacer()
+
+                            if let verdict = coach.hrResidualLabel {
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text("Baseline")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .textCase(.uppercase)
+                                        .tracking(2.0)
+                                        .foregroundStyle(DS.Colors.outline)
+                                    Text(verdict)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .tracking(-0.5)
+                                        .foregroundStyle(.white)
+                                        .multilineTextAlignment(.trailing)
+                                    if let r = coach.hrResidualBpm {
+                                        Text(String(format: "%+.0f bpm vs expected", r))
+                                            .font(.system(size: 10))
+                                            .monospacedDigit()
+                                            .foregroundStyle(DS.Colors.onSurface)
+                                    }
+                                }
+                                .accessibilityElement(children: .combine)
+                            }
                         }
                     }
                 } else {
@@ -540,15 +565,4 @@ struct ActivityDetailView: View {
         return formatter.string(from: date)
     }
     
-    private var efficiencyValue: Double {
-        guard let rating = analysis?.rating.uppercased() else { return 0.0 }
-        switch rating {
-        case "A": return 0.98
-        case "B": return 0.85
-        case "C": return 0.75
-        case "D": return 0.60
-        case "F": return 0.50
-        default: return 0.0
-        }
-    }
 }

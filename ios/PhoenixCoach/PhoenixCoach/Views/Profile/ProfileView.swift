@@ -624,8 +624,46 @@ struct ProfileView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 4)
                 }
+
+                // Predicted finish from the athlete's own race efforts
+                // (backend/services/personal_model.py). Read-only, like the
+                // tune-up verdict: the target stays whatever Alex set.
+                if let p = profile.prediction, let predicted = p.predicted {
+                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                        HStack {
+                            Text("Predicted \(p.distance ?? "race")")
+                                .font(.system(size: 10, weight: .bold))
+                                .textCase(.uppercase)
+                                .tracking(DS.Tracking.wide)
+                                .foregroundStyle(DS.Colors.outline)
+                            Spacer()
+                            Text(predicted)
+                                .font(.system(size: 17, weight: .light))
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                        }
+                        Text(predictionFootnote(p))
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundStyle(DS.Colors.onSurface)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(DS.Spacing.m)
+                    .background(Color.white.opacity(0.03))
+                    .clipShape(.rect(cornerRadius: DS.Radius.medium))
+                    .accessibilityElement(children: .combine)
+                }
             }
         }
+    }
+
+    private func predictionFootnote(_ p: RacePrediction) -> String {
+        let km = p.basisKm.map { String(format: $0.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f km" : "%.1f km", $0) } ?? "a race"
+        var text = "From \(km) in \(p.basisTime ?? "—") on \(p.basisDate ?? "—")."
+        if let gap = p.gapPct {
+            let pct = String(format: "%.0f%%", abs(gap))
+            text += gap > 0 ? " \(pct) slower than your target." : " \(pct) faster than your target."
+        }
+        return text
     }
     
     // TUNE-UP RACE — the fitness-test race (e.g. the October half). Setting a

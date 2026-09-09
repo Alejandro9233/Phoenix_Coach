@@ -241,6 +241,13 @@ class DataAgent:
             for alert in alerts:
                 lines.append(f"  ⚠️ {alert}")
         
+        # Personal model: fitted numbers, not prompt text. See services/personal_model.py.
+        try:
+            from backend.services.personal_model import coach_lines
+            lines.extend(coach_lines(self.db, athlete, today))
+        except Exception as e:
+            print(f"⚠️ personal model skipped: {e}")
+
         return "\n".join(lines)
     
     def _check_alerts(self, snapshots, activities):

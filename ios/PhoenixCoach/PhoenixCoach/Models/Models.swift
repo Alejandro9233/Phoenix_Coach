@@ -333,6 +333,7 @@ struct DashboardResponse: Codable {
     let athlete: Athlete?
     var activities: [Activity]
     let recovery: [RecoverySnapshot]
+    let personal: PersonalSummary?
 }
 
 struct Athlete: Codable {
@@ -403,9 +404,10 @@ struct AthleteProfile: Codable {
     /// the race is scraped. Riding it back on PUT is harmless — the backend
     /// only reads the tune_race_* fields.
     var tuneup: TuneupStatus?
+    var prediction: RacePrediction?
 
     enum CodingKeys: String, CodingKey {
-        case name, age, timezone, tuneup
+        case name, age, timezone, tuneup, prediction
         case weightKg = "weight_kg"
         case raceName = "race_name"
         case raceType = "race_type"
@@ -550,6 +552,77 @@ struct ActivityAnalysis: Codable {
     let analysis: String
     let rating: String
     let advice: String
+    /// Personal-model numbers (backend/services/personal_model.py). Nil when
+    /// no baseline exists yet or the run wasn't a steady outdoor run — the
+    /// view omits them rather than rendering a placeholder.
+    let hrResidualBpm: Double?
+    let hrResidualLabel: String?
+    let intensity: IntensityZone?
+
+    enum CodingKeys: String, CodingKey {
+        case analysis, rating, advice, intensity
+        case hrResidualBpm = "hr_residual_bpm"
+        case hrResidualLabel = "hr_residual_label"
+    }
+}
+
+struct IntensityZone: Codable {
+    let zone: String?
+    let label: String?
+    let pctLthr: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case zone, label
+        case pctLthr = "pct_lthr"
+    }
+}
+
+/// Recent tab: easy long runs in the last N weeks. The one marathon-readiness number.
+struct LongRunLedger: Codable {
+    let weeks: Int?
+    let minKm: Double?
+    let longRuns: Int?
+    let easyLongRuns: Int?
+    let lastEasyLongRun: String?
+
+    enum CodingKeys: String, CodingKey {
+        case weeks
+        case minKm = "min_km"
+        case longRuns = "long_runs"
+        case easyLongRuns = "easy_long_runs"
+        case lastEasyLongRun = "last_easy_long_run"
+    }
+}
+
+struct PersonalSummary: Codable {
+    let ledger: LongRunLedger?
+    let modelRuns: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case ledger
+        case modelRuns = "model_runs"
+    }
+}
+
+/// Profile: Riegel prediction for the goal race from the athlete's own race efforts.
+struct RacePrediction: Codable {
+    let basisKm: Double?
+    let basisTime: String?
+    let basisDate: String?
+    let distance: String?
+    let predicted: String?
+    let predictedSec: Int?
+    let target: String?
+    let gapPct: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case distance, predicted, target
+        case basisKm = "basis_km"
+        case basisTime = "basis_time"
+        case basisDate = "basis_date"
+        case predictedSec = "predicted_sec"
+        case gapPct = "gap_pct"
+    }
 }
 
 struct RecoverySnapshot: Codable, Identifiable {

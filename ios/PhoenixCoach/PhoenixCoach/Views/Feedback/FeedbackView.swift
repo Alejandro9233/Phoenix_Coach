@@ -82,6 +82,13 @@ struct FeedbackView: View {
                             }
                         }
 
+                        // Long-run ledger (backend/services/personal_model.py):
+                        // easy runs >= 20 km in the last 16 weeks. Hidden until
+                        // the backend knows a threshold HR.
+                        if let ledger = dashboard?.personal?.ledger {
+                            LongRunLedgerCard(ledger: ledger)
+                        }
+
                         // Recent Load (Activity History)
                         VStack(alignment: .leading, spacing: 16) {
                             HStack(alignment: .bottom) {
@@ -427,4 +434,49 @@ struct ActivityCard: View {
 
 #Preview {
     FeedbackView()
+}
+
+/// The one marathon-readiness number: easy long runs, counted, not graded.
+struct LongRunLedgerCard: View {
+    let ledger: LongRunLedger
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+            Text("Long runs")
+                .font(.system(size: 11, weight: .bold))
+                .textCase(.uppercase)
+                .tracking(DS.Tracking.wide)
+                .foregroundStyle(DS.Colors.outline)
+
+            HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
+                Text("\(ledger.easyLongRuns ?? 0)")
+                    .font(.system(size: 36, weight: .ultraLight))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                Text("easy")
+                    .font(.system(size: 13))
+                    .foregroundStyle(DS.Colors.outline)
+                Spacer()
+                Text("\(ledger.longRuns ?? 0) at distance")
+                    .font(.system(size: 13))
+                    .monospacedDigit()
+                    .foregroundStyle(DS.Colors.outline)
+            }
+
+            Text("Runs of \(Int(ledger.minKm ?? 20)) km or more under 90% of threshold HR, last \(ledger.weeks ?? 16) weeks.")
+                .font(.footnote)
+                .foregroundStyle(DS.Colors.onSurface)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let last = ledger.lastEasyLongRun {
+                Text("Last one \(last)")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(DS.Colors.outline)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+        .accessibilityElement(children: .combine)
+    }
 }

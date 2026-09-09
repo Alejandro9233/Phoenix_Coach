@@ -66,6 +66,7 @@ def _migrate_athletes(target_engine):
         "tune_race_date": "DATE",
         "tune_race_distance_km": "FLOAT",
         "tune_race_target": "VARCHAR",
+        "personal_model": "JSON",
     }
     for col, sql_type in tune_columns.items():
         if col not in existing:
@@ -290,6 +291,33 @@ def _tuneup_block(db, athlete):
     }
 
 
+def _prediction_block(db, athlete):
+    """Riegel prediction for the goal race from the athlete's own race-effort
+    activities. Read-only; the target stays whatever Alex set."""
+    from backend.services.personal_model import get_model, race_prediction, _run_activities
+
+    activities = _run_activities(db)
+    model = get_model(db, athlete, activities)
+    if not model or not model.get("lthr"):
+        return None
+    return race_prediction(activities, model["lthr"], athlete.race_distance,
+                           athlete.target_finish_time)
+
+
+def _personal_block(db, athlete):
+    """The Recent tab's long-run ledger. None until an LTHR is known."""
+    from backend.services.personal_model import get_model, long_run_ledger, _run_activities
+
+    if athlete is None:
+        return None
+    activities = _run_activities(db)
+    model = get_model(db, athlete, activities)
+    if not model or not model.get("lthr"):
+        return None
+    return {"ledger": long_run_ledger(activities, model["lthr"]),
+            "model_runs": (model.get("hr_model") or {}).get("n")}
+
+
 @app.get("/athlete/profile")
 def get_athlete_profile(db: Session = Depends(get_db)):
     """Return the athlete's profile including race objectives and schedule."""
@@ -320,6 +348,7 @@ def get_athlete_profile(db: Session = Depends(get_db)):
         "tune_race_distance_km": athlete.tune_race_distance_km,
         "tune_race_target": athlete.tune_race_target,
         "tuneup": _tuneup_block(db, athlete),
+        "prediction": _prediction_block(db, athlete),
     }
 
 
@@ -653,7 +682,8 @@ def get_dashboard_data(db: Session = Depends(get_db)):
     return {
         "athlete": athlete,
         "activities": activities,
-        "recovery": recovery
+        "recovery": recovery,
+        "personal": _personal_block(db, athlete),
     }
 
 
@@ -2408,6 +2438,18 @@ def get_activity_analysis(activity_id: str, db: Session = Depends(get_db)):
         "user_notes": feedback.general_notes if feedback else "None"
     }
     
+    # Personal-model numbers ride both ways: into the prompt so the coach can
+    # cite them, and out to iOS, which used to render hardcoded placeholders
+    # ("Zone 2 Aerobic", "Fully Recovered") in their place.
+    from backend.services.personal_model import activity_insight
+    athlete = db.query(Athlete).first()
+    insight = activity_insight(db, athlete, activity)
+    if insight["hr_residual_bpm"] is not None:
+        activity_data["hr_vs_personal_baseline_bpm"] = insight["hr_residual_bpm"]
+        activity_data["hr_baseline_verdict"] = insight["hr_residual_label"]
+    if insight["intensity"]:
+        activity_data["intensity_zone"] = insight["intensity"]
+
     agent = ResponseAgent()
     analysis = agent.analyze_activity(
         activity_data,
@@ -2415,6 +2457,7 @@ def get_activity_analysis(activity_id: str, db: Session = Depends(get_db)):
         compliance=compliance,
         training_context=training_context
     )
+    analysis.update(insight)
     return analysis
 
 if __name__ == "__main__":
