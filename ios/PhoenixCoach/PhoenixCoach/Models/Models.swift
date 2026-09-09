@@ -619,6 +619,11 @@ struct RacePrediction: Codable {
     let distance: String?
     let predicted: String?
     let predictedSec: Int?
+    /// Riegel band around `predicted`. The point estimate is the midpoint, not
+    /// a promise — the formula assumes you are already trained for the target
+    /// distance, which a first marathoner is not.
+    let predictedLo: String?
+    let predictedHi: String?
     let target: String?
     let gapPct: Double?
 
@@ -628,6 +633,8 @@ struct RacePrediction: Codable {
         case basisTime = "basis_time"
         case basisDate = "basis_date"
         case predictedSec = "predicted_sec"
+        case predictedLo = "predicted_lo"
+        case predictedHi = "predicted_hi"
         case gapPct = "gap_pct"
     }
 }

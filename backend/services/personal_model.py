@@ -39,7 +39,7 @@ a db session only to read activities and write the athlete row.
 """
 from datetime import datetime, timedelta, timezone
 
-from backend.services.pace_model import RACE_KM, RIEGEL_EXP, fmt_hms, parse_hms, riegel
+from backend.services.pace_model import RACE_KM, RIEGEL_EXP, fmt_hms, parse_hms, prediction_band, riegel
 from backend.utils.timezone import get_local_today
 
 # Mean lap temperature by month, Hermosillo, from 2024-12..2026-09 watch data.
@@ -66,7 +66,13 @@ RACE_EFFORT_FRAC = 0.95    # avg_hr / LTHR at/above this counts as a race effort
 PREDICTION_LOOKBACK_DAYS = 365
 PREDICTION_MIN_KM = 5.0
 
-ZONES = [(0.85, "Z1", "easy"), (0.90, "Z2", "steady"), (0.95, "Z3", "tempo"),
+# Upper bound of each zone as a fraction of LTHR, matching the Friel 7-zone
+# ladder in knowledge/hr_zones.md (Z1 <81%, Z2 81-89%, Z3 90-93%, Z4 94-99%).
+# These used to start at 0.85, so 81-85% of LTHR — the easy/long-run band, where
+# most of the week lives — came back "Z1 easy" from the Activity screen while
+# the coach, reading the knowledge file, called the same run "solid Z2". One
+# ladder or the numbers argue with each other in front of the athlete.
+ZONES = [(0.81, "Z1", "easy"), (0.90, "Z2", "steady"), (0.94, "Z3", "tempo"),
          (1.00, "Z4", "threshold")]
 
 
@@ -271,9 +277,11 @@ def race_prediction(activities, lthr, race_distance, target_finish_time, today=N
     # longest distance wins; among equals, the faster one
     km, sec, when = max(cands, key=lambda c: (round(c[0], 1), -c[1] / c[0]))
     pred = riegel(sec, km, target_km)
+    pred_lo, pred_hi = prediction_band(pred)
     out = {
         "basis_km": round(km, 2), "basis_time": fmt_hms(sec), "basis_date": when.isoformat(),
         "distance": race_distance, "predicted": fmt_hms(pred), "predicted_sec": round(pred),
+        "predicted_lo": fmt_hms(pred_lo), "predicted_hi": fmt_hms(pred_hi),
         "exponent": RIEGEL_EXP, "target": target_finish_time, "gap_pct": None,
     }
     tsec = parse_hms(target_finish_time)
@@ -383,6 +391,8 @@ def coach_lines(db, athlete, today=None):
                            bests=model.get("bests"))
     if pred:
         gap = f"; target {pred['target']} -> {pred['gap_pct']:+.0f}% gap" if pred.get("gap_pct") is not None else ""
-        lines.append(f"  Race prediction: {pred['distance']} {pred['predicted']} from"
+        lines.append(f"  Race prediction: {pred['distance']} {pred['predicted_lo']}-"
+                     f"{pred['predicted_hi']} (Riegel midpoint {pred['predicted']}, "
+                     f"assumes {pred['distance']}-specific training) from"
                      f" {pred['basis_km']:g} km in {pred['basis_time']} on {pred['basis_date']}{gap}")
     return lines

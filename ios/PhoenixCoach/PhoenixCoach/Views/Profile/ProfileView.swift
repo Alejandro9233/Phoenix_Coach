@@ -637,7 +637,9 @@ struct ProfileView: View {
                                 .tracking(DS.Tracking.wide)
                                 .foregroundStyle(DS.Colors.outline)
                             Spacer()
-                            Text(predicted)
+                            // A range, not a point: "3:25:59" to the second
+                            // reads as a promise the formula cannot make.
+                            Text(predictionRange(p) ?? predicted)
                                 .font(.system(size: 17, weight: .light))
                                 .monospacedDigit()
                                 .foregroundStyle(.white)
@@ -656,12 +658,22 @@ struct ProfileView: View {
         }
     }
 
+    /// "2:56:51-3:05:55" when the backend sent a band, nil to fall back to the
+    /// midpoint (older responses, or a prediction built before the band).
+    private func predictionRange(_ p: RacePrediction) -> String? {
+        guard let lo = p.predictedLo, let hi = p.predictedHi else { return nil }
+        return "\(lo)–\(hi)"
+    }
+
     private func predictionFootnote(_ p: RacePrediction) -> String {
         let km = p.basisKm.map { String(format: $0.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f km" : "%.1f km", $0) } ?? "a race"
         var text = "From \(km) in \(p.basisTime ?? "—") on \(p.basisDate ?? "—")."
         if let gap = p.gapPct {
             let pct = String(format: "%.0f%%", abs(gap))
             text += gap > 0 ? " \(pct) slower than your target." : " \(pct) faster than your target."
+        }
+        if p.predictedLo != nil, let mid = p.predicted {
+            text += " Midpoint \(mid); assumes race-distance training."
         }
         return text
     }

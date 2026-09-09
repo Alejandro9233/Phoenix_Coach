@@ -80,9 +80,20 @@ def test_residual_labels():
 
 
 def test_intensity_zones():
-    assert pm.intensity(_run(1, datetime(2026, 1, 1), 5, 1800, 150), 185)["zone"] == "Z1"
-    assert pm.intensity(_run(2, datetime(2026, 1, 1), 5, 1800, 170), 185)["zone"] == "Z3"
-    assert pm.intensity(_run(3, datetime(2026, 1, 1), 5, 1800, 190), 185)["zone"] == "Z5"
+    """Bounds follow the Friel ladder in knowledge/hr_zones.md: Z1 <81% LTHR,
+    Z2 81-89%, Z3 90-93%, Z4 94-99%. They used to open Z1 up to 85%, so a
+    150 bpm run at LTHR 185 (81.1%) came back "Z1 easy" here while the coach
+    called it Z2 — the easy/long-run band, where most of the week lives."""
+    def zone(hr):
+        return pm.intensity(_run(1, datetime(2026, 1, 1), 5, 1800, hr), 185)["zone"]
+
+    assert zone(145) == "Z1"    # 78.4%
+    assert zone(155) == "Z2"    # 83.8%
+    assert zone(170) == "Z3"    # 91.9%
+    assert zone(175) == "Z4"    # 94.6%
+    assert zone(190) == "Z5"    # 102.7%
+    # 81.1% sits just inside Z2, the boundary the old ladder got wrong.
+    assert zone(150) == "Z2"
     assert pm.intensity(_run(4, datetime(2026, 1, 1), 5, 1800, None), 185) is None
 
 

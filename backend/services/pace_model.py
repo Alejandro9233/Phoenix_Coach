@@ -51,6 +51,14 @@ FIRST_5K_EASE_SEC = 6  # s/km added to the first 5K
 EASE_MIN_RACE_KM = 10.1  # short races don't need a conservative-start table
 
 RIEGEL_EXP = 1.06
+# Riegel returns one number to the second, and a point estimate reads as a
+# promise: "Proposed target: 3:01:23" off a single half invites treating it as
+# fact. The formula also assumes you are FULLY TRAINED for the target distance
+# — every source says so — which a first marathoner at half the needed long-run
+# volume is not, so the point is the optimistic edge. The band is a
+# presentation device, not a second model: same Riegel number, stated with the
+# precision it actually has.
+PREDICTION_BAND_PCT = 0.025
 # Threshold paces outside 3:00-7:00 /km are bad watch data, not fitness.
 T_BOUNDS_SEC = (180, 420)
 
@@ -81,6 +89,14 @@ def fmt_band(lo: float, hi: float) -> str:
 def fmt_hms(total_sec: float) -> str:
     total_sec = int(round(total_sec))
     return f"{total_sec // 3600}:{(total_sec % 3600) // 60:02d}:{total_sec % 60:02d}"
+
+
+def prediction_band(pred_sec: float) -> tuple:
+    """(lo, hi) seconds around a Riegel prediction. Symmetric on purpose — the
+    asymmetry that matters (under-trained for the distance) is a coaching
+    caveat, not something this function can measure."""
+    return (pred_sec * (1 - PREDICTION_BAND_PCT),
+            pred_sec * (1 + PREDICTION_BAND_PCT))
 
 
 def riegel(t_sec: float, d_from_km: float, d_to_km: float) -> float:
@@ -210,16 +226,20 @@ def tuneup_verdict(result_sec, result_km, goal_distance,
     if not goal_km or not result_sec or not result_km or result_km <= 0:
         return None
     pred = riegel(float(result_sec), float(result_km), goal_km)
+    lo, hi = prediction_band(pred)
     verdict = {
         "predicted": fmt_hms(pred),
         "predicted_sec": int(round(pred)),
+        "predicted_lo": fmt_hms(lo),
+        "predicted_hi": fmt_hms(hi),
         "goal_distance": goal_distance,
         "goal": None,
         "delta_sec": None,
         "summary": (
             f"{fmt_hms(result_sec)} over {race_label(result_km)} predicts "
-            f"{fmt_hms(pred)} for the {goal_distance} (Riegel "
-            f"{RIEGEL_EXP:g}). Proposed target: {fmt_hms(pred)}."
+            f"{fmt_hms(lo)}-{fmt_hms(hi)} for the {goal_distance} (Riegel "
+            f"{RIEGEL_EXP:g}, which assumes {goal_distance}-specific training). "
+            f"Midpoint {fmt_hms(pred)}."
         ),
     }
     goal_sec = parse_hms(target_finish_time)

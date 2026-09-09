@@ -100,10 +100,18 @@ def test_verdict_validates_the_house_rule():
     assert "Proposed target: 3:01:23" in v["summary"]
 
 
-def test_verdict_without_goal_still_proposes():
+def test_verdict_without_goal_states_a_range_not_a_point():
+    """A single half cannot justify a target to the second. "Proposed target:
+    3:01:23" read as a promise and hid the assumption Riegel actually makes —
+    that you are already trained for the goal distance."""
     v = tuneup_verdict(5220, HALF_KM, "Marathon", None)
     assert v["goal"] is None and v["delta_sec"] is None
-    assert "Proposed target: 3:01:23" in v["summary"]
+    assert v["predicted"] == "3:01:23"                  # midpoint unchanged
+    assert v["predicted_lo"] == "2:56:51"
+    assert v["predicted_hi"] == "3:05:55"
+    assert "2:56:51-3:05:55" in v["summary"]
+    assert "assumes Marathon-specific training" in v["summary"]
+    assert "Proposed target" not in v["summary"]
 
 
 def test_verdict_none_for_non_running_goal_or_garbage():
