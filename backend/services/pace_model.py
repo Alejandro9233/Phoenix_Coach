@@ -204,63 +204,6 @@ def race_pacing(target_finish_time, race_distance, hr_zones=None) -> dict | None
     }
 
 
-def race_label(distance_km) -> str:
-    """21.0975 -> "Half Marathon"; anything within 3% of a known race counts
-    (a scraped GPS half reads ~21.3). Unknown distances stay numeric."""
-    if not distance_km:
-        return "race"
-    for name, km in RACE_KM.items():
-        if abs(distance_km - km) / km <= 0.03:
-            return name
-    return f"{distance_km:g} km race"
-
-
-def tuneup_verdict(result_sec, result_km, goal_distance,
-                   target_finish_time=None) -> dict | None:
-    """Riegel verdict from a tune-up race result: what the result predicts at
-    the goal distance, and how that compares to the current target. The
-    proposed target IS the prediction — Alex rounds it himself in the Profile
-    picker; nothing here writes target_finish_time.
-    """
-    goal_km = RACE_KM.get(goal_distance)
-    if not goal_km or not result_sec or not result_km or result_km <= 0:
-        return None
-    pred = riegel(float(result_sec), float(result_km), goal_km)
-    lo, hi = prediction_band(pred)
-    verdict = {
-        "predicted": fmt_hms(pred),
-        "predicted_sec": int(round(pred)),
-        "predicted_lo": fmt_hms(lo),
-        "predicted_hi": fmt_hms(hi),
-        "goal_distance": goal_distance,
-        "goal": None,
-        "delta_sec": None,
-        "summary": (
-            f"{fmt_hms(result_sec)} over {race_label(result_km)} predicts "
-            f"{fmt_hms(lo)}-{fmt_hms(hi)} for the {goal_distance} (Riegel "
-            f"{RIEGEL_EXP:g}, which assumes {goal_distance}-specific training). "
-            f"Midpoint {fmt_hms(pred)}."
-        ),
-    }
-    goal_sec = parse_hms(target_finish_time)
-    if goal_sec:
-        delta = int(round(pred - goal_sec))
-        side = "under" if delta <= 0 else "over"
-        d = abs(delta)
-        d_str = fmt_hms(d) if d >= 3600 else f"{d // 60}:{d % 60:02d}"
-        verdict.update({
-            "goal": target_finish_time,
-            "delta_sec": delta,
-            "summary": (
-                f"{fmt_hms(result_sec)} over {race_label(result_km)} predicts "
-                f"{fmt_hms(pred)} for the {goal_distance} — {d_str} {side} "
-                f"the {target_finish_time} target. Proposed target: "
-                f"{fmt_hms(pred)}."
-            ),
-        })
-    return verdict
-
-
 def _band(lo: float, hi: float) -> dict:
     return {"lo": round(lo, 1), "hi": round(hi, 1), "label": fmt_band(lo, hi)}
 

@@ -431,14 +431,11 @@ def _open_run_days(window, availability, active_injuries) -> int:
 
 
 def _is_race_week(ctx: dict) -> bool:
-    """Goal race week or tune-up race week. The hours CEILING needs this as
-    much as the floor did: a marathon plus three shakeouts is ~4.7 h against a
-    3-5 h taper range, so race week hard-failed hours_high and the gate pushed
-    the coach to cut sessions out of race week."""
-    return bool(
-        ctx and (ctx.get("race_week")
-                 or (ctx.get("tuneup") or {}).get("is_race_week"))
-    )
+    """Goal race week. The hours CEILING needs this as much as the floor did:
+    a marathon plus three shakeouts is ~4.7 h against a 3-5 h taper range, so
+    race week hard-failed hours_high and the gate pushed the coach to cut
+    sessions out of race week."""
+    return bool(ctx and ctx.get("race_week"))
 
 
 def _open_aerobic_days(window, availability, active_injuries) -> int:
@@ -473,16 +470,13 @@ def _open_aerobic_days(window, availability, active_injuries) -> int:
 
 def _race_day_exempt(ctx: dict, day_name: str) -> bool:
     """The race itself is a fact, not a menu violation. On the goal race
-    week's race day — and a tune-up's — the title and quality audits stand
-    down for that one day; the rest of the week stays fully gated. Without
-    this, the taper rule + off-menu-quality check would hard-fail the
-    marathon the prompt itself scheduled and repair it into an Easy Run."""
+    week's race day the title and quality audits stand down for that one
+    day; the rest of the week stays fully gated. Without this, the taper
+    rule + off-menu-quality check would hard-fail the marathon the prompt
+    itself scheduled and repair it into an Easy Run."""
     if not ctx:
         return False
-    if ctx.get("race_week") and day_name == ctx.get("race_day_name"):
-        return True
-    tu = ctx.get("tuneup") or {}
-    return bool(tu.get("is_race_week") and day_name == tu.get("race_day_name"))
+    return bool(ctx.get("race_week") and day_name == ctx.get("race_day_name"))
 
 
 def _audit_titles(plan_json: dict, ctx: dict, window, report: GateReport) -> None:
@@ -609,7 +603,7 @@ def _audit_quality(plan_json: dict, ctx: dict, window, budget: dict,
     open_days = _open_run_days(list(VALID_DAYS), availability, active_injuries)
     if (phase in ("base", "build", "peak")
             and not ctx.get("is_recovery_week")
-            and not ((ctx.get("tuneup") or {}).get("is_race_week"))
+            and not ctx.get("race_week")
             and (max_quality or 0) >= 2
             and "running" not in _injury_blocked_sports(active_injuries or [])
             and open_days >= 2
@@ -751,7 +745,7 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
             "ceiling": hours_high,
         })
 
-    # Race weeks (goal or tune-up): the run target is race-shaped but
+    # Race week: the run target is race-shaped but
     # phase_hours_range isn't, so a deliberately light race week would trip
     # the hours floor — and the race IS the week's quality, so the quality
     # nudge is spurious too. Both checks are soft-only; hatching them costs

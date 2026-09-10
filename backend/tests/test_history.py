@@ -8,8 +8,7 @@ Rules locked in here:
 - The feed merges refresh events + derived plan receipts newest-first by UTC
   instant; an auto-adapt's receipt folds INTO its refresh row.
 - refresh_events prunes to the newest 200; regenerate carries receipts
-  forward; the volume gate stays quiet about hours/quality in a tune-up race
-  week (soft checks only).
+  forward.
 - /weekly-plan/status carries run_km_done vs the C3 target, and the race
   block inside the final two weeks.
 """
@@ -528,42 +527,6 @@ def test_second_refresh_never_claims_the_mornings_adapt(db, monkeypatch, client)
     assert second["event"]["adaptation"]["receipt_at"] is None
 
 
-# --- gate hatches in a tune-up race week ---
-
-def test_gate_quiet_in_tuneup_race_week():
-    from backend.services import volume_gate
-
-    ctx = {
-        "phase": "build", "phase_name": "Build", "is_recovery_week": False,
-        "recovery": {"status": "green"},
-        "volume_targets": {"run_km_target": 20.0, "run_km_hard_cap": 25.0},
-        "volume_references": {"phase_hours_range": "10-12",
-                              "max_quality_sessions": 2,
-                              "sport_sessions": {"running": {"sessions": 4}}},
-        "tuneup": {"is_race_week": True},
-    }
-    light_plan = {
-        "week_summary": {},
-        "days": {"Tuesday": {"summary": "s", "workouts": [
-            {"sport": "running", "title": "Easy Run", "total_time": "40 min",
-             "distance_km": 7.0, "steps": []}]}},
-    }
-    availability = {"run_days": "mon,tue,wed,thu,fri,sat,sun"}
-
-    report = volume_gate.audit_plan(light_plan, ctx, availability=availability,
-                                    active_injuries=[])
-    kinds = [v["kind"] for v in report.soft]
-    assert "hours_low" not in kinds
-    assert "quality_missing" not in kinds
-
-    ctx["tuneup"] = None  # control: without the race week both fire
-    report = volume_gate.audit_plan(light_plan, ctx, availability=availability,
-                                    active_injuries=[])
-    kinds = [v["kind"] for v in report.soft]
-    assert "hours_low" in kinds
-    assert "quality_missing" in kinds
-
-
 # --- the goal race week: the gate must not repair the marathon away ---
 
 def _race_week_ctx():
@@ -579,7 +542,6 @@ def _race_week_ctx():
                               "sport_sessions": {"running": {"sessions": 3}}},
         "workout_menu": {"running": ["Easy Run (short)", "Strides/Openers"]},
         "forbidden_workouts": [],
-        "tuneup": None,
     }
 
 

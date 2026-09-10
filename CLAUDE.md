@@ -56,6 +56,14 @@ those limits and writes the coaching notes.
   LLM failed (2026-08-17: retired Groq model → silent "Base Building" template
   persisted). Failed generation raises; plan endpoints return 502 and persist
   nothing. `test_weekly_plan_safety.py` guards it.
+- **Tune-up race** (`tune_race_*` profile fields, `tuneup` context block,
+  `tuneup_verdict`, Profile > Tune-Up Race card), deleted 2026-09-09. The
+  Profile card's invisible date picker marked the date as set on appear, so
+  every profile save shipped "half marathon today" and turned an injury week
+  into a 0.6x race week. Alex: "I don't want that on my app." The goal-race
+  week path stays. The three `tune_race_*` columns are still in prod Postgres,
+  nullable and unread — no migration framework to drop them; don't re-add them
+  to the model or the startup `ALTER TABLE` dict.
 - **`frontend/`** web UI — replaced by the iOS app.
 - **Root `phoenix_coach.db`** — no SQLite snapshot in the repo. Use `scripts/rebuild_db.py`.
 

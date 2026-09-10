@@ -49,7 +49,7 @@ from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyP
 from backend.services.constraint_enforcer import (
     SPORT_TO_AVAILABILITY_KEY, get_travel_day_names, parse_day_list,
 )
-from backend.services.pace_model import RACE_KM, compute_pace_model, race_label
+from backend.services.pace_model import RACE_KM, compute_pace_model
 from backend.utils.timezone import get_local_today
 
 # Estimated hours one weekly session of each sport contributes to a phase's
@@ -1203,11 +1203,6 @@ class PeriodizationEngine:
             athlete.race_date
             and start_of_week <= athlete.race_date < start_of_week + timedelta(days=7)
         )
-        tuneup_week = bool(
-            athlete.tune_race_date
-            and start_of_week <= athlete.tune_race_date < start_of_week + timedelta(days=7)
-        )
-
         # A deload never lands on a race week. Both cut volume, and stacking
         # them shrank phase_hours_range 3-5 -> 2-4, under which a sane race
         # week (marathon + three shakeouts = 4.7 h) HARD-failed hours_high —
@@ -1223,21 +1218,6 @@ class PeriodizationEngine:
             race_distance=race_distance
         )
 
-        # Tune-up race (the October half). Its week is a race week: volume
-        # scales down and the race replaces the long run. Past races drop out
-        # of planning context — the Riegel verdict lives in /athlete/profile.
-        tuneup = None
-        if athlete.tune_race_date and (athlete.tune_race_date - today).days >= 0:
-            tuneup = {
-                "race_date": athlete.tune_race_date.isoformat(),
-                "race_day_name": athlete.tune_race_date.strftime("%A"),
-                "distance_km": athlete.tune_race_distance_km,
-                "label": race_label(athlete.tune_race_distance_km),
-                "target": athlete.tune_race_target,
-                "days_away": (athlete.tune_race_date - today).days,
-                "is_race_week": tuneup_week,
-            }
-
         # THE weekly run-km target — actuals-derived, ramp-capped. The volume
         # gate enforces these numbers; the phase range above is only prose.
         # On the goal race week of a running race, the budget must contain the
@@ -1246,7 +1226,7 @@ class PeriodizationEngine:
         race_week_km = RACE_KM.get(race_distance) if race_week else None
         volume_targets = self._get_weekly_run_target(
             db, self._phase_def(profile, phase_info),
-            cycle_info["is_recovery_week"], today, tuneup_week=tuneup_week,
+            cycle_info["is_recovery_week"], today,
             race_week_km=race_week_km,
             phase_id=phase_info.get("id"), weeks_to_race=weeks_to_race,
         )
@@ -1313,9 +1293,6 @@ class PeriodizationEngine:
             # Computed weekly run target (hard numbers — the volume gate
             # enforces run_km_hard_cap). None for profiles without a run range.
             "volume_targets": volume_targets,
-
-            # Upcoming tune-up race, None when unset or already run
-            "tuneup": tuneup,
 
             # How is the body?
             "recovery": recovery,
@@ -1737,7 +1714,7 @@ class PeriodizationEngine:
 
     def _get_weekly_run_target(
         self, db: Session, phase_def: dict,
-        is_recovery_week: bool, today: date, tuneup_week: bool = False,
+        is_recovery_week: bool, today: date,
         race_week_km: float = None,
         phase_id: str = None, weeks_to_race: int = None,
     ) -> Optional[dict]:
@@ -1842,12 +1819,6 @@ class PeriodizationEngine:
                 f"goal race week: {race_week_km:g} km race + up to "
                 f"{RACE_WEEK_EASY_KM:g} km of shakeouts"
             )
-        elif tuneup_week:
-            # C7 hook: race week — the tune-up race IS the long run.
-            target *= 0.6
-            hard_cap *= 0.65
-            long_run = 0
-            basis += " — tune-up race week: 0.6x, the race is the long run"
         elif is_recovery_week:
             target *= 0.75
             hard_cap *= 0.80

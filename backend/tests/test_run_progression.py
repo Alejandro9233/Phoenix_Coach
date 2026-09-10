@@ -173,14 +173,6 @@ def test_long_run_progresses_plus_12(test_db_session):
     assert t["long_run_minutes"] == 78  # 112 * 0.7
 
 
-def test_tuneup_week_hook_scales_and_drops_long_run(test_db_session):
-    """C7's race-week hook: 0.6x target, no long run (the race is the long run)."""
-    _seed_weeks(test_db_session, [55, 58, 60])
-    t = _target(test_db_session, BUILD_DEF, tuneup_week=True)
-    assert t["run_km_target"] == round(55 * 0.6, 1)
-    assert t["long_run_minutes"] == 0
-
-
 def test_profile_without_run_range_returns_none(test_db_session):
     """Stub profiles without km in their volume_note degrade to None."""
     stub = {"sport_sessions": {"running": {"volume_note": "easy running only"}}}
