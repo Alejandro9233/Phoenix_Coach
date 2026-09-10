@@ -13,6 +13,20 @@ enum DS {
         static let success     = Color.green
         static let warning     = Color.orange                                   // Semantic warning
         static let danger      = Color.red                                      // Semantic danger
+
+        /// Training zones — colour IS the meaning here (Z1 blue … Z5 red).
+        /// From the Today Activities Card canvas; the one place zone colours
+        /// live. Unknown zone reads as outline so a missing value is quiet.
+        static func zone(_ zone: Int?) -> Color {
+            switch zone {
+            case 1: return Color(red: 0.431, green: 0.659, blue: 0.878)   // #6EA8E0
+            case 2: return Color(red: 0.373, green: 0.788, blue: 0.541)   // #5FC98A
+            case 3: return Color(red: 0.910, green: 0.773, blue: 0.278)   // #E8C547
+            case 4: return Color(red: 0.941, green: 0.588, blue: 0.290)   // #F0964A
+            case 5: return Color(red: 0.898, green: 0.388, blue: 0.420)   // #E5636B
+            default: return outline
+            }
+        }
     }
     
     // MARK: - Spacing (4/8 grid)
