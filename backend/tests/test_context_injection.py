@@ -502,3 +502,99 @@ def test_recovery_score_surfaces_in_fitness_markers(temp_db_session):
 
     summary = DataAgent(temp_db_session).summarize()
     assert "COROS Recovery: 78%" in summary
+
+
+# --- an injury that blocks running hands the week's hours to the bike ---
+
+def _ankle(athlete_id, sports="run"):
+    from backend.models.database import InjuryLog
+    return InjuryLog(
+        athlete_id=athlete_id, date_reported=get_local_today(),
+        body_part="Ankle", status="Active", severity=4, affected_sports=sports,
+    )
+
+
+def test_blocked_running_moves_the_hours_to_the_bike(temp_db_session):
+    """Foundation 5-7 h, running 4x + cycling 2x. With running injury-blocked
+    the window stays 5-7 h (an injured week is when the bike carries the
+    hours, not when they vanish), running drops to 0 sessions, and cycling
+    becomes round(6 h / 1.25 h) = 5 rides. The prompt then says so in the
+    constraints block, the budget line and the volume block."""
+    athlete = _marathon_athlete()
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+    temp_db_session.add(_ankle(athlete.id))
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+    refs = ctx["volume_references"]
+
+    assert refs["phase_hours_range"] == "5-7"
+    assert refs["sport_sessions"]["running"]["sessions"] == 0
+    assert refs["sport_sessions"]["cycling"]["sessions"] == 5
+    assert refs["injury_substitution"] == {
+        "blocked": "running", "carrier": "cycling",
+        "rides": 5, "hours_range": "5-7",
+    }
+    assert "running" in ctx["injury_blocked_sports"]
+
+    from backend.agents.response_agent import build_constraint_block
+    block = build_constraint_block(ctx)
+    assert "Running: BLOCKED this week by injury (Ankle" in block
+    assert "running 0 km this week (blocked by injury)" in block
+    assert "5 rides on the bike carrying those hours" in block
+    assert "protected quantity: 5 rides" in block
+    assert "RUN kilometers are the protected quantity" not in block
+
+    text = _format_training_context(ctx)
+    assert "Running: 0 km — BLOCKED by injury" in text
+    assert "Run km target:" not in text
+
+
+def test_blocked_running_respects_bike_days(temp_db_session):
+    """Three open bike days cap the carrier at three rides."""
+    athlete = _marathon_athlete(bike_days="mon,wed,fri")
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+    temp_db_session.add(_ankle(athlete.id))
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+    assert ctx["volume_references"]["injury_substitution"]["rides"] == 3
+    assert ctx["volume_references"]["sport_sessions"]["cycling"]["sessions"] == 3
+
+
+def test_blocked_running_and_cycling_has_no_carrier(temp_db_session):
+    """Both blocked: running still drops to zero so the prompt stops asking
+    for it, but nothing is handed to the bike and the old protected-quantity
+    line is gone with it."""
+    athlete = _marathon_athlete()
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+    temp_db_session.add(_ankle(athlete.id, sports="run,bike"))
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+    refs = ctx["volume_references"]
+    assert refs["injury_substitution"] is None
+    assert refs["sport_sessions"]["running"]["sessions"] == 0
+    assert refs["sport_sessions"]["cycling"]["sessions"] == 2  # untouched
+
+    from backend.agents.response_agent import build_constraint_block
+    block = build_constraint_block(ctx)
+    assert "Cycling: BLOCKED this week by injury" in block
+    assert "running 0 km this week (blocked by injury)" in block
+
+
+def test_no_injury_leaves_the_week_alone(temp_db_session):
+    athlete = _marathon_athlete()
+    temp_db_session.add(athlete)
+    temp_db_session.commit()
+
+    ctx = PeriodizationEngine().compute_context(temp_db_session)
+    refs = ctx["volume_references"]
+    assert refs["injury_substitution"] is None
+    assert refs["sport_sessions"]["running"]["sessions"] == 4
+    assert ctx["injury_blocked_sports"] == {}
+    from backend.agents.response_agent import build_constraint_block
+    assert "RUN kilometers are the protected quantity" in build_constraint_block(ctx)

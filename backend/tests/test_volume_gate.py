@@ -567,3 +567,25 @@ def test_taper_never_admits_vo2max():
     plan = _week({"Tuesday": (5, "VO2max Intervals")})
     report = audit_plan(plan, _taper_ctx(), availability=AVAIL)
     assert any(v["kind"] == "forbidden_title" for v in report.hard)
+
+
+def test_hours_low_names_the_bike_when_running_is_blocked():
+    """The retry feedback must tell the coach who carries the hours, or it
+    plans the same running week and loses it to the enforcer again."""
+    class Injury:
+        affected_sports = "run"
+        body_part = "ankle"
+        severity = 4
+
+    thin = {
+        "week_summary": {},
+        "days": {"Thursday": {"summary": "s", "workouts": [
+            {"sport": "cycling", "title": "Endurance Ride (Z2)",
+             "total_time": "45:00", "distance_km": 20.0, "steps": []}]}},
+    }
+    report = audit_plan(thin, _ctx(hours="5-7"),
+                        availability={**AVAIL, "bike_days": "mon,tue,wed,thu,fri,sat,sun"},
+                        active_injuries=[Injury()])
+    low = next(v for v in report.soft if v["kind"] == "hours_low")
+    assert "bike must carry the hours" in low["detail"]
+    assert not low.get("advisory")  # earns the retry

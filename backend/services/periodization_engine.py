@@ -47,7 +47,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyPlan
 from backend.services.constraint_enforcer import (
-    SPORT_TO_AVAILABILITY_KEY, get_travel_day_names, parse_day_list,
+    SPORT_TO_AVAILABILITY_KEY, _injury_blocked_sports, get_active_injuries,
+    get_travel_day_names, parse_day_list,
 )
 from backend.services.pace_model import RACE_KM, compute_pace_model
 from backend.utils.timezone import get_local_today
@@ -1212,10 +1213,20 @@ class PeriodizationEngine:
         # collision in favour of the race; references have to agree with it.
         deload_week = cycle_info["is_recovery_week"] and not race_week
 
+        # Sports an active injury blocks this week (sport -> reason). Read
+        # through the enforcer's query so expiry is handled once. The
+        # enforcer strips violating workouts after generation; this is the
+        # BEFORE half — the budget has to stop asking for what will be
+        # removed, or the LLM plans a running week and ships a hollow one.
+        injury_blocked = _injury_blocked_sports(
+            get_active_injuries(db, athlete.id, commit=False)
+        )
+
         # Volume references
         volume_refs = self._get_volume_references(
             phase_info, deload_week, athlete, db,
-            race_distance=race_distance
+            race_distance=race_distance,
+            blocked_sports=set(injury_blocked),
         )
 
         # THE weekly run-km target — actuals-derived, ramp-capped. The volume
@@ -1302,6 +1313,9 @@ class PeriodizationEngine:
 
             # Sport availability
             "availability": availability,
+            # Sport -> reason, for sports an active injury blocks this week.
+            # Empty when nothing is blocked.
+            "injury_blocked_sports": injury_blocked,
 
             # Athlete profile snapshot
             "athlete": {
@@ -1661,7 +1675,8 @@ class PeriodizationEngine:
     def _get_volume_references(
         self, phase_info: dict, is_recovery_week: bool,
         athlete: Athlete, db: Session,
-        race_distance: str = "Marathon"
+        race_distance: str = "Marathon",
+        blocked_sports: set | None = None,
     ) -> dict:
         """
         Compute volume reference data for the LLM.
@@ -1710,7 +1725,70 @@ class PeriodizationEngine:
         else:
             refs["recovery_week_adjustment"] = None
 
+        # After the hours window is fixed: the window is what the athlete can
+        # hold, and an injury changes which sport holds it, not how much.
+        self._carry_blocked_running(refs, athlete, blocked_sports or set())
+
         return refs
+
+    @staticmethod
+    def _carry_blocked_running(refs: dict, athlete: Athlete,
+                               blocked_sports: set) -> None:
+        """When an injury blocks running, the bike carries the week's hours.
+
+        WHY: nothing used to convert a blocked sport's budget. The prompt kept
+        saying "running 31 km this week" beside "ankle: avoid running"; the
+        LLM planned a running week, the enforcer stripped every run, and the
+        athlete got 1.7 h of riding against a 5-7 h window with a footnote
+        (2026-09-09, ankle sprain). The hours window stays exactly what
+        availability left it — an injured week is when the bike has to carry
+        the hours, not when the hours disappear — and the ride count comes
+        from that window and SESSION_HOURS_ESTIMATE, so Python decides the
+        volume and the LLM only picks the rides.
+
+        Cycling is the only carrier: it is the one sport the profiles budget
+        beside running and the one an ankle/calf/knee usually tolerates.
+        Cycling blocked or disabled too -> no carrier; running still drops to
+        zero sessions so the prompt stops asking for it. Running disabled at
+        profile level was already removed by availability: nothing to carry.
+        """
+        refs["injury_substitution"] = None
+        sessions = refs.get("sport_sessions") or {}
+        if "running" not in blocked_sports or "running" not in sessions:
+            return
+
+        sessions["running"] = {
+            "sessions": 0,
+            "volume_note": ("BLOCKED by injury this week — do not schedule "
+                            "any run; the system removes them"),
+        }
+        if "cycling" in blocked_sports or "cycling" not in sessions:
+            return
+
+        try:
+            lo, hi = (float(x) for x in refs["phase_hours_range"].split("-"))
+        except (KeyError, ValueError, AttributeError):
+            return
+        bike_days = parse_day_list(getattr(athlete, "bike_days", None))
+        open_days = 7 if bike_days is None else len(bike_days)
+        if open_days == 0:
+            return
+        est = SESSION_HOURS_ESTIMATE["cycling"]
+        rides = max(1, min(open_days, round(((lo + hi) / 2) / est)))
+        sessions["cycling"] = {
+            "sessions": rides,
+            "volume_note": (
+                f"{rides} rides of 60-90 min, mostly Z2 — the bike carries the "
+                f"{lo:g}-{hi:g} h this week while running is blocked. Up to "
+                f"the week's quality cap may be Sweet Spot / Threshold rides."
+            ),
+        }
+        refs["injury_substitution"] = {
+            "blocked": "running",
+            "carrier": "cycling",
+            "rides": rides,
+            "hours_range": refs["phase_hours_range"],
+        }
 
     def _get_weekly_run_target(
         self, db: Session, phase_def: dict,

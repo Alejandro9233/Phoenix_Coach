@@ -64,15 +64,42 @@ def build_constraint_block(ctx: dict) -> str:
     avail = (ctx or {}).get("availability") or {}
     travel = ", ".join(avail.get("travel_day_names") or []) or "none this week"
 
+    blocked = (ctx or {}).get("injury_blocked_sports") or {}
+    sub = ((ctx or {}).get("volume_references") or {}).get("injury_substitution")
+
+    def _sport_line(sport: str, days) -> str:
+        if sport in blocked:
+            return (f"BLOCKED this week by injury ({blocked[sport]}) — schedule "
+                    f"none; the system removes any")
+        return _availability_text(days)
+
     budget = compute_budget(ctx or {}) or {}
     budget_bits = []
-    if budget.get("run_km_target") is not None:
+    if "running" in blocked:
+        budget_bits.append("running 0 km this week (blocked by injury)")
+    elif budget.get("run_km_target") is not None:
         cap = budget.get("run_km_hard_cap")
         cap_txt = f" (hard cap {cap} km)" if cap is not None else ""
         budget_bits.append(f"running {budget['run_km_target']} km this week{cap_txt}")
     if budget.get("hours_low") is not None:
         budget_bits.append(
             f"{budget['hours_low']:g}-{budget['hours_high']:g} hours excluding strength"
+        )
+    if sub:
+        budget_bits.append(f"{sub['rides']} rides on the bike carrying those hours")
+
+    if sub:
+        protected = (
+            f"Running is blocked this week, so aerobic HOURS on the bike are the "
+            f"protected quantity: {sub['rides']} rides of 60-90 min totaling "
+            f"{sub['hours_range']} h. Never shorten a ride to fit strength."
+        )
+    else:
+        protected = (
+            "Weekly RUN kilometers are the protected quantity. If days are "
+            "unavailable, move run sessions (especially the long run) to open "
+            "days and drop strength or cycling instead. Never delete the long "
+            "run to keep a strength session."
         )
     if budget.get("max_quality") is not None:
         budget_bits.append(f"at most {budget['max_quality']} quality (hard) sessions")
@@ -82,12 +109,12 @@ def build_constraint_block(ctx: dict) -> str:
     )
 
     return f"""CONSTRAINTS YOU MUST RESPECT (violations are removed by the system after you answer):
-- Swimming: {_availability_text(avail.get('swim_days'))}
-- Cycling: {_availability_text(avail.get('bike_days'))}
-- Running: {_availability_text(avail.get('run_days'))}
-- Strength: {_availability_text(avail.get('strength_days'))}
+- Swimming: {_sport_line('swimming', avail.get('swim_days'))}
+- Cycling: {_sport_line('cycling', avail.get('bike_days'))}
+- Running: {_sport_line('running', avail.get('run_days'))}
+- Strength: {_sport_line('strength', avail.get('strength_days'))}
 - Traveling (MUST be rest days, no training of any kind): {travel}
-- Weekly RUN kilometers are the protected quantity. If days are unavailable, move run sessions (especially the long run) to open days and drop strength or cycling instead. Never delete the long run to keep a strength session.{budget_line}
+- {protected}{budget_line}
 - Copy workout titles VERBATIM from the AVAILABLE WORKOUTS menu — an off-menu title will be rejected.
 - Every running/cycling/swimming workout MUST include "distance_km" (a number).
 - For strength workouts, you MUST include a "muscle_groups" array selecting from: ["chest", "shoulders", "back", "legs", "arms"]."""
@@ -131,7 +158,16 @@ def _format_training_context(ctx: dict) -> str:
     # post-generation; the LLM is told exactly what it will be graded on.
     vol = ctx.get("volume_references", {})
     vt = ctx.get("volume_targets")
-    if vt:
+    sub = vol.get("injury_substitution")
+    if sub:
+        lines.append("\nTHIS WEEK'S VOLUME (computed):")
+        lines.append(
+            f"  Running: 0 km — BLOCKED by injury. The bike carries the week: "
+            f"{sub['rides']} rides of 60-90 min totaling {sub['hours_range']} h "
+            f"(excluding strength). The run target resumes when the injury clears."
+        )
+        lines.append(f"\nVolume References:")
+    elif vt:
         lines.append("\nTHIS WEEK'S RUN VOLUME (computed — the week's running MUST total within 10% of this):")
         lines.append(f"  Run km target: {vt['run_km_target']} km"
                      f" (hard cap {vt['run_km_hard_cap']} km — the system trims anything above)")

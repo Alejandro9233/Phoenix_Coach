@@ -756,13 +756,26 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
     if (hours_low is not None and open_aerobic_days > 0
             and not race_week
             and week_hours < hours_low * HOURS_FLOOR_FRAC):
-        report.soft.append({
-            "kind": "hours_low",
-            "detail": (
+        if "running" in blocked:
+            # The feedback has to name the carrier, or the retry plans the
+            # same running week and loses it to the enforcer again.
+            detail = (
+                f"Planned training totals {week_hours:.1f} h excluding "
+                f"strength; the phase guide is {hours_low:.1f}-"
+                f"{hours_high:.1f} h. Running is blocked by injury, so the "
+                f"bike must carry the hours: add or lengthen rides "
+                f"(60-90 min each) on open days until the total reaches "
+                f"{hours_low:.1f} h."
+            )
+        else:
+            detail = (
                 f"Planned training totals {week_hours:.1f} h excluding "
                 f"strength; the phase guide is {hours_low:.1f}-"
                 f"{hours_high:.1f} h."
-            ),
+            )
+        report.soft.append({
+            "kind": "hours_low",
+            "detail": detail,
             "week_hours": round(week_hours, 1),
             "floor": hours_low,
         })
