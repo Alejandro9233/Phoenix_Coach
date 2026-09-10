@@ -589,3 +589,40 @@ def test_hours_low_names_the_bike_when_running_is_blocked():
     low = next(v for v in report.soft if v["kind"] == "hours_low")
     assert "bike must carry the hours" in low["detail"]
     assert not low.get("advisory")  # earns the retry
+
+
+def test_long_ride_short_is_advisory_in_a_blocked_running_week():
+    """Five equal 60-min rides satisfy the hours but flatten the long run's
+    slot away; the gate says so without burning the retry, full week only."""
+    class Injury:
+        affected_sports = "run"
+        body_part = "ankle"
+        severity = 4
+
+    ctx = _ctx(hours="5-7")
+    ctx["volume_references"]["injury_substitution"] = {
+        "blocked": "running", "carrier": "cycling", "rides": 5,
+        "hours_range": "5-7", "long_ride_minutes": 105,
+    }
+    ride = lambda: {"sport": "cycling", "title": "Endurance Ride (Z2)",
+                    "total_time": "60:00", "distance_km": 28.0, "steps": []}
+    flat = {"week_summary": {}, "days": {
+        d: {"summary": "ride", "workouts": [ride()]}
+        for d in ("Monday", "Tuesday", "Thursday", "Friday", "Sunday")}}
+    avail = {**AVAIL, "bike_days": "mon,tue,wed,thu,fri,sat,sun"}
+
+    report = audit_plan(flat, ctx, availability=avail, active_injuries=[Injury()])
+    assert report.ok
+    short = next(v for v in report.soft if v["kind"] == "long_ride_short")
+    assert short["advisory"] and short["target_min"] == 105
+
+    # Windowed replan: silent, like long_run_short (the short ride may sit
+    # on a locked day).
+    report = audit_plan(flat, ctx, days=["Friday", "Sunday"], availability=avail,
+                        active_injuries=[Injury()])
+    assert "long_ride_short" not in [v["kind"] for v in report.soft]
+
+    # One real long ride clears it.
+    flat["days"]["Sunday"]["workouts"][0]["total_time"] = "1:45:00"
+    report = audit_plan(flat, ctx, availability=avail, active_injuries=[Injury()])
+    assert "long_ride_short" not in [v["kind"] for v in report.soft]

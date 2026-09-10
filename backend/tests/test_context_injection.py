@@ -532,10 +532,13 @@ def test_blocked_running_moves_the_hours_to_the_bike(temp_db_session):
     assert refs["phase_hours_range"] == "5-7"
     assert refs["sport_sessions"]["running"]["sessions"] == 0
     assert refs["sport_sessions"]["cycling"]["sessions"] == 5
+    # Foundation with no run history: long run 70 min -> long ride
+    # round(70 * 1.5) = 105 min.
     assert refs["injury_substitution"] == {
         "blocked": "running", "carrier": "cycling",
-        "rides": 5, "hours_range": "5-7",
+        "rides": 5, "hours_range": "5-7", "long_ride_minutes": 105,
     }
+    assert "LONG RIDE: ~105 min" in refs["sport_sessions"]["cycling"]["volume_note"]
     assert "running" in ctx["injury_blocked_sports"]
 
     from backend.agents.response_agent import build_constraint_block
@@ -544,10 +547,12 @@ def test_blocked_running_moves_the_hours_to_the_bike(temp_db_session):
     assert "running 0 km this week (blocked by injury)" in block
     assert "5 rides on the bike carrying those hours" in block
     assert "protected quantity: 5 rides" in block
+    assert "LONG RIDE of ~105 min" in block
     assert "RUN kilometers are the protected quantity" not in block
 
     text = _format_training_context(ctx)
     assert "Running: 0 km — BLOCKED by injury" in text
+    assert "Long ride: ~105 min" in text
     assert "Run km target:" not in text
 
 

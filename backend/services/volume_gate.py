@@ -385,6 +385,9 @@ def compute_budget(ctx: dict) -> dict | None:
         "hours_low": hours_low,
         "hours_high": hours_high,
         "long_run_minutes": vt.get("long_run_minutes"),
+        # Blocked-running weeks: the long run's slot on the bike.
+        "long_ride_minutes": (refs.get("injury_substitution") or {})
+        .get("long_ride_minutes"),
         "max_quality": refs.get("max_quality_sessions"),
         "phase_run_sessions": (refs.get("sport_sessions") or {})
         .get("running", {}).get("sessions"),
@@ -804,6 +807,30 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
                 ),
                 "longest_run_min": round(longest_run_min, 1),
                 "target_min": lr_target,
+                "advisory": True,  # warns, never burns the gate retry
+            })
+
+    # The long ride is the long run's slot in a blocked-running week and the
+    # one session a "5 rides of 60-90 min" prompt is most likely to flatten
+    # away. Same shape as long_run_short: full week only, advisory.
+    lride_target = budget.get("long_ride_minutes")
+    if (days is None and lride_target and "running" in blocked
+            and "cycling" not in blocked and not race_week):
+        longest_ride_min = 0.0
+        for _d, w in _window_workouts(plan_json, None):
+            if map_sport(w.get("sport") or "") == "cycling":
+                longest_ride_min = max(
+                    longest_ride_min, parse_minutes(w.get("total_time")) or 0.0)
+        if longest_ride_min < lride_target - LONG_RUN_SLACK_MIN:
+            report.soft.append({
+                "kind": "long_ride_short",
+                "detail": (
+                    f"The week's longest ride is {longest_ride_min:.0f} min; "
+                    f"running is blocked, so a ~{lride_target:.0f}-min long "
+                    f"ride takes the long run's slot. Lengthen the longest ride."
+                ),
+                "longest_ride_min": round(longest_ride_min, 1),
+                "target_min": lride_target,
                 "advisory": True,  # warns, never burns the gate retry
             })
 

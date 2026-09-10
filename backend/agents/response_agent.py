@@ -89,10 +89,14 @@ def build_constraint_block(ctx: dict) -> str:
         budget_bits.append(f"{sub['rides']} rides on the bike carrying those hours")
 
     if sub:
+        long_ride = sub.get("long_ride_minutes")
+        long_txt = (f", one of them a LONG RIDE of ~{long_ride} min in place "
+                    f"of the long run" if long_ride else "")
         protected = (
             f"Running is blocked this week, so aerobic HOURS on the bike are the "
-            f"protected quantity: {sub['rides']} rides of 60-90 min totaling "
-            f"{sub['hours_range']} h. Never shorten a ride to fit strength."
+            f"protected quantity: {sub['rides']} rides totaling "
+            f"{sub['hours_range']} h{long_txt}. Never shorten a ride to fit "
+            f"strength."
         )
     else:
         protected = (
@@ -163,9 +167,14 @@ def _format_training_context(ctx: dict) -> str:
         lines.append("\nTHIS WEEK'S VOLUME (computed):")
         lines.append(
             f"  Running: 0 km — BLOCKED by injury. The bike carries the week: "
-            f"{sub['rides']} rides of 60-90 min totaling {sub['hours_range']} h "
+            f"{sub['rides']} rides totaling {sub['hours_range']} h "
             f"(excluding strength). The run target resumes when the injury clears."
         )
+        if sub.get("long_ride_minutes"):
+            lines.append(
+                f"  Long ride: ~{sub['long_ride_minutes']} min Z2 — the long "
+                f"run's slot; the week's longest ride must be about this long."
+            )
         lines.append(f"\nVolume References:")
     elif vt:
         lines.append("\nTHIS WEEK'S RUN VOLUME (computed — the week's running MUST total within 10% of this):")

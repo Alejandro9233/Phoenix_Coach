@@ -60,6 +60,14 @@ from backend.utils.timezone import get_local_today
 # (volume_gate charter), so gym availability never moves the window.
 SESSION_HOURS_ESTIMATE = {"swimming": 1.0, "cycling": 1.25, "running": 1.0}
 
+# Blocked-running weeks (_carry_blocked_running): the long run becomes a long
+# ride of LONG_RIDE_PER_LONG_RUN x its minutes — no impact, so the same
+# aerobic stimulus takes longer on the bike — clamped to a range a runner
+# actually holds in the saddle.
+LONG_RIDE_PER_LONG_RUN = 1.5
+LONG_RIDE_MIN = 90
+LONG_RIDE_MAX = 180
+
 # Weekly run-km progression (_get_weekly_run_target). Tunable in one place.
 RUN_RAMP = 1.08            # next week = 8% over the best recent week
 RUN_RAMP_HARD_CAP = 1.15   # never plan >15% above demonstrated volume,
@@ -1226,7 +1234,6 @@ class PeriodizationEngine:
         volume_refs = self._get_volume_references(
             phase_info, deload_week, athlete, db,
             race_distance=race_distance,
-            blocked_sports=set(injury_blocked),
         )
 
         # THE weekly run-km target — actuals-derived, ramp-capped. The volume
@@ -1240,6 +1247,13 @@ class PeriodizationEngine:
             cycle_info["is_recovery_week"], today,
             race_week_km=race_week_km,
             phase_id=phase_info.get("id"), weeks_to_race=weeks_to_race,
+        )
+
+        # After the hours window AND the long run are fixed: an injury changes
+        # which sport holds the week, not how much of it there is.
+        self._carry_blocked_running(
+            volume_refs, athlete, set(injury_blocked),
+            long_run_minutes=(volume_targets or {}).get("long_run_minutes"),
         )
 
         # Python-derived training paces from the watch's LT pace (running
@@ -1676,7 +1690,6 @@ class PeriodizationEngine:
         self, phase_info: dict, is_recovery_week: bool,
         athlete: Athlete, db: Session,
         race_distance: str = "Marathon",
-        blocked_sports: set | None = None,
     ) -> dict:
         """
         Compute volume reference data for the LLM.
@@ -1725,15 +1738,12 @@ class PeriodizationEngine:
         else:
             refs["recovery_week_adjustment"] = None
 
-        # After the hours window is fixed: the window is what the athlete can
-        # hold, and an injury changes which sport holds it, not how much.
-        self._carry_blocked_running(refs, athlete, blocked_sports or set())
-
         return refs
 
     @staticmethod
     def _carry_blocked_running(refs: dict, athlete: Athlete,
-                               blocked_sports: set) -> None:
+                               blocked_sports: set,
+                               long_run_minutes: float | None = None) -> None:
         """When an injury blocks running, the bike carries the week's hours.
 
         WHY: nothing used to convert a blocked sport's budget. The prompt kept
@@ -1744,7 +1754,11 @@ class PeriodizationEngine:
         availability left it — an injured week is when the bike has to carry
         the hours, not when the hours disappear — and the ride count comes
         from that window and SESSION_HOURS_ESTIMATE, so Python decides the
-        volume and the LLM only picks the rides.
+        volume and the LLM only picks the rides. The long run carries over
+        too: one of the rides is a long ride of LONG_RIDE_PER_LONG_RUN x the
+        week's long_run_minutes (the first version handed over five equal
+        rides and Alex asked "no long ride?" — the week's one big aerobic
+        session had vanished with the run it replaced).
 
         Cycling is the only carrier: it is the one sport the profiles budget
         beside running and the one an ankle/calf/knee usually tolerates.
@@ -1775,12 +1789,21 @@ class PeriodizationEngine:
             return
         est = SESSION_HOURS_ESTIMATE["cycling"]
         rides = max(1, min(open_days, round(((lo + hi) / 2) / est)))
+        long_ride = None
+        if long_run_minutes and long_run_minutes > 0:
+            long_ride = int(round(min(
+                LONG_RIDE_MAX,
+                max(LONG_RIDE_MIN, long_run_minutes * LONG_RIDE_PER_LONG_RUN),
+            )))
+        long_txt = (f" One of them is the LONG RIDE: ~{long_ride} min Z2, "
+                    f"in place of the long run." if long_ride else "")
         sessions["cycling"] = {
             "sessions": rides,
             "volume_note": (
-                f"{rides} rides of 60-90 min, mostly Z2 — the bike carries the "
-                f"{lo:g}-{hi:g} h this week while running is blocked. Up to "
-                f"the week's quality cap may be Sweet Spot / Threshold rides."
+                f"{rides} rides, mostly Z2, 60-90 min each — the bike carries "
+                f"the {lo:g}-{hi:g} h this week while running is blocked."
+                f"{long_txt} Up to the week's quality cap may be Sweet Spot / "
+                f"Threshold rides."
             ),
         }
         refs["injury_substitution"] = {
@@ -1788,6 +1811,7 @@ class PeriodizationEngine:
             "carrier": "cycling",
             "rides": rides,
             "hours_range": refs["phase_hours_range"],
+            "long_ride_minutes": long_ride,
         }
 
     def _get_weekly_run_target(
