@@ -31,6 +31,11 @@ those limits and writes the coaching notes.
   workouts *after* generation. Every path that writes `plan_json` must run
   `enforce_constraints` before persisting. Never "fix" a violated constraint by
   rewording the prompt.
+- **Reuse before you create.** Before building any iOS header, chip, CTA, stat
+  tile, or card, check `DesignSystem.swift` and the swiftui-design skill's
+  `references/refactors.md`; one probably exists. New components and animations
+  go through `/variants`, and Alex picks. A rejected direction goes in the
+  skill's Rejected log and is never resubmitted.
 
 ## Don't re-add these — removed on purpose
 

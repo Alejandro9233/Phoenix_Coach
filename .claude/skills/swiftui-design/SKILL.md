@@ -10,6 +10,14 @@ accent, glass cards, thin numerals for data, bold tracked micro-labels for
 chrome. Color is reserved for meaning (status, zones). Data is loud, chrome is
 quiet. Your job when touching UI: extend this language, never invent a new one.
 
+Two halves live here. The tokens and grammar below were derived from the app
+itself. `references/taste/` is the outside half: screenshots of apps Alex
+would steal from, one note each on why. Read those notes before designing
+anything new; the grammar says how to build, the notes say what to aim at.
+New components and any animation go through `/variants` (five real SwiftUI
+candidates, one contact sheet, Alex picks). The **Rejected** log at the end
+is binding.
+
 **Read `ios/PhoenixCoach/PhoenixCoach/DesignSystem.swift` before styling
 anything.** Every constant you need is a `DS` token. A styling literal
 (`.spring(response:...)`, `cornerRadius: 12`, `.tracking(1.2)`,
@@ -257,7 +265,9 @@ Every screen designs four: loading, empty, error, content.
   drift"). Candidates already at 3+ call sites are listed in
   [references/refactors.md](references/refactors.md) — check it before
   building any header, chip, CTA, stat tile, or step timeline; one
-  probably exists.
+  probably exists. Pieces Alex saved from a variants round live in
+  [references/keepers.md](references/keepers.md); reuse them as-is. The decided
+  Today design is [references/today-v2.md](references/today-v2.md).
 - Touching a file = leave it more on-grammar than you found it
   (double-padding, literal springs, `.uppercased()`, off-token colors),
   but don't restyle unrelated screens in a feature commit, and list every
@@ -265,3 +275,36 @@ Every screen designs four: loading, empty, error, content.
 - Before finishing any UI change, check: tokens only · nothing pops ·
   numerals monospaced · on-accent is black · 44pt targets · four states ·
   builds against iPhone 17 Pro simulator.
+
+## References — what good looks like
+
+`references/taste/` holds Alex's references, one `.md` per image: what to
+steal and why. Read `_common-thread.md` first; it is the one-page synthesis.
+Five so far (2026-09-12): one UI reference (Leafora, cards only) and four
+tone references (grain runner, data mountain, Solvana glow, motion-blur
+portrait). Short version: black and white, grain/blur/glow as material,
+data as texture, sparse mono-flavored copy about effort, quiet CTAs. The
+Claude app icon remains the reference for the app mark.
+
+## Rejected — one line per kill, newest last
+
+Every time Alex rejects a variant or a shipped component, append what and
+why. A component rewritten twice means this file is underspecified: fix the
+rule, not the component.
+
+- 2026-09-10 Today card, Option B (compact) — lost to A.
+- 2026-09-08 App icon, abstract marks (V, flame, P monogram, bars) — "trash"; he wants a bird with mass, not a symbol.
+- 2026-09-09 App icon, agent-drawn bezier birds (sparrow on a wire, rooster, trophy, leaf) — clip art; use computed geometry.
+- 2026-09-12 Today round 1: V1 session-first, V2 glowing HRV figure, V4 editorial poster (no cards), V5 instrument grid — all lost to V3 (point-cloud HRV texture on top, session card below). Alex kept 3's layout and "the grains from the top"; asked for more glass on the cards and light on the background with an ascending, Solvana-like feel. V2's glow idea carries into round 2 as a background treatment, not a hero number.
+- 2026-09-12 Today round 2 (light/grain/glass on layout 3): V1 horizon glow, V2 halo + rings, V4 poster grain + crop marks, V5 rising dust — lost to V3's vertical beam rising from the bottom edge. All five glass treatments (regular/thick/thin material, brighter hairlines, top highlight, sheen, bevel) rejected: "still don't like any of the cards". "More glass" is not the fix; direction unknown, ask before another glass round.
+- 2026-09-12 Today round 3 (figure + card axes on beam light): figures V1 constellation, V2 hairline bars, V4 wave with dust, V5 number + tick strip — lost to V3's ring (thin arc, dotted baseline arc, number inside). Cards: none/hairlines, flat surface, lit top edge, recessed — lost to V3's outline-only card (stroke, no fill; beam and grain pass through). "Loved number 3." Next: VO2 max becomes the hero figure, HRV must stay visible.
+- 2026-09-12 Today round 4 (VO2 max rings × lights): V1 two rings, V2 dial with ticks, V4 HRV orbit dots, V5 dust ring — lost to V3's open gauge arc with horizon light. Then VO2 max itself was dropped as the hero ("don't include VO2 max at all"): it moves monthly, Today should lead with what changed since yesterday. Hero becomes the engine's recovery status (green/yellow/red + reason, periodization_engine). Color rule decided: white ring by default, tinted only on yellow or red.
+- 2026-09-12 Today round 5 (readiness in the open arc): V2 full arc as frame, V3 HRV-vs-baseline arc, V4 signal dots on a quiet track, V5 seven day-arcs — lost to V1's four segments (one per engine signal: HRV, RHR, form, load; lit when normal, dimmed when flagged; whole arc takes the tint). Today hero is now settled: segments arc, horizon light, outline cards. Next round: the session card's content.
+- 2026-09-12 Today round 6 (session card content): V1 hero minutes, V2 vertical timeline with zone dots, V3 zone blocks with columns, V4 editorial sentences — lost to V5's instrument split (minutes + target on the left, mono step table on the right). Alex's worry: it loses the step explanations; wants a way into the coach chat about the workout. Round 7 is that.
+- 2026-09-12 Today round 7 (explanation + coach entry on the instrument card): V1 solid full-width CTA, V2 outlined pill, V3 coach-note panel with "Ask why", V4 step descriptions as footnotes ("looks bad with all that text") — V5 chat-input teaser bar kept as the entry to the coach. Still open: how to keep step details without a wall of text. Round 8 is that.
+- 2026-09-12 Today round 8 (step details on the instrument card): V1 expandable rows with chevrons, V2 one-line coach note, V3 main-set footnote only, V5 question chips — V4 key-set panel chosen (main set called out in an inner panel: label, zone·minutes, description in white). Rule for the key set: longest step that isn't warm-up or cool-down. Rows stay tappable to reveal a description, no chevrons drawn. Alex was torn between 1 and 4; 4 won because the main set should not sit behind a daily tap.
+- 2026-09-12 Today round 9 (ask-the-coach bar): V1 outlined bar, V2 hairline row, V3 chips + solid send button, V5 glass capsule docked under the card — V4 chosen: the coach speaks first, one line in its voice from the plan's coach note ("Questions about the 4×10? Ask me."), tap opens Coach prefilled. Session card is settled.
+- 2026-09-12 Today round 10 (week card): V1 seven dots, V2 score hero with mono lines, V4 day columns with sport icons, V5 three-row ledger with hours — V3 chosen: sessions as six segments + run-km keeper row, score demoted to a mono readout ("adherence 82") in the corner.
+- 2026-09-12 Today round 11 (training timeline link): V1 outlined pill, V3 phase-bar card, V4 centred text link, V5 docked glass capsule — V2 chosen: hairline context row (label + 14-tick week strip + chevron, "Build · week 6 of 14 · race in 8 wk" beneath).
+- 2026-09-12 Today round 12 (session slot states): rest day card chosen (one line, bed icon, sentence, coach opener "Rest is training. Ask me what counts."); race week as its own outline card above the session chosen (name, day count hero, 14-segment strip, taper note) over the inline corner-label version. Adapted day: V2 quiet strikethrough lost to V1 chip + warm reason panel + original row, but Alex is undecided; round 13 explores adapted further.
+- 2026-09-12 Today round 13 (adapted day): V1 chip + warm panel, V2 struck "was" table, V3 reason inside the key-set panel, V5 "because" trigger list — V4 chosen: an orange hairline banner above the card ("Adapted" + engine reason + "use the original"), card unchanged. Banner takes the readiness tint in the port. Today screen fully decided; spec in references/today-v2.md.

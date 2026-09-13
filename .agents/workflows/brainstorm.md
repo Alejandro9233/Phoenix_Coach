@@ -41,14 +41,14 @@ selects one or more proposals explicitly (e.g. "do #2" or "do #1 and #3").
 ## Step 4 — Auto-route to the right workflow
 Once one or more proposals are approved, route automatically without asking
 which workflow to use:
-- If a proposal's Nature is VISUAL → call /design with that proposal as the
-  brief. Do not write SwiftUI directly — let /design generate Stitch options
+- If a proposal's Nature is VISUAL → call /variants with that proposal as the
+  brief. Do not write SwiftUI directly — let /variants build the five options
   first and wait for a variant to be approved before implementing.
 - If a proposal's Nature is FIX-OR-BACKEND → call /bugbatch with that
   proposal reframed as a bug/change item, following its triage → fix →
   verify steps.
 - If a proposal has both a backend and a visual component, call /bugbatch
-  first for the backend/API part, then /design for the UI part once the
+  first for the backend/API part, then /variants for the UI part once the
   backend is verified working.
 
 Multiple approved proposals may be routed in parallel via subagents if they
@@ -59,4 +59,4 @@ Never modify `periodization_engine.py`, database schema/migrations, or any
 existing API contract as part of an unapproved proposal — these require
 explicit, separate confirmation even after a proposal is greenlit, since
 they affect live production data on Render. This rule applies regardless of
-which downstream workflow (/design or /bugbatch) ends up executing the work.
+which downstream workflow (/variants or /bugbatch) ends up executing the work.

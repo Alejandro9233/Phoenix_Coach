@@ -6,11 +6,17 @@ struct PhoenixCoachApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .preferredColorScheme(.dark)
-                .task {
-                    await NetworkManager.shared.syncDeviceTimezone()
-                }
+            if let n = VariantHost.requested {
+                // /variants judging loop: `--variant N` renders one candidate.
+                CurrentVariants.view(n)
+                    .preferredColorScheme(.dark)
+            } else {
+                ContentView()
+                    .preferredColorScheme(.dark)
+                    .task {
+                        await NetworkManager.shared.syncDeviceTimezone()
+                    }
+            }
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {

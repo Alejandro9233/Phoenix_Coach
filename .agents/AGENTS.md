@@ -19,8 +19,8 @@
 - Scope each change to the specific module/phase/file actually being worked on. Don't ripple edits into unrelated files "while you're in there" without flagging it first.
 
 ## UI / visual changes
-- Any new screen, redesign, or change involving visual/UX judgment on the iOS app should go through the `/design` workflow (Stitch MCP → user approval → then implement).
-- Never implement major UI changes directly from a text description — route through `/design` first. Pure logic fixes / bug patches with no visual component are exempt.
+- Any new screen, redesign, or change involving visual/UX judgment on the iOS app goes through `/variants` (5 real SwiftUI variants → simulator contact sheet → Alex picks → then port).
+- Never implement major UI changes directly from a text description — route through `/variants` first. Pure logic fixes / bug patches with no visual component are exempt.
 
 ## Bug reports & QA output
 - Any bug report or QA summary the agent produces should follow this shape:

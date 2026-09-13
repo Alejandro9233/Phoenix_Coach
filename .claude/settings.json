@@ -69,5 +69,19 @@
     "additionalDirectories": [
       "/Users/alex/Documents/Code/Phoenix_Project"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/design-gate.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
