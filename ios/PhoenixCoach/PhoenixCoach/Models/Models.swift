@@ -910,22 +910,27 @@ struct RefreshJobStatus: Codable {
 // MARK: - Training Context (from /training-context endpoint)
 
 struct TrainingContext: Codable {
-    let currentDate: String
+    // Everything optional: the engine's `_empty_context` (no athlete / no
+    // race) returns a subset, and Today must still render its ring from
+    // `recovery` when that happens.
+    let currentDate: String?
     let raceDate: String?
-    let raceName: String
-    let raceType: String
-    let raceDistance: String
-    let weeksToRace: Int
-    let phase: String
-    let phaseName: String
-    let phaseWeek: Int
-    let phaseTotalWeeks: Int
-    let phasePriorities: String
-    let cycleWeek: Int
-    let isRecoveryWeek: Bool
-    let recoveryNote: String
+    let raceName: String?
+    let raceType: String?
+    let raceDistance: String?
+    let weeksToRace: Int?
+    let phase: String?
+    let phaseName: String?
+    let phaseWeek: Int?
+    let phaseTotalWeeks: Int?
+    let phasePriorities: String?
+    let cycleWeek: Int?
+    let isRecoveryWeek: Bool?
+    let recoveryNote: String?
     let raceGoals: RaceGoals?
-    
+    /// The periodization engine's recovery check — the Today ring.
+    let recovery: RecoveryStatus?
+
     enum CodingKeys: String, CodingKey {
         case currentDate = "current_date"
         case raceDate = "race_date"
@@ -942,6 +947,39 @@ struct TrainingContext: Codable {
         case isRecoveryWeek = "is_recovery_week"
         case recoveryNote = "recovery_note"
         case raceGoals = "race_goals"
+        case recovery
+    }
+}
+
+/// `periodization_engine._get_recovery_status`. `status` is green / yellow /
+/// red / unknown. `checks` is one tri-state per signal ("pass", "concern",
+/// "unknown") set at the same line the engine records a concern, so the
+/// ring's segments can never disagree with the word. Every field optional:
+/// the no-data branches return subsets.
+struct RecoveryStatus: Codable {
+    let status: String?
+    let detail: String?
+    let hrvVsBaseline: String?
+    let rhrTrend: String?
+    let tib: Double?
+    let loadRatio: Double?
+    let checks: [String: String]?
+
+    enum CodingKeys: String, CodingKey {
+        case status, detail, tib, checks
+        case hrvVsBaseline = "hrv_vs_baseline"
+        case rhrTrend = "rhr_trend"
+        case loadRatio = "load_ratio"
+    }
+
+    /// The word in the ring.
+    var word: String {
+        switch status {
+        case "green": return "Ready"
+        case "yellow": return "Careful"
+        case "red": return "Recover"
+        default: return "No data"
+        }
     }
 }
 

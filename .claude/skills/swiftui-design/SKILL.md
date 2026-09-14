@@ -76,7 +76,10 @@ confirm toolbar text buttons instead of xmark (AddInjurySheet is the
 model). Never ship a `Form` without `.scrollContentBackground(.hidden)` —
 the system grouped gray is alien chrome here.
 
-**Cards** — `.glassCard()` is the only card. Never hand-roll
+**Cards** — `.glassCard()` is the card on every screen except Today,
+which uses `.outlineCard()` (stroke, no fill; decided 2026-09-12, see
+[references/today-v2.md](references/today-v2.md)). A screen switches only
+through its own /variants round. Never hand-roll
 `DS.Colors.surface` + stroke (BlockCalendarView does — drift, don't copy
 it). Two rules that keep getting broken:
 - `.glassCard()` already contains `.padding(16)`. Adding your own padding
@@ -174,6 +177,10 @@ be smaller than the gap between cards (`section`), or grouping dissolves.
 moves). The hand-rolled `spring(response: 0.3, dampingFraction: 0.8)`
 scattered through the app IS `DS.Animation.normal` — reference it.
 
+- **Ambient motion exists on Today only**: the horizon glow breathes on
+  `DS.Animation.ambient` and the grain's embers climb (`DS.GrainOverlay(.embers)`).
+  Both decided by Alex 2026-09-13 from recorded clips; do not add ambient
+  motion elsewhere without a /variants round.
 - **Animate by frequency.** Every-refresh paths (Today sync, tab switches)
   get no animation — a haptic acknowledges instead. Occasional events
   (sheet present, proposal card, plan change) get `.normal`. Rare moments
@@ -308,3 +315,4 @@ rule, not the component.
 - 2026-09-12 Today round 11 (training timeline link): V1 outlined pill, V3 phase-bar card, V4 centred text link, V5 docked glass capsule — V2 chosen: hairline context row (label + 14-tick week strip + chevron, "Build · week 6 of 14 · race in 8 wk" beneath).
 - 2026-09-12 Today round 12 (session slot states): rest day card chosen (one line, bed icon, sentence, coach opener "Rest is training. Ask me what counts."); race week as its own outline card above the session chosen (name, day count hero, 14-segment strip, taper note) over the inline corner-label version. Adapted day: V2 quiet strikethrough lost to V1 chip + warm reason panel + original row, but Alex is undecided; round 13 explores adapted further.
 - 2026-09-12 Today round 13 (adapted day): V1 chip + warm panel, V2 struck "was" table, V3 reason inside the key-set panel, V5 "because" trigger list — V4 chosen: an orange hairline banner above the card ("Adapted" + engine reason + "use the original"), card unchanged. Banner takes the readiness tint in the port. Today screen fully decided; spec in references/today-v2.md.
+- 2026-09-13 Today grain (clips): shimmer, weave, lit-by-glow, flicker — lost to rising dust. Then ascending motion: slow drift, fast drift, whole-texture scroll, breathe — lost to embers (brighter specks born in the bottom third, climb and fade). Also: the horizon glow is top-anchored to the content, not the screen; the "HRV RHR FORM LOAD" labels under the arc removed; corner date is the newest snapshot's date ("data · Sep 12"), not the device's last fetch.

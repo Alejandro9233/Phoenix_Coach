@@ -1,20 +1,22 @@
 import SwiftUI
 
-/// Today's session — the workout card on the Today tab.
+/// Today's session — the instrument card on the Today tab.
 ///
-/// Built from the "Today Activities Card" design canvas (Option A, 2026-09-10).
-/// One card per day: title + sport/zone/HR line + a thin hero numeral for the
-/// minutes, a zone-coloured segment bar of the steps, the steps as rows with
-/// a zone label instead of a timeline dot, and the fuel line in an inner
-/// panel. An adapted day adds a chip in the header, the reason in plain
-/// words with the telemetry comparison as its footer row, and the original
-/// plan as a one-line disclosure at the bottom — the previous card showed
-/// the original as a second full card you scrolled sideways to find.
+/// Rounds 6–9 and 12–13 of the Today variants (references/today-v2.md):
+/// title row · split body (minutes + target on the left, mono step table on
+/// the right) · zone bar · the key set called out in an inner panel · one
+/// line in the coach's voice that opens the chat. An adapted day puts a
+/// banner *above* the card in the readiness tint; the card itself does not
+/// change. Rows reveal their description on tap, no chevrons drawn.
 struct TodaySessionCard: View {
     let plan: DayPlan
+    /// Readiness status, for the adapted banner's tint.
+    var readinessStatus: String? = nil
     var onCompare: (() -> Void)? = nil
+    /// Opens the Coach tab with this prompt prefilled.
+    var onAskCoach: ((String) -> Void)? = nil
 
-    @State private var showOriginal = false
+    @State private var revealed: Set<Int> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var workouts: [Workout] { plan.workouts ?? [] }
@@ -22,214 +24,114 @@ struct TodaySessionCard: View {
         guard let a = plan.adaptation else { return false }
         return !a.isEmpty
     }
-    private var originals: [Workout] { plan.originalWorkouts ?? [] }
+    private var original: Workout? { plan.originalWorkouts?.first }
+    private var bannerTint: Color {
+        let c = DS.Colors.readiness(readinessStatus)
+        return c == .white || c == DS.Colors.outline ? DS.Colors.warning : c
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            HStack(alignment: .center, spacing: DS.Spacing.s) {
-                Text("Today's session")
-                    .font(.system(size: 11, weight: .bold))
-                    .textCase(.uppercase)
-                    .tracking(DS.Tracking.wide)
-                    .foregroundStyle(DS.Colors.outline)
-                Spacer()
-                if isAdapted {
-                    Text("Adapted")
-                        .font(.system(size: 10, weight: .bold))
-                        .textCase(.uppercase)
-                        .tracking(DS.Tracking.normal)
-                        .foregroundStyle(DS.Colors.onAccent)
-                        .padding(.horizontal, DS.Spacing.s)
-                        .padding(.vertical, DS.Spacing.xs)
-                        .background(DS.Colors.accent)
-                        .clipShape(Capsule())
-                }
+            if isAdapted, let reason = plan.adaptation {
+                adaptedBanner(reason)
             }
-            .padding(.horizontal, DS.Spacing.xs)
-
+            DS.SectionLabel(text: "Today's session")
+                .padding(.horizontal, DS.Spacing.xs)
             VStack(alignment: .leading, spacing: DS.Spacing.l) {
                 ForEach(Array(workouts.enumerated()), id: \.offset) { index, workout in
                     if index > 0 { hairline }
-                    SessionWorkoutBlock(workout: workout)
-                    if index == 0 && isAdapted, let reason = plan.adaptation {
-                        adaptationPanel(reason)
-                    }
+                    instrument(workout, index: index)
                 }
-
-                if isAdapted && !originals.isEmpty {
-                    hairline
-                    originalDisclosure
-                }
+                coachOpener
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassCard()
+            .outlineCard()
         }
     }
 
-    // MARK: - Adapted day
+    // MARK: - Adapted banner (round-13 V4)
 
-    private func adaptationPanel(_ reason: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private func adaptedBanner(_ reason: String) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+            Rectangle().fill(bannerTint.opacity(0.6)).frame(height: 1)
             HStack(alignment: .top, spacing: DS.Spacing.s) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 13))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white)
-                    .padding(.top, 2)
+                DS.MonoLabel(text: "Adapted", color: bannerTint)
                 Text(reason)
-                    .font(.system(size: 13))
+                    .font(.system(size: 11))
                     .foregroundStyle(DS.Colors.onSurface)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(DS.Spacing.m)
-
-            if let onCompare {
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 1)
+            if let onCompare, let o = original {
                 Button(action: onCompare) {
-                    HStack(spacing: DS.Spacing.xs + 2) {
-                        Image(systemName: "waveform.path.ecg")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("Compare telemetry")
-                            .font(.system(size: 13, weight: .semibold))
+                    HStack {
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(DS.Colors.outline)
+                        DS.MonoLabel(text: "Use the original · \(o.title)\(SessionFormat.minutes(o.totalTime).map { " \($0) min" } ?? "")",
+                                     color: .white)
+                            .lineLimit(1)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, DS.Spacing.m)
-                    .frame(height: 44)
+                    .frame(minHeight: 32)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Compare telemetry")
+                .accessibilityLabel("Compare with the original plan")
             }
+            Rectangle().fill(bannerTint.opacity(0.6)).frame(height: 1)
         }
-        .background(Color.white.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
+        .padding(.horizontal, DS.Spacing.xs)
+        .transition(.opacity)
+        .accessibilityElement(children: .combine)
     }
 
-    private var originalDisclosure: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            Button {
-                withAnimation(reduceMotion ? nil : DS.Animation.quick) {
-                    showOriginal.toggle()
-                }
-            } label: {
-                HStack(alignment: .center, spacing: DS.Spacing.s) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Original plan")
-                            .font(.system(size: 11, weight: .bold))
-                            .textCase(.uppercase)
-                            .tracking(DS.Tracking.normal)
-                            .foregroundStyle(DS.Colors.outline)
-                        ForEach(Array(originals.enumerated()), id: \.offset) { _, w in
-                            originalLine(w)
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: showOriginal ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(DS.Colors.outline)
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Original plan")
-            .accessibilityValue(showOriginal ? "Expanded" : "Collapsed")
-            .accessibilityAddTraits(.isButton)
+    // MARK: - Instrument body (round-6 V5)
 
-            if showOriginal {
-                VStack(alignment: .leading, spacing: DS.Spacing.m) {
-                    ForEach(Array(originals.enumerated()), id: \.offset) { index, w in
-                        if index > 0 { hairline }
-                        SessionStepList(steps: w.steps)
-                    }
-                }
-                .padding(DS.Spacing.m)
-                .background(Color.white.opacity(0.03))
-                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
-                .transition(.opacity)
-            }
-        }
-    }
-
-    /// "Tempo Run · Zone 4 · 50 min" with the zone word in its colour.
-    private func originalLine(_ w: Workout) -> some View {
-        let zone = SessionFormat.zone(of: w)
-        let minutes = SessionFormat.minutes(w.totalTime)
-        var line = Text(w.title)
-        if let zone {
-            line = line + Text(" · ") + Text("Zone \(zone)").foregroundColor(DS.Colors.zone(zone))
-        }
-        if let minutes {
-            line = line + Text(" · \(minutes) min")
-        }
-        return line
-            .font(.system(size: 13))
-            .foregroundStyle(DS.Colors.onSurface)
-    }
-
-    private var hairline: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.06))
-            .frame(height: 1)
-    }
-}
-
-// MARK: - One workout inside the card
-
-private struct SessionWorkoutBlock: View {
-    let workout: Workout
-
-    private var minutes: Int? { SessionFormat.minutes(workout.totalTime) }
-    private var zone: Int? { SessionFormat.zone(of: workout) }
-
-    var body: some View {
+    private func instrument(_ w: Workout, index: Int) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.l) {
-            HStack(alignment: .top, spacing: DS.Spacing.m) {
-                VStack(alignment: .leading, spacing: DS.Spacing.xs + 2) {
-                    HStack(spacing: DS.Spacing.s) {
-                        Image(systemName: workout.sportIcon)
-                            .font(.system(size: 15, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white)
-                        Text(workout.title)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                    }
-                    Text(subtitle)
-                        .font(.system(size: 11, weight: .bold))
-                        .textCase(.uppercase)
-                        .tracking(DS.Tracking.normal)
-                        .foregroundStyle(DS.Colors.outline)
+            VStack(alignment: .leading, spacing: DS.Spacing.xs + 2) {
+                HStack(spacing: DS.Spacing.s) {
+                    Image(systemName: w.sportIcon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white)
+                    Text(w.title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
                 }
-                Spacer(minLength: DS.Spacing.s)
-                if let minutes {
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("\(minutes)")
-                            .font(.system(size: 36, weight: .ultraLight))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                        Text("min")
-                            .font(.system(size: 13))
-                            .foregroundStyle(DS.Colors.outline)
-                    }
-                    .fixedSize()
-                }
+                Text(subtitle(w))
+                    .font(.system(size: 11, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(DS.Tracking.normal)
+                    .foregroundStyle(DS.Colors.outline)
             }
             .accessibilityElement(children: .combine)
 
-            if !workout.steps.isEmpty {
-                SessionSegmentBar(steps: workout.steps)
-                SessionStepList(steps: workout.steps)
+            HStack(alignment: .top, spacing: DS.Spacing.l) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                    if let m = SessionFormat.minutes(w.totalTime) {
+                        DS.HeroNumeral(value: "\(m)", unit: "min", size: 36)
+                    }
+                    if let z = SessionFormat.zone(of: w) {
+                        DS.MonoLabel(text: "target Z\(z)", color: DS.Colors.zone(z))
+                    }
+                    if let hr = SessionFormat.heartRate(w.hrTarget) {
+                        DS.MonoLabel(text: hr)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                if !w.steps.isEmpty {
+                    Rectangle().fill(Color.white.opacity(0.10)).frame(width: 1)
+                    stepTable(w.steps, workoutIndex: index)
+                }
             }
+            .fixedSize(horizontal: false, vertical: true)
 
-            if let fuel = workout.fuel, !fuel.isEmpty {
+            if !w.steps.isEmpty {
+                SessionSegmentBar(steps: w.steps)
+            }
+            if let key = keySet(of: w) {
+                keySetPanel(key)
+            }
+            if let fuel = w.fuel, !fuel.isEmpty {
                 HStack(alignment: .center, spacing: DS.Spacing.s) {
                     Image(systemName: "fork.knife")
                         .font(.system(size: 13))
@@ -240,26 +142,209 @@ private struct SessionWorkoutBlock: View {
                         .foregroundStyle(DS.Colors.onSurface)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(DS.Spacing.m)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.03))
-                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
                 .accessibilityElement(children: .combine)
             }
         }
     }
 
+    private func stepTable(_ steps: [WorkoutStep], workoutIndex: Int) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { i, st in
+                if i > 0 { hairline }
+                let id = workoutIndex * 100 + i
+                let open = revealed.contains(id)
+                Button {
+                    withAnimation(reduceMotion ? nil : DS.Animation.quick) {
+                        if open { revealed.remove(id) } else { revealed.insert(id) }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                        HStack(spacing: DS.Spacing.m) {
+                            DS.MonoLabel(text: st.zone.map { "Z\($0)" } ?? "", color: DS.Colors.zone(st.zone))
+                                .frame(width: 22, alignment: .leading)
+                            DS.MonoLabel(text: st.type, color: .white)
+                            Spacer(minLength: DS.Spacing.s)
+                            Text(SessionFormat.tableDuration(st.duration))
+                                .font(.system(size: 13, weight: .light, design: .monospaced))
+                                .foregroundStyle(.white)
+                        }
+                        if open, let d = st.description, !d.isEmpty {
+                            Text(d)
+                                .font(.system(size: 11))
+                                .foregroundStyle(DS.Colors.outline)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.leading, 22 + DS.Spacing.m)
+                                .transition(.opacity)
+                        }
+                    }
+                    .padding(.vertical, DS.Spacing.s)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityValue(open ? "Expanded" : "Collapsed")
+                .accessibilityAddTraits(.isButton)
+            }
+        }
+    }
+
+    // MARK: - Key set (round-8 V4)
+
+    /// The longest step that isn't warm-up or cool-down.
+    private func keySet(of w: Workout) -> WorkoutStep? {
+        let candidates = w.steps.filter { st in
+            let t = st.type.lowercased()
+            return !t.contains("warm") && !t.contains("cool")
+        }
+        guard let step = candidates.max(by: {
+            (SessionFormat.minutes($0.duration) ?? 0) < (SessionFormat.minutes($1.duration) ?? 0)
+        }) else { return nil }
+        guard let d = step.description, !d.isEmpty else { return nil }
+        return step
+    }
+
+    private func keySetPanel(_ step: WorkoutStep) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+            HStack(spacing: DS.Spacing.s) {
+                DS.SectionLabel(text: "Key set")
+                DS.MonoLabel(text: [step.zone.map { "Z\($0)" }, SessionFormat.stepDuration(step.duration)]
+                                .compactMap { $0 }.joined(separator: " · "),
+                             color: DS.Colors.zone(step.zone))
+            }
+            Text(step.description ?? "")
+                .font(.system(size: 13))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(DS.Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.medium))
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Coach opener (round-9 V4)
+
+    /// One line in the coach's voice. The plan's coach note, first sentence,
+    /// else a fixed line. Tap opens the Coach tab with the session as context.
+    private var openerLine: String {
+        if isAdapted { return "I changed today. Ask me why." }
+        if let note = plan.coachNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            let first = note.split(whereSeparator: { ".!?".contains($0) }).first.map(String.init) ?? note
+            let line = first.trimmingCharacters(in: .whitespaces)
+            if line.count <= 64 { return line + (first.count < note.count ? "." : "") }
+        }
+        return "Questions about today? Ask me."
+    }
+
+    private var openerPrompt: String {
+        let title = workouts.first?.title ?? "today's session"
+        if isAdapted { return "Why did you change today's session (\(title))?" }
+        return "About today's session, \(title): what should I know before I start?"
+    }
+
+    @ViewBuilder private var coachOpener: some View {
+        if let onAskCoach {
+            Button {
+                onAskCoach(openerPrompt)
+            } label: {
+                HStack(alignment: .top, spacing: DS.Spacing.s) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white)
+                        .padding(.top, 1)
+                    Text(openerLine)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.leading)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(DS.Colors.outline)
+                        .padding(.top, 2)
+                }
+                .frame(minHeight: 32)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ask the coach about today's session")
+        }
+    }
+
+    // MARK: - Helpers
+
     /// "Run · Zone 2 · 140–150 bpm" — each part only when known.
-    private var subtitle: String {
-        var parts = [SessionFormat.sportName(workout.sport)]
-        if let zone { parts.append("Zone \(zone)") }
-        if let hr = SessionFormat.heartRate(workout.hrTarget) { parts.append(hr) }
+    private func subtitle(_ w: Workout) -> String {
+        var parts = [SessionFormat.sportName(w.sport)]
+        if let zone = SessionFormat.zone(of: w) { parts.append("Zone \(zone)") }
+        if let hr = SessionFormat.heartRate(w.hrTarget) { parts.append(hr) }
         return parts.joined(separator: " · ")
+    }
+
+    private var hairline: some View {
+        Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
+    }
+}
+
+/// Rest day: the card shrinks to one line and the coach's opener.
+/// Round-12 V3 of the Today variants.
+struct RestDayCard: View {
+    var note: String? = nil
+    var onAskCoach: ((String) -> Void)? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+            DS.SectionLabel(text: "Today's session")
+                .padding(.horizontal, DS.Spacing.xs)
+            VStack(alignment: .leading, spacing: DS.Spacing.l) {
+                HStack(spacing: DS.Spacing.s) {
+                    Image(systemName: "bed.double.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.white)
+                    Text("Rest day")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    DS.MonoLabel(text: "no session")
+                }
+                Text(note?.isEmpty == false ? note! : "Nothing structured. Walk, stretch, sleep.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(DS.Colors.onSurface)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let onAskCoach {
+                    Button {
+                        onAskCoach("It's a rest day. What counts as recovery today, and what should I avoid?")
+                    } label: {
+                        HStack(alignment: .top, spacing: DS.Spacing.s) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 13))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(.white)
+                            Text("Rest is training. Ask me what counts.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(DS.Colors.outline)
+                        }
+                        .frame(minHeight: 32)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Ask the coach about rest days")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .outlineCard()
+        }
     }
 }
 
 /// Step durations as a thin bar, each segment in its zone colour.
-private struct SessionSegmentBar: View {
+struct SessionSegmentBar: View {
     let steps: [WorkoutStep]
 
     private let gap: CGFloat = 2
@@ -283,51 +368,6 @@ private struct SessionSegmentBar: View {
             }
             .frame(height: 8)
             .accessibilityHidden(true)
-        }
-    }
-}
-
-/// The steps as rows: zone label · name + description · duration.
-private struct SessionStepList: View {
-    let steps: [WorkoutStep]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                if index > 0 {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(height: 1)
-                }
-                HStack(alignment: .top, spacing: DS.Spacing.m) {
-                    Text(step.zone.map { "Z\($0)" } ?? "")
-                        .font(.system(size: 11, weight: .bold))
-                        .monospacedDigit()
-                        .tracking(DS.Tracking.normal)
-                        .foregroundStyle(DS.Colors.zone(step.zone))
-                        .frame(width: 28, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(step.type)
-                            .font(.system(size: 11, weight: .bold))
-                            .textCase(.uppercase)
-                            .tracking(DS.Tracking.normal)
-                            .foregroundStyle(DS.Colors.outline)
-                        if let desc = step.description, !desc.isEmpty {
-                            Text(desc)
-                                .font(.system(size: 13))
-                                .foregroundStyle(DS.Colors.onSurface)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    Spacer(minLength: DS.Spacing.s)
-                    Text(SessionFormat.stepDuration(step.duration))
-                        .font(.system(size: 13, weight: .light))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                }
-                .padding(.vertical, DS.Spacing.s)
-                .accessibilityElement(children: .combine)
-            }
         }
     }
 }
@@ -369,6 +409,16 @@ enum SessionFormat {
         if let n = Int(digits) { return n > 0 ? n : nil }
         if let d = Double(digits) { return d > 0 ? Int(d.rounded()) : nil }
         return nil
+    }
+
+    /// The instrument table's column: always mm:ss, so the digits line up.
+    static func tableDuration(_ raw: String) -> String {
+        if raw.contains(":") {
+            let parts = raw.split(separator: ":")
+            if parts.count == 2 { return raw }
+        }
+        if let m = minutes(raw) { return String(format: "%02d:00", m) }
+        return raw
     }
 
     /// "10:00" stays; a bare "30" becomes "30 min".

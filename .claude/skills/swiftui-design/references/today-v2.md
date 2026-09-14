@@ -7,13 +7,21 @@ candidate is `Views/Variants/CurrentVariants.swift` at round 13 in git history
 of this session's working tree; the pieces are reusable as-is.
 
 ## Screen
-- Background: `DS.Colors.background`, a **horizon glow** (white radial,
-  centre x 0.5 / y 0.42, radius 440, opacity 0.34) rising from under the ring.
-  Replaces the top radial on this screen only.
-- **Film grain** over the background: ~12k static 1pt white dots, alpha
-  0.03–0.10, seeded so it never shimmers. `allowsHitTesting(false)`.
-- No sync pill in the content. Date on the top-left, "synced HH:MM" on the
-  top-right, both mono micro-labels. The pull-to-refresh gesture stays; its
+- Background: `DS.Colors.background`. The **horizon glow** (white radial,
+  radius ~440, opacity ~0.34) rises from under the ring and is the *content's*
+  top-aligned background, so it scrolls away with the header (Alex,
+  2026-09-13: "top anchored"). Replaces the top radial on this screen only. It breathes (`DS.Animation.ambient`,
+  12 s, ±3% opacity, a few points of drift), off under Reduce Motion. The one
+  non-state animation in the app, Alex's call 2026-09-13.
+- **Film grain** on the screen (fixed, does not scroll): `DS.GrainOverlay(.embers)`
+  — ~12k seeded dots denser toward the bottom, plus ~140 brighter specks born
+  in the bottom third that climb and fade (12 fps Canvas, frozen under Reduce
+  Motion). Grain round of 2026-09-13: still / shimmer / weave / rising / lit /
+  flicker → rising; then slow drift / fast drift / embers / scrolling texture /
+  breathe → embers.
+- No sync pill in the content. Date on the top-left, "data · Sep 12" on the
+  top-right (the newest recovery snapshot's date, i.e. when watch data last
+  landed — never the device's last fetch), both mono micro-labels. The pull-to-refresh gesture stays; its
   readout during the pull is decided in the port (pill vs the corner label).
 - Cards are **outline only**: `RoundedRectangle(DS.Radius.large)` stroke
   white 0.22, no fill, `DS.Spacing.l` padding. Light and grain pass through.
@@ -28,7 +36,7 @@ of this session's working tree; the pieces are reusable as-is.
 - **Colour rule:** the arc is white on green; `DS.Colors.warning` on yellow;
   `DS.Colors.danger` on red. Nothing else on the screen takes the tint
   except the adapted banner.
-- Labels under the arc: HRV · RHR · FORM · LOAD, mono.
+- No labels under the arc (removed 2026-09-13; the corner readouts name the signals).
 - Corner readouts: bottom-left HRV ms (white) / % vs baseline / RHR + trend;
   bottom-right form (white) / load ratio / ATL · CTL.
 - Data: `periodization_engine` recovery check → `status`, `detail`,

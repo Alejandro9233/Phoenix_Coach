@@ -7,10 +7,14 @@ extension String: @retroactive Identifiable {
 
 struct TodayView: View {
     @StateObject private var network = NetworkManager.shared
+    @Environment(\.grainMode) private var grainMode
     @State private var weeklyPlan: WeeklyPlanResponse?
     @State private var planStatus: WeeklyPlanStatusResponse?
     @State private var dashboard: DashboardResponse?
     @State private var refreshResponse: SmartRefreshResponse?
+    /// /training-context: the engine's recovery check (the readiness ring)
+    /// and where we are in the block (the timeline row).
+    @State private var trainingContext: TrainingContext?
     
     @State private var isLoading = false
     @State private var isSyncing = false
@@ -180,6 +184,40 @@ struct TodayView: View {
         return nil
     }
     
+    private var pillActive: Bool {
+        isSyncing || isDragging || dwellTask != nil || lightSyncArmed || deepSyncArmed
+    }
+
+    /// "Saturday · Sep 13". Explicit locale: the app's copy is English.
+    private var headerDateText: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "EEEE · MMM d"
+        return f.string(from: Date())
+    }
+
+    /// "data · Sep 12": the date of the newest recovery snapshot, i.e. when
+    /// watch data last landed. Not when this device last talked to the
+    /// backend — that number said "today" on a day nothing had synced.
+    private var syncedText: String {
+        guard let raw = dashboard?.recovery.first?.date else { return "no data" }
+        let inF = DateFormatter()
+        inF.locale = Locale(identifier: "en_US_POSIX")
+        inF.dateFormat = "yyyy-MM-dd"
+        guard let d = inF.date(from: raw) else { return "data · \(raw)" }
+        if Calendar.current.isDateInToday(d) { return "data · today" }
+        let outF = DateFormatter()
+        outF.locale = Locale(identifier: "en_US_POSIX")
+        outF.dateFormat = "MMM d"
+        return "data · \(outF.string(from: d))"
+    }
+
+    /// The coach opener: prefill the Coach tab and switch to it.
+    private func askCoach(_ prompt: String) {
+        ChatPrefill.pending = prompt
+        NotificationCenter.default.post(name: NSNotification.Name("OpenCoachChat"), object: nil)
+    }
+
     var body: some View {
         NavigationStack {
             // One ScrollView. The error and content states are branched
@@ -192,49 +230,74 @@ struct TodayView: View {
                 // The pill sits outside the branch and outside the dimming: it
                 // reports both refresh tiers and the error state, so it is the
                 // one thing that must stay legible while the rest fades.
-                VStack(spacing: 24) {
-                    statusPill
-
+                VStack(spacing: DS.Spacing.section) {
                     if let err = errorMessage, weeklyPlan == nil, dashboard == nil {
                         errorView(err)
                             .frame(maxWidth: .infinity, minHeight: 400)
                     } else {
-                        VStack(spacing: 24) {
+                        VStack(spacing: DS.Spacing.section) {
+                            ReadinessHeader(
+                                recovery: trainingContext?.recovery,
+                                hrvMs: latestRecovery?.hrvMs,
+                                restingHr: latestRecovery?.restingHr,
+                                ati: latestRecovery?.ati,
+                                cti: latestRecovery?.cti,
+                                dateText: headerDateText,
+                                syncedText: syncedText,
+                                onHRV: { if dashboard?.recovery.isEmpty == false { showHRVChart = true } },
+                                onRHR: { if dashboard?.recovery.isEmpty == false { showRHRChart = true } },
+                                onLoad: { if dashboard?.recovery.isEmpty == false { showLoadChart = true } }
+                            )
+
                             // "What just happened" — the refresh that just ran,
                             // same event the History tab keeps durably.
                             if let event = refreshResponse?.event, !debriefDismissed, !isSyncing {
                                 debriefCard(event)
                             }
 
-                            VStack(spacing: 12) {
-                                HStack(spacing: 12) {
-                                    hrvCard
-                                    rhrCard
-                                }
-                                loadRatioCard
-                            }
-
                             if let race = planStatus?.race {
                                 raceWeekCard(race)
                             }
 
-                            timelineLink
-
                             if needsRaceSetup {
                                 raceSetupCard
+                            } else if let todayPlan = todayDayPlan, !(todayPlan.workouts ?? []).isEmpty {
+                                TodaySessionCard(
+                                    plan: todayPlan,
+                                    readinessStatus: trainingContext?.recovery?.status,
+                                    onCompare: { showAdaptationSheet = true },
+                                    onAskCoach: askCoach
+                                )
                             } else {
-                                workoutProtocolSection
+                                RestDayCard(note: todayDayPlan?.coachNote, onAskCoach: askCoach)
                             }
 
-                            complianceSection
+                            if let progress = planStatus?.weekProgress {
+                                WeekCard(progress: progress)
+                            }
 
-                            rationaleSection
+                            TimelineRow(context: trainingContext)
                         }
                         .opacity(isSyncing ? 0.3 : 1.0)
                     }
                 }
-                .padding()
+                .padding(.horizontal, DS.Spacing.page)
+                .padding(.top, DS.Spacing.s)
+                .padding(.bottom, DS.Spacing.section)
+                // The light is the ring's, so it scrolls away with it.
+                .background(alignment: .top) { DS.HorizonGlow() }
             }
+            // The pill is the gesture's readout and the sync's progress. It
+            // only exists while one of those is happening; at rest the header's
+            // corner labels carry the date and the last sync.
+            .overlay(alignment: .top) {
+                if pillActive {
+                    statusPill
+                        .padding(.top, DS.Spacing.s)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(DS.Animation.normal, value: pillActive)
             .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, offsetY in
                 handlePull(offsetY: offsetY)
             }
@@ -272,18 +335,9 @@ struct TodayView: View {
             }
             .background {
                 ZStack {
-                    DS.Colors.background
-                    RadialGradient(
-                        gradient: Gradient(colors: [
-                            DS.Colors.accent.opacity(0.12),
-                            .clear
-                        ]),
-                        center: .top,
-                        startRadius: 0,
-                        endRadius: 400
-                    )
+                    DS.Colors.background.ignoresSafeArea()
+                    DS.GrainOverlay(mode: grainMode)
                 }
-                .ignoresSafeArea()
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -410,10 +464,10 @@ struct TodayView: View {
                     .scaleEffect(deepSyncArmed ? 1.25 : 1.0)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: isSyncing)
+        .animation(DS.Animation.quick, value: isSyncing)
         // Spring, not easeInOut: arming should feel like a detent clicking over.
-        .animation(.spring(response: 0.28, dampingFraction: 0.62), value: deepSyncArmed)
-        .animation(.spring(response: 0.28, dampingFraction: 0.62), value: lightSyncArmed)
+        .animation(DS.Animation.detent, value: deepSyncArmed)
+        .animation(DS.Animation.detent, value: lightSyncArmed)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial)
@@ -537,270 +591,10 @@ struct TodayView: View {
         lightSyncArmed = false
         deepSyncArmed = false
         if dwellProgress != 0 {
-            withAnimation(.easeOut(duration: 0.18)) { dwellProgress = 0 }
+            withAnimation(DS.Animation.quick) { dwellProgress = 0 }
         }
     }
     
-    private var hrvCard: some View {
-        Button(action: { if dashboard?.recovery.isEmpty == false { showHRVChart = true } }) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "heart.text.square")
-                        .font(.subheadline)
-                        .foregroundStyle(DS.Colors.accent)
-                    Spacer()
-                    Text("HRV")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.1)
-                        .foregroundStyle(DS.Colors.outline)
-                }
-                
-                Spacer()
-                
-                HStack(alignment: .bottom, spacing: 2) {
-                    if let hrv = latestRecovery?.hrvMs {
-                        Text("\(Int(hrv))")
-                            .font(.system(size: 36, weight: .ultraLight))
-                            .foregroundStyle(DS.Colors.primaryText)
-                        Text("ms")
-                            .font(.caption2)
-                            .foregroundStyle(DS.Colors.outline)
-                            .padding(.bottom, 6)
-                    } else {
-                        Text("--")
-                            .font(.system(size: 36, weight: .ultraLight))
-                            .foregroundStyle(DS.Colors.outline)
-                    }
-                }
-                
-                Spacer()
-                
-                if let hrv = latestRecovery?.hrvMs, let baseline = dashboard?.athlete?.hrvBaseline, baseline > 0 {
-                    let pctDiff = ((hrv - baseline) / baseline) * 100.0
-                    let sign = pctDiff >= 0 ? "+" : ""
-                    Text("\(sign)\(Int(pctDiff))% vs baseline")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(pctDiff >= -15 ? .green : .red)
-                } else {
-                    Text("No baseline")
-                        .font(.system(size: 10, weight: .regular))
-                        .foregroundStyle(DS.Colors.outline)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 120)
-            .glassCard()
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-    }
-    
-    private var rhrCard: some View {
-        Button(action: { if dashboard?.recovery.isEmpty == false { showRHRChart = true } }) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "heart.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(DS.Colors.accent)
-                    Spacer()
-                    Text("RHR")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.1)
-                        .foregroundStyle(DS.Colors.outline)
-                }
-                
-                Spacer()
-                
-                HStack(alignment: .bottom, spacing: 2) {
-                    if let rhr = latestRecovery?.restingHr {
-                        Text("\(rhr)")
-                            .font(.system(size: 36, weight: .ultraLight))
-                            .foregroundStyle(DS.Colors.primaryText)
-                        Text("bpm")
-                            .font(.caption2)
-                            .foregroundStyle(DS.Colors.outline)
-                            .padding(.bottom, 6)
-                    } else {
-                        Text("--")
-                            .font(.system(size: 36, weight: .ultraLight))
-                            .foregroundStyle(DS.Colors.outline)
-                    }
-                }
-                
-                Spacer()
-                
-                if let rhr = latestRecovery?.restingHr, let baseRhr = dashboard?.athlete?.hrRest {
-                    let diff = rhr - baseRhr
-                    let sign = diff >= 0 ? "+" : ""
-                    Text("\(sign)\(diff) bpm vs rest")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(diff <= 5 ? .green : .red)
-                } else {
-                    Text("No baseline")
-                        .font(.system(size: 10, weight: .regular))
-                        .foregroundStyle(DS.Colors.outline)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 120)
-            .glassCard()
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-    }
-    
-    private var loadRatioCard: some View {
-        Button(action: { if dashboard?.recovery.isEmpty == false { showLoadChart = true } }) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.subheadline)
-                        .foregroundStyle(DS.Colors.accent)
-                    
-                    Text("LOAD RATIO")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.1)
-                        .foregroundStyle(DS.Colors.outline)
-                    
-                    Spacer()
-                    
-                    let label = latestRecovery?.loadRatioLabel ?? loadRatioLabel(for: latestRecovery?.loadRatio)
-                    Text(label.uppercased())
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(badgeColor(for: label))
-                        .clipShape(Capsule())
-                }
-                
-                HStack(alignment: .center, spacing: 16) {
-                    HStack(alignment: .bottom, spacing: 2) {
-                        if let ratio = latestRecovery?.loadRatio {
-                            Text(String(format: "%.2f", ratio))
-                                .font(.system(size: 36, weight: .ultraLight))
-                                .foregroundStyle(DS.Colors.primaryText)
-                        } else {
-                            Text("--")
-                                .font(.system(size: 36, weight: .ultraLight))
-                                .foregroundStyle(DS.Colors.outline)
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Injury risk evaluation based on acute vs chronic load")
-                            .font(.caption2)
-                            .foregroundStyle(DS.Colors.onSurface)
-                        
-                        if let cti = latestRecovery?.cti, let ati = latestRecovery?.ati {
-                            Text("ATL: \(Int(ati)) • CTL: \(Int(cti))")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(DS.Colors.outline)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .glassCard()
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-    }
-    
-    private var timelineLink: some View {
-        NavigationLink(destination: BlockCalendarView()) {
-            HStack(spacing: 12) {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.title3)
-                    .foregroundStyle(DS.Colors.accent)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("TRAINING TIMELINE")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(1.1)
-                        .foregroundStyle(DS.Colors.outline)
-                    Text("View training phases and full calendar")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.footnote)
-                    .foregroundStyle(DS.Colors.outline)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glassCard()
-        }
-        .buttonStyle(.plain)
-    }
-    
-    private var workoutProtocolSection: some View {
-        Group {
-            if let todayPlan = todayDayPlan, !(todayPlan.workouts ?? []).isEmpty {
-                TodaySessionCard(plan: todayPlan, onCompare: { showAdaptationSheet = true })
-            } else {
-                emptyDayCard
-            }
-        }
-    }
-    
-    private var complianceSection: some View {
-        Group {
-            if let score = planStatus?.weekProgress?.complianceScore {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("WEEKLY ADHERENCE")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.1)
-                        .foregroundStyle(DS.Colors.outline)
-
-                    HStack(alignment: .center, spacing: 16) {
-                        Text("\(score)")
-                            .font(.system(size: 48, weight: .ultraLight))
-                            .foregroundStyle(complianceColor(for: score))
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("/ 100")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(DS.Colors.outline)
-
-                            if let completed = planStatus?.weekProgress?.sessionsCompleted,
-                               let planned = planStatus?.weekProgress?.sessionsPlanned {
-                                Text("\(completed) of \(planned) sessions completed")
-                                    .font(.caption2)
-                                    .foregroundStyle(DS.Colors.onSurface)
-                            }
-                        }
-                        Spacer()
-                    }
-
-                    // Protected run km, week to date vs the Python target.
-                    // Hidden when the target is nil — a zero-denominator bar
-                    // would be a lie, not a chart.
-                    if let done = planStatus?.weekProgress?.runKmDone,
-                       let target = planStatus?.weekProgress?.runKmTarget,
-                       target > 0 {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("RUN KM")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .tracking(1.2)
-                                    .foregroundStyle(DS.Colors.outline)
-                                Spacer()
-                                Text(String(format: "%.1f of %.0f km", done, target))
-                                    .font(.system(size: 12, weight: .light))
-                                    .foregroundStyle(DS.Colors.onSurface)
-                            }
-                            RunProgressBar(done: done, target: target)
-                        }
-                        .padding(.top, 2)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .glassCard()
-            }
-        }
-    }
-
     // MARK: - Debrief card (what the refresh just did)
 
     private func debriefCard(_ event: HistoryEvent) -> some View {
@@ -812,7 +606,7 @@ struct TodayView: View {
                     .foregroundStyle(DS.Colors.outline)
                 Spacer()
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(DS.Animation.normal) {
                         debriefDismissed = true
                     }
                 } label: {
@@ -862,9 +656,8 @@ struct TodayView: View {
             }
             .padding(.top, 2)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
+        .outlineCard()
         .sheet(isPresented: $showDebriefSheet) {
             RefreshDebriefSheet(event: event)
         }
@@ -874,102 +667,78 @@ struct TodayView: View {
     // MARK: - Race week card (final two weeks)
 
     private func raceWeekCard(_ race: RaceStatus) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
             HStack {
-                Image(systemName: "flag.checkered")
-                    .font(.system(size: 14))
-                    .foregroundStyle(DS.Colors.accent)
-                Text(race.isRaceWeek == true ? "RACE WEEK" : "RACE AHEAD")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.5)
+                DS.SectionLabel(text: race.isRaceWeek == true ? "Race week" : "Race ahead")
+                Spacer()
+                if let d = race.raceDate {
+                    DS.MonoLabel(text: raceDateText(d))
+                }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
+                Text(race.raceName ?? "Race")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                 Spacer()
+                if let days = race.daysToRace {
+                    if days == 0 {
+                        DS.MonoLabel(text: "today", color: .white)
+                    } else {
+                        DS.HeroNumeral(value: "\(days)", unit: days == 1 ? "day" : "days", size: 36)
+                    }
+                }
             }
-            if let days = race.daysToRace {
-                Text(days == 0
-                     ? "\(race.raceName ?? "Race") — today."
-                     : "\(race.raceName ?? "Race") in \(days) day\(days == 1 ? "" : "s")")
-                    .font(.system(size: 22, weight: .ultraLight))
-                    .foregroundStyle(.white)
+            if let days = race.daysToRace, (0...14).contains(days) {
+                HStack(spacing: 3) {
+                    ForEach(0..<14, id: \.self) { i in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(i < 14 - days || i == 13 ? Color.white : Color.white.opacity(0.12))
+                            .frame(height: i == 13 ? 10 : 6)
+                    }
+                }
+                .accessibilityHidden(true)
             }
             if race.pacing != nil {
                 Button {
                     showRacePlanSheet = true
                 } label: {
-                    HStack {
+                    HStack(spacing: DS.Spacing.s) {
                         Image(systemName: "stopwatch")
                             .font(.system(size: 12))
-                        Text("RACE PLAN")
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(1.5)
+                        Text("Race plan")
+                            .font(.system(size: 13, weight: .semibold))
                     }
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
+                    .foregroundStyle(DS.Colors.onAccent)
+                    .padding(.horizontal, DS.Spacing.l)
+                    .padding(.vertical, DS.Spacing.s + 1)
                     .background(DS.Colors.accent)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
+        .outlineCard()
+        .accessibilityElement(children: .combine)
         .sheet(isPresented: $showRacePlanSheet) {
             if let pacing = race.pacing {
                 RacePlanSheet(race: race, pacing: pacing)
             }
         }
     }
-    
-    private func complianceColor(for score: Int) -> Color {
-        if score >= 90 { return .green }
-        if score >= 80 { return .teal }
-        if score >= 70 { return .orange }
-        return .red
+
+    /// "2026-09-20" → "Sun Sep 20". Explicit locale on both sides.
+    private func raceDateText(_ raw: String) -> String {
+        let inF = DateFormatter()
+        inF.locale = Locale(identifier: "en_US_POSIX")
+        inF.dateFormat = "yyyy-MM-dd"
+        guard let d = inF.date(from: raw) else { return raw }
+        let outF = DateFormatter()
+        outF.locale = Locale(identifier: "en_US_POSIX")
+        outF.dateFormat = "EEE MMM d"
+        return outF.string(from: d)
     }
-    
-    private var rationaleSection: some View {
-        Group {
-            if let todayPlan = todayDayPlan {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("COACH'S RATIONALE & NOTE")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(1.1)
-                        .foregroundStyle(DS.Colors.outline)
-                    
-                    if let rationale = todayPlan.rationale, !rationale.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("RATIONALE")
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(0.9)
-                                .foregroundStyle(DS.Colors.accent)
-                            Text(rationale)
-                                .font(.system(size: 13))
-                                .foregroundStyle(DS.Colors.onSurface)
-                                .lineSpacing(3)
-                        }
-                    }
-                    
-                    if let note = todayPlan.coachNote, !note.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("COACH NOTE")
-                                .font(.system(size: 9, weight: .bold))
-                                .tracking(0.9)
-                                .foregroundStyle(DS.Colors.accent)
-                            Text(note)
-                                .font(.system(size: 13).italic())
-                                .foregroundStyle(DS.Colors.onSurface)
-                                .lineSpacing(3)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .glassCard()
-            }
-        }
-    }
-    
+
     /// Shared scaffold for the empty-state cards, so their styles can't drift.
     /// `messagePadding` exists because raceSetupCard insets its message and
     /// emptyDayCard never did.
@@ -996,19 +765,8 @@ struct TodayView: View {
             accessory()
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .glassCard()
-    }
-
-    private var emptyDayCard: some View {
-        statusCard(
-            icon: "zzz",
-            iconColor: DS.Colors.outline,
-            title: "Rest Day",
-            message: "No structured training scheduled for today. Focus on active recovery, stretching, or general wellness."
-        ) {
-            EmptyView()
-        }
+        .padding(.vertical, DS.Spacing.s)
+        .outlineCard()
     }
 
     /// Shown in place of the plan when the backend answers 409
@@ -1062,8 +820,23 @@ struct TodayView: View {
         async let dashTask: () = fetchDashboard()
         async let planTask: () = fetchWeeklyPlan()
         async let statusTask: () = fetchPlanStatus()
-        _ = await (dashTask, planTask, statusTask)
+        async let ctxTask: () = fetchTrainingContext()
+        _ = await (dashTask, planTask, statusTask, ctxTask)
         endSync()
+    }
+
+    /// The readiness ring and the timeline row. Cheap on the server (DB and
+    /// date math, no LLM) and it runs alongside the other reads. A failure
+    /// leaves the ring in its no-data state rather than blanking the screen.
+    private func fetchTrainingContext() async {
+        do {
+            let ctx = try await network.fetchTrainingContext()
+            await MainActor.run {
+                self.trainingContext = ctx
+            }
+        } catch {
+            print("Training context fetch error: \(error)")
+        }
     }
     
     private func fetchWeeklyPlan() async {
@@ -1244,33 +1017,13 @@ struct TodayView: View {
         await MainActor.run { self.endSync(haptic: .medium) }
     }
 
-    /// The three plain reads both refresh tiers end with.
+    /// The four plain reads both refresh tiers end with.
     private func fetchAllFromBackend() async {
         async let dashTask: () = fetchDashboard(forceRefresh: true)
         async let planTask: () = fetchWeeklyPlan()
         async let statusTask: () = fetchPlanStatus()
-        _ = await (dashTask, planTask, statusTask)
-    }
-    
-    private func loadRatioLabel(for ratio: Double?) -> String {
-        guard let ratio = ratio else { return "UNKNOWN" }
-        if ratio < 0.8 { return "DETRAINING" }
-        if ratio <= 1.3 { return "OPTIMAL" }
-        if ratio <= 1.5 { return "OVERREACHING" }
-        return "HIGH RISK"
-    }
-    
-    private func badgeColor(for label: String) -> Color {
-        switch label.uppercased() {
-        case "OPTIMAL":
-            return .green
-        case "DETRAINING", "OVERREACHING":
-            return .orange
-        case "HIGH RISK":
-            return .red
-        default:
-            return .gray
-        }
+        async let ctxTask: () = fetchTrainingContext()
+        _ = await (dashTask, planTask, statusTask, ctxTask)
     }
     
     private func errorView(_ error: String) -> some View {

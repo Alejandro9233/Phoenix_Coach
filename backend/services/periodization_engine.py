@@ -1939,10 +1939,20 @@ class PeriodizationEngine:
         }
 
     def _get_recovery_status(self, db: Session) -> dict:
-        """Assess current recovery status from recent snapshots."""
+        """Assess current recovery status from recent snapshots.
+
+        ``checks`` is one tri-state per signal the status is built from —
+        ``"pass"``, ``"concern"``, or ``"unknown"`` (no data). It is set at the
+        same lines that append a concern, never re-derived afterwards, so the
+        Today ring's four segments cannot disagree with the status word. Status
+        itself is still derived from the concern list; keep it that way until
+        adapt-today's triggers read these checks too (council 2026-09-12).
+        """
         snapshots = db.query(RecoverySnapshot).order_by(
             RecoverySnapshot.date.desc()
         ).limit(7).all()
+
+        checks = {"hrv": "unknown", "rhr": "unknown", "form": "unknown", "load": "unknown"}
 
         if not snapshots:
             return {
@@ -1952,6 +1962,7 @@ class PeriodizationEngine:
                 "load_ratio": None,
                 "status": "unknown",
                 "detail": "No recovery data available. Train conservatively.",
+                "checks": checks,
             }
 
         latest = snapshots[0]
@@ -1968,9 +1979,12 @@ class PeriodizationEngine:
             if len(recent_hrv) >= 2 and latest.hrv_baseline:
                 avg_recent = sum(recent_hrv) / len(recent_hrv)
                 avg_pct = ((avg_recent - latest.hrv_baseline) / latest.hrv_baseline) * 100
+                checks["hrv"] = "pass"
                 if avg_pct < -10:
+                    checks["hrv"] = "concern"
                     concerns.append(f"HRV {avg_pct:.0f}% below baseline for {len(recent_hrv)} days — significant fatigue signal")
                 elif avg_pct < -5:
+                    checks["hrv"] = "concern"
                     concerns.append(f"HRV {avg_pct:.0f}% below baseline — mild fatigue signal")
 
         # RHR trend
@@ -1982,27 +1996,36 @@ class PeriodizationEngine:
                 diff = rhr_values[0] - avg_rhr
                 if diff > 5:
                     rhr_trend = "elevated"
+                    checks["rhr"] = "concern"
                     concerns.append(f"RHR {rhr_values[0]} bpm — {diff:.0f} bpm above 7-day average")
                 elif diff > 3:
                     rhr_trend = "slightly_elevated"
+                    checks["rhr"] = "concern"
                     concerns.append(f"RHR slightly elevated ({diff:.0f} bpm above average)")
                 else:
                     rhr_trend = "stable"
+                    checks["rhr"] = "pass"
 
         # TIB (form)
         tib = latest.tib
         if tib is not None:
+            checks["form"] = "pass"
             if tib < -20:
+                checks["form"] = "concern"
                 concerns.append(f"TIB at {tib:.0f} — deep fatigue territory, consider reducing load")
             elif tib < -15:
+                checks["form"] = "concern"
                 concerns.append(f"TIB at {tib:.0f} — accumulated fatigue building")
 
         # Load ratio
         load_ratio = latest.load_ratio
         if load_ratio is not None:
+            checks["load"] = "pass"
             if load_ratio > 1.5:
+                checks["load"] = "concern"
                 concerns.append(f"Load ratio {load_ratio:.2f} — HIGH injury risk, reduce training")
             elif load_ratio > 1.3:
+                checks["load"] = "concern"
                 concerns.append(f"Load ratio {load_ratio:.2f} — approaching overreach, monitor carefully")
 
         # Determine status color
@@ -2023,6 +2046,7 @@ class PeriodizationEngine:
             "load_ratio": round(load_ratio, 2) if load_ratio is not None else None,
             "status": status,
             "detail": detail,
+            "checks": checks,
         }
 
     def _get_last_week_summary(self, db: Session) -> dict:
@@ -2139,6 +2163,10 @@ class PeriodizationEngine:
             "phase_name": "Phase 1: Foundation",
             "phase_priorities": "Build consistency and aerobic base",
             "weeks_to_race": None,
-            "recovery": {"status": "unknown", "detail": reason},
+            "recovery": {
+                "status": "unknown",
+                "detail": reason,
+                "checks": {"hrv": "unknown", "rhr": "unknown", "form": "unknown", "load": "unknown"},
+            },
             "error": reason,
         }
