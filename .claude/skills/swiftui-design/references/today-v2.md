@@ -84,3 +84,24 @@ of this session's working tree; the pieces are reusable as-is.
   retry, offline, debrief card after a refresh, race-setup card, the
   rationale section (opener replaces the note; rationale → chat or drop),
   HRV/RHR/load chart sheets (open from the corner readouts).
+
+## Deep-sync Live Activity (decided 2026-09-15, one round, V3)
+
+The deep tier of the pull shows in the Dynamic Island and on the lock screen;
+the light tier stays inline. Lives in `ios/PhoenixCoach/SyncActivity/`.
+
+- **Step strip**: the sync's four steps (Scrape · Recovery · Plan · Refresh,
+  `SyncActivityAttributes.steps`) as 2pt capsules with 10pt bold uppercase
+  labels. Done and current lit white, current with the arc's glow shadow,
+  upcoming white 0.14. Failure turns the current step red.
+- **Expanded island**: glyph + "Deep sync" micro-label leading, 22pt
+  ultraLight elapsed timer trailing, strip with labels in the bottom region.
+- **Compact island**: glyph leading, the strip as four unlabeled ticks
+  trailing (44pt wide). **Minimal**: glyph.
+- **Lock screen**: glyph + label and timer on one row, strip, then the stage
+  sentence in `onSurface`. Stale (app suspended) swaps the sentence for
+  "Still syncing on the server. Open the app for the result." in outline.
+- No spinner: activities are rendered snapshots. The ticking timer and the
+  advancing strip are the proof of life.
+- Losers logged in SKILL.md: instrument, sentence-first, glow + grain
+  material, ring.

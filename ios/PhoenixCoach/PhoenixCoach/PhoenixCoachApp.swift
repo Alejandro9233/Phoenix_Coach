@@ -15,6 +15,13 @@ struct PhoenixCoachApp: App {
                     .preferredColorScheme(.dark)
                     .task {
                         await NetworkManager.shared.syncDeviceTimezone()
+                        #if DEBUG
+                        // `--sync-demo`: fake deep-sync stages for screenshotting
+                        // the Live Activity without scraping production.
+                        if DeepSyncActivity.demoRequested {
+                            await DeepSyncActivity.shared.runDemo()
+                        }
+                        #endif
                     }
             }
         }

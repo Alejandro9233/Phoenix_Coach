@@ -369,6 +369,9 @@ struct TodayView: View {
                 Text(scraperErrorMessage)
             }
             .task {
+                // A Live Activity from a launch that died mid-sync would still
+                // say "syncing"; the job finished server-side without it.
+                DeepSyncActivity.shared.endStale()
                 if weeklyPlan == nil {
                     await loadInitialData()
                 }
@@ -805,6 +808,13 @@ struct TodayView: View {
         resetPull()
     }
 
+    /// One stage message, both places it shows: the pill and, for the deep
+    /// tier, the Live Activity. `update` is a no-op when no activity is up.
+    private func setSyncStage(_ stage: String) async {
+        syncMessage = stage
+        await DeepSyncActivity.shared.update(stage: stage)
+    }
+
     private func endSync(haptic: UIImpactFeedbackGenerator.FeedbackStyle? = nil) {
         isSyncing = false
         syncStartedAt = nil
@@ -939,7 +949,11 @@ struct TodayView: View {
     /// poll loop's sleep safe *there and only there*.
     private func performSmartRefresh() async {
         guard !isSyncing else { return }
-        beginSync("Starting deep sync...")
+        let opening = "Starting deep sync..."
+        beginSync(opening)
+        // The deep tier is the one long enough to leave the app for, so it is
+        // the one that gets a Live Activity. The light tier stays inline.
+        DeepSyncActivity.shared.start(stage: opening)
 
         await detachedFetch {
             do {
@@ -957,7 +971,7 @@ struct TodayView: View {
                         try await Task.sleep(for: .seconds(2))
                         status = try await network.smartRefreshStatus()
                         if !status.stage.isEmpty {
-                            await MainActor.run { self.syncMessage = status.stage }
+                            await self.setSyncStage(status.stage)
                         }
                     }
 
@@ -967,7 +981,7 @@ struct TodayView: View {
                     // manual pull now happens once, automatically.
                     if status.state == "idle", !rejoined {
                         rejoined = true
-                        await MainActor.run { self.syncMessage = "Server restarted — retrying sync..." }
+                        await self.setSyncStage("Server restarted — retrying sync...")
                         status = try await network.startSmartRefresh()
                         continue
                     }
@@ -1010,11 +1024,17 @@ struct TodayView: View {
             }
 
             // Always re-read from the backend, whatever the job did.
-            await MainActor.run { self.syncMessage = "Refreshing data..." }
+            await self.setSyncStage("Refreshing data...")
             await fetchAllFromBackend()
         }
 
         await MainActor.run { self.endSync(haptic: .medium) }
+        // The island's last word. Every failure path above raises the alert
+        // flag, so it is the one bit that separates "synced" from "failed".
+        await DeepSyncActivity.shared.end(
+            showScraperError ? .failed : .synced,
+            message: showScraperError ? scraperErrorMessage : "Biometrics synced"
+        )
     }
 
     /// The four plain reads both refresh tiers end with.

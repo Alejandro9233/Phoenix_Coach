@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FAB3D36B3057AE32003A4AF2 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAB3D36A3057AE32003A4AF2 /* WidgetKit.framework */; };
+		FAB3D36D3057AE32003A4AF2 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FAB3D36C3057AE32003A4AF2 /* SwiftUI.framework */; };
+		FAB3D37E3057AE33003A4AF2 /* SyncActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FAB3D3693057AE32003A4AF2 /* SyncActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		FAD74ED3301412A200D8B4BB /* Hub in Frameworks */ = {isa = PBXBuildFile; productRef = FAD74ED2301412A200D8B4BB /* Hub */; };
 		FAD74ED5301412A200D8B4BB /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = FAD74ED4301412A200D8B4BB /* Tokenizers */; };
 		FAD74ED7301412A200D8B4BB /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = FAD74ED6301412A200D8B4BB /* Transformers */; };
@@ -17,14 +20,77 @@
 		FAD74EE3301413FE00D8B4BB /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = FAD74EE2301413FE00D8B4BB /* MLXVLM */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		FAB3D37C3057AE33003A4AF2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FA9327432FB54F5C00E14013 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FAB3D3683057AE32003A4AF2;
+			remoteInfo = SyncActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		FAB3D3833057AE33003A4AF2 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				FAB3D37E3057AE33003A4AF2 /* SyncActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		FA93274B2FB54F5C00E14013 /* PhoenixCoach.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhoenixCoach.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAB3D3693057AE32003A4AF2 /* SyncActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SyncActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAB3D36A3057AE32003A4AF2 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		FAB3D36C3057AE32003A4AF2 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4AEF52E8201642E18ADBEE79 /* Exceptions for "PhoenixCoach" folder in "SyncActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				DesignSystem.swift,
+			);
+			target = FAB3D3683057AE32003A4AF2 /* SyncActivityExtension */;
+		};
+		A157DE191D3847A5A424672F /* Exceptions for "SyncActivity" folder in "PhoenixCoach" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SyncActivityAttributes.swift,
+			);
+			target = FA93274A2FB54F5C00E14013 /* PhoenixCoach */;
+		};
+		FAB3D37F3057AE33003A4AF2 /* Exceptions for "SyncActivity" folder in "SyncActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = FAB3D3683057AE32003A4AF2 /* SyncActivityExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		FA93274D2FB54F5C00E14013 /* PhoenixCoach */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4AEF52E8201642E18ADBEE79 /* Exceptions for "PhoenixCoach" folder in "SyncActivityExtension" target */,
+			);
 			path = PhoenixCoach;
+			sourceTree = "<group>";
+		};
+		FAB3D36E3057AE32003A4AF2 /* SyncActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A157DE191D3847A5A424672F /* Exceptions for "SyncActivity" folder in "PhoenixCoach" target */,
+				FAB3D37F3057AE33003A4AF2 /* Exceptions for "SyncActivity" folder in "SyncActivityExtension" target */,
+			);
+			path = SyncActivity;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -45,6 +111,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FAB3D3663057AE32003A4AF2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FAB3D36D3057AE32003A4AF2 /* SwiftUI.framework in Frameworks */,
+				FAB3D36B3057AE32003A4AF2 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -52,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				FA93274D2FB54F5C00E14013 /* PhoenixCoach */,
+				FAB3D36E3057AE32003A4AF2 /* SyncActivity */,
 				FA9327972FBC9EE900E14013 /* Frameworks */,
 				FA93274C2FB54F5C00E14013 /* Products */,
 			);
@@ -61,6 +137,7 @@
 			isa = PBXGroup;
 			children = (
 				FA93274B2FB54F5C00E14013 /* PhoenixCoach.app */,
+				FAB3D3693057AE32003A4AF2 /* SyncActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,6 +145,8 @@
 		FA9327972FBC9EE900E14013 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				FAB3D36A3057AE32003A4AF2 /* WidgetKit.framework */,
+				FAB3D36C3057AE32003A4AF2 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -82,10 +161,12 @@
 				FA9327472FB54F5C00E14013 /* Sources */,
 				FA9327482FB54F5C00E14013 /* Frameworks */,
 				FA9327492FB54F5C00E14013 /* Resources */,
+				FAB3D3833057AE33003A4AF2 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				FAB3D37D3057AE33003A4AF2 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				FA93274D2FB54F5C00E14013 /* PhoenixCoach */,
@@ -105,6 +186,28 @@
 			productReference = FA93274B2FB54F5C00E14013 /* PhoenixCoach.app */;
 			productType = "com.apple.product-type.application";
 		};
+		FAB3D3683057AE32003A4AF2 /* SyncActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FAB3D3803057AE33003A4AF2 /* Build configuration list for PBXNativeTarget "SyncActivityExtension" */;
+			buildPhases = (
+				FAB3D3653057AE32003A4AF2 /* Sources */,
+				FAB3D3663057AE32003A4AF2 /* Frameworks */,
+				FAB3D3673057AE32003A4AF2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				FAB3D36E3057AE32003A4AF2 /* SyncActivity */,
+			);
+			name = SyncActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = SyncActivityExtension;
+			productReference = FAB3D3693057AE32003A4AF2 /* SyncActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -116,6 +219,9 @@
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					FA93274A2FB54F5C00E14013 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					FAB3D3683057AE32003A4AF2 = {
 						CreatedOnToolsVersion = 26.5;
 					};
 				};
@@ -140,12 +246,20 @@
 			projectRoot = "";
 			targets = (
 				FA93274A2FB54F5C00E14013 /* PhoenixCoach */,
+				FAB3D3683057AE32003A4AF2 /* SyncActivityExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		FA9327492FB54F5C00E14013 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FAB3D3673057AE32003A4AF2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -162,7 +276,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FAB3D3653057AE32003A4AF2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FAB3D37D3057AE33003A4AF2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FAB3D3683057AE32003A4AF2 /* SyncActivityExtension */;
+			targetProxy = FAB3D37C3057AE33003A4AF2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		FA9327542FB54F5E00E14013 /* Debug */ = {
@@ -296,6 +425,7 @@
 				DEVELOPMENT_TEAM = 8V2JH6CUZV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -331,6 +461,7 @@
 				DEVELOPMENT_TEAM = 8V2JH6CUZV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -347,6 +478,68 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		FAB3D3813057AE33003A4AF2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8V2JH6CUZV;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SyncActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SyncActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Alejandro.PhoenixCoach.SyncActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FAB3D3823057AE33003A4AF2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8V2JH6CUZV;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SyncActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SyncActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Alejandro.PhoenixCoach.SyncActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -371,6 +564,15 @@
 			buildConfigurations = (
 				FA9327572FB54F5E00E14013 /* Debug */,
 				FA9327582FB54F5E00E14013 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FAB3D3803057AE33003A4AF2 /* Build configuration list for PBXNativeTarget "SyncActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FAB3D3813057AE33003A4AF2 /* Debug */,
+				FAB3D3823057AE33003A4AF2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
