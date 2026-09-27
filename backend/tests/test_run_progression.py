@@ -173,6 +173,21 @@ def test_long_run_progresses_plus_12(test_db_session):
     assert t["long_run_minutes"] == 78  # 112 * 0.7
 
 
+def test_comeback_long_run_steps_from_short_runs(test_db_session):
+    """Two short runs back from a layoff (31 and 38 min, both under 8 km):
+    rebuild mode steps the long run up from 38 -> 50, not the 70-minute
+    fresh-athlete default. No runs at all still starts at 70."""
+    assert _target(test_db_session, BUILD_DEF)["long_run_minutes"] == 70
+
+    _run(test_db_session, MONDAY - timedelta(days=2), 4.5, dur_min=31)
+    _run(test_db_session, MONDAY - timedelta(days=1), 5.6, dur_min=38)
+    test_db_session.commit()
+
+    t = _target(test_db_session, BUILD_DEF)
+    assert t["rebuild_mode"] is True
+    assert t["long_run_minutes"] == 50
+
+
 def test_profile_without_run_range_returns_none(test_db_session):
     """Stub profiles without km in their volume_note degrade to None."""
     stub = {"sport_sessions": {"running": {"volume_note": "easy running only"}}}

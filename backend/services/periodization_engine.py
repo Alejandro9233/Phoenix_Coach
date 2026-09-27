@@ -1854,14 +1854,17 @@ class PeriodizationEngine:
 
         week_km: dict[int, float] = {}
         longest_run_min = 0.0
+        longest_any_min = 0.0
         for a in activities:
             if (a.sport or "") != "running" or not a.start_time:
                 continue
             km = (a.distance_m or 0) / 1000
             wk = (a.start_time.date() - window_start).days // 7
             week_km[wk] = week_km.get(wk, 0.0) + km
-            if km >= 8 and a.duration_sec:
-                longest_run_min = max(longest_run_min, a.duration_sec / 60)
+            if a.duration_sec:
+                longest_any_min = max(longest_any_min, a.duration_sec / 60)
+                if km >= 8:
+                    longest_run_min = max(longest_run_min, a.duration_sec / 60)
 
         weeks_with_data = [v for v in week_km.values() if v > RUN_NOISE_FLOOR_KM]
 
@@ -1889,6 +1892,14 @@ class PeriodizationEngine:
                     f" — rebuild mode: ramp cap {ramp_cap:.1f} km is below the "
                     f"phase floor, building back gradually"
                 )
+
+        # Rebuild mode with no 8 km+ run in the window means a comeback on
+        # short runs. Step up from the longest of those, not from the
+        # fresh-athlete 70-minute default: on 2026-09-26 that default would
+        # have planned a 70-minute long run for an ankle two weeks off a
+        # sprain whose longest run back was 38 minutes.
+        if rebuild_mode and longest_run_min == 0:
+            longest_run_min = longest_any_min
 
         if longest_run_min > 0:
             long_run = longest_run_min + LONG_RUN_STEP_MIN
