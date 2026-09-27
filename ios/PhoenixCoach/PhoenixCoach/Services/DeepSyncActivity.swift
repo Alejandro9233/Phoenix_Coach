@@ -41,7 +41,7 @@ final class DeepSyncActivity {
 
     private var activity: ActivityKit.Activity<SyncActivityAttributes>?
     /// Which of `SyncActivityAttributes.steps` is in progress. Kept here so a
-    /// stage string nobody recognises leaves the strip where it was.
+    /// stage string nobody recognises leaves the ring where it was.
     private var step = 0
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     /// Set while the app is in the background with an activity up: the
@@ -89,7 +89,7 @@ final class DeepSyncActivity {
     func end(_ outcome: SyncActivityAttributes.Outcome, message: String) async {
         guard let activity else { return }
         self.activity = nil
-        // Synced lights the whole strip; failed leaves it where it stopped.
+        // Synced lights the whole ring; failed leaves it where it stopped.
         if outcome == .synced { step = SyncActivityAttributes.steps.count - 1 }
         await activity.end(content(stage: message, outcome: outcome, endedAt: .now),
                            dismissalPolicy: .after(.now.addingTimeInterval(6)))

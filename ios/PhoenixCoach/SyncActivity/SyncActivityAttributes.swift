@@ -16,7 +16,7 @@ struct SyncActivityAttributes: ActivityAttributes {
         /// The job's current stage, verbatim from the backend
         /// ("Scraping COROS..."), or the final word.
         var stage: String
-        /// Index into `steps` of the stage in progress. The strip lights
+        /// Index into `steps` of the stage in progress. The ring lights
         /// this one and everything before it.
         var step: Int
         var outcome: Outcome
@@ -35,16 +35,16 @@ struct SyncActivityAttributes: ActivityAttributes {
     /// timer counts from here on its own, no per-second update needed.
     var startedAt: Date
 
-    /// The four steps the strip shows, in order. Three are the backend
+    /// The four steps the ring shows, in order. Three are the backend
     /// job's `report(...)` stages in `_run_smart_refresh`; the last is the
     /// phone re-reading everything afterwards. "Plan" only runs when
     /// recovery says today's session should change — when it is skipped
-    /// the strip simply lights it along with Refresh.
+    /// the ring simply lights it along with Refresh.
     static let steps = ["Scrape", "Recovery", "Plan", "Refresh"]
 
     /// Maps a stage string to its step. Matched on prefixes so a reworded
     /// suffix does not break it; a stage nobody here knows keeps the
-    /// previous step rather than jumping the strip around.
+    /// previous step rather than jumping the ring around.
     static func step(for stage: String, previous: Int) -> Int {
         let s = stage.lowercased()
         if s.hasPrefix("starting") || s.hasPrefix("scraping") || s.hasPrefix("server restarted") { return 0 }
