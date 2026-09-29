@@ -49,6 +49,9 @@ LONG_RUN_SLACK_MIN = 5.0    # long-run shortfall (soft) fires past this
 # Overshoot direction is HARD: 2026-08-31 planned a 118-min long run against
 # an 86-min engine target (+37%) and only the shortfall direction existed.
 LONG_RUN_OVERSHOOT_FRAC = 0.25
+# Comeback single-run cap (C3's single_run_cap_km): rounding grace only — the
+# cap is already the 10% allowance over the longest run of the last 30 days.
+SINGLE_RUN_CAP_GRACE_KM = 0.3
 # Declared distance_km vs the km the steps describe: past this the workout
 # is internally contradictory and cannot be trusted in either direction.
 STEPS_DECLARED_TOLERANCE = 0.15
@@ -99,6 +102,7 @@ class PlanIntegrityError(Exception):
 # PlanIntegrityError when one survives the retry.
 UNREPAIRABLE_KINDS = {
     "internal_contradiction", "long_run_overshoot", "step_pace_implausible",
+    "single_run_cap",
 }
 
 # B3: titles that are quality (hard) sessions regardless of step zones.
@@ -385,6 +389,9 @@ def compute_budget(ctx: dict) -> dict | None:
         "hours_low": hours_low,
         "hours_high": hours_high,
         "long_run_minutes": vt.get("long_run_minutes"),
+        # Comeback weeks only: no run longer than this.
+        "single_run_cap_km": vt.get("single_run_cap_km"),
+        "longest_run_30d_km": vt.get("longest_run_30d_km"),
         # Blocked-running weeks: the long run's slot on the bike.
         "long_ride_minutes": (refs.get("injury_substitution") or {})
         .get("long_ride_minutes"),
@@ -857,6 +864,34 @@ def audit_plan(plan_json: dict, ctx: dict, *, days=None, availability=None,
                 ),
                 "longest_run_min": round(window_longest, 1),
                 "target_min": lr_target,
+            })
+
+    # Comeback single-run cap: no run more than 10% over the longest run of
+    # the last 30 days — the one load number the injury evidence ties to a
+    # single session (Frandsen 2025). HARD, windowed, and unrepairable like
+    # the overshoot: stripping can't shorten a run. Estimated distances
+    # (minutes / 6) are skipped; a slow easy pace would read as a breach.
+    cap_km = budget.get("single_run_cap_km")
+    if cap_km and not race_week:
+        for day_name, w in _window_workouts(plan_json, window):
+            if map_sport(w.get("sport") or "") != "running":
+                continue
+            km, source = workout_km(w)
+            if source in ("estimated", "none") or km <= cap_km + SINGLE_RUN_CAP_GRACE_KM:
+                continue
+            longest = budget.get("longest_run_30d_km") or 0.0
+            report.hard.append({
+                "kind": "single_run_cap",
+                "day": day_name,
+                "title": w.get("title"),
+                "detail": (
+                    f'"{w.get("title")}" on {day_name} is {km:.1f} km. While '
+                    f"coming back no run may exceed {cap_km:.1f} km (10% over "
+                    f"the longest run of the last 30 days, {longest:.1f} km). "
+                    f"Shorten it — add a run instead of lengthening one."
+                ),
+                "run_km": round(km, 1),
+                "cap_km": cap_km,
             })
 
     _audit_titles(plan_json, ctx or {}, window, report)

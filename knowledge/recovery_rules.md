@@ -71,11 +71,16 @@
 ## Load Ratio (Acute:Chronic)
 | Ratio | State | Action |
 |---|---|---|
-| <0.8 | Detraining risk | Increase training volume — you're doing too little |
+| <0.8 | Low recent load | Expected in a comeback or a taper. Otherwise check the drop was intended — never add volume just to lift the ratio |
 | 0.8-1.0 | Maintenance | Stable fitness — good for recovery weeks |
 | 1.0-1.3 | Optimal training zone | "Sweet spot" — building fitness safely |
 | 1.3-1.5 | Functional overreaching | Acceptable for 1-2 weeks max during a hard build block |
 | >1.5 | HIGH injury/illness risk | Reduce load immediately — do NOT train through this |
+
+Treat the ratio as context, not a rule: it has known statistical flaws
+(Impellizzeri et al. 2020) and did not predict injury in 5,205 runners
+(Frandsen et al. 2025). For runners the evidence points at single runs
+instead — see "Coming Back After a Break" in periodization.md.
 
 ## Overtraining Warning Signs
 When multiple of these occur together, prescribe rest:

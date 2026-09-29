@@ -137,6 +137,9 @@ substitution case only starts above that.
 - Week 3: Build (increase volume ~10%)
 - Week 4: Recovery (reduce volume 20-30%, maintain some intensity touches)
 - Repeat cycle
+- No recovery week inside a comeback (its reduced weeks already are the
+  recovery), in the taper (the taper IS the recovery), or in the week right
+  before the taper. The cycle restarts when a comeback ends.
 
 ### Recovery Week Rules
 - Volume drops 20-30% across all sports
@@ -155,8 +158,41 @@ This approach is ideal for an athlete with a running injury history (max 115 km/
 
 ## Key Periodization Rules
 - Never increase volume AND intensity in the same week
-- After illness or missed week: restart at 70% of previous volume
-- After injury layoff >7 days: restart at 50%, rebuild over 3-4 weeks
 - One sport can be in "build" while another is in "maintain" — don't build everything at once
-- Monitor load ratio (Acute:Chronic): keep between 0.8-1.3
-- ALWAYS respect the 3:1 cycle — deload weeks are not optional
+- Take the 3:1 recovery week, except in the cases above (comeback, taper, the week before the taper)
+- The load ratio (acute:chronic) is context, not a target — see recovery_rules.md
+
+## Coming Back After a Break
+<!-- The numbers here are the ones periodization_engine.py enforces
+(COMEBACK_LADDERS, COMEBACK_STEP_DONE, SINGLE_RUN_CAP). Change both together. -->
+
+A break is any week with 5 km of running or less: injury, illness, travel.
+The plan detects it from the watch; nothing to switch on.
+
+- **Normal week** = the best of the 4 weeks before the break. The week the
+  break started in was cut short by it, so it never counts against the athlete.
+- **Restart at a fraction of the normal week — lower the longer the break:**
+  - 1 week off: 70% → 85% → 100%
+  - 2-3 weeks off: 65% → 80% → 100%
+  - 4+ weeks off: 50% → 65% → 80% → 100%
+- **One step per week, and only once it has been run:** the watch must show at
+  least 90% of the step before the next one unlocks. A skipped run is a step
+  not taken. Still short of the normal week after 8 weeks? That volume is the
+  new normal and the regular ramp takes over.
+- **No single run more than 10% longer than the longest run of the last 30
+  days.** This is the rule with evidence behind it: in 5,205 runners, one run
+  beyond that raised overuse injuries by 52-128%, while week-to-week changes
+  showed no clear link (Frandsen et al., BJSM 2025). Reach the week's km by
+  adding runs, never by lengthening one.
+- **Easy running only** (strides are fine) until back to the normal week.
+  Workouts come back after it.
+- **Pain-free is not healed.** After an ankle sprain the ligament only regains
+  mechanical stability 6 weeks to 3 months later (Hubbard & Hicks-Little
+  2008), and a previous sprain is the biggest risk factor for the next one.
+  Move up only when the injured area is quiet the morning after a run; if it
+  isn't, repeat the step.
+- **After an ankle sprain, train balance:** 8 weeks, 3x/week, up to 30 min
+  (single-leg balance, eyes closed once it's easy; slow single-leg calf raises;
+  small hops) cut repeat sprains by a third (Hupperets et al., BMJ 2009).
+  A lace-up brace helps too (Vuurberg et al. 2018 guideline). Smooth, flat
+  ground first; trails last.

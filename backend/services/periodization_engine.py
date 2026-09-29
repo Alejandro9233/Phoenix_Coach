@@ -89,6 +89,33 @@ RACE_WEEK_EASY_CAP_KM = 14.0   # hard-cap headroom above the race distance
 TAPER_RUN_RETAIN = {3: 0.78, 2: 0.62, 1: 0.45}
 TAPER_LONG_RUN_MIN = {3: 110, 2: 80, 1: 50}
 
+# Comeback after a break (_detect_comeback). A break is any week at or under
+# RUN_NOISE_FLOOR_KM. The 3-week ramp window used to be the only memory: 1-2
+# weeks off planned ABOVE the pre-break week, 3+ weeks of zero fell back to
+# the 40 km phase floor, and a short comeback week rebuilt at +15%/week under
+# a calendar deload (2026-09-28, ankle sprain: 11.7 km against a 38.7 km
+# normal week). The comeback restarts at a fraction of the normal week —
+# lower the longer the break — and climbs one step per week, only after the
+# watch shows the previous step was run.
+COMEBACK_LADDERS = (          # (min break weeks, ladder), longest break first
+    (4, (0.50, 0.65, 0.80, 1.00)),
+    (2, (0.65, 0.80, 1.00)),
+    (1, (0.70, 0.85, 1.00)),
+)
+COMEBACK_STEP_DONE = 0.90    # a step counts as run at >= 90% of its km
+COMEBACK_BASE_WEEKS = 4      # normal week = best of the 4 weeks before the break
+COMEBACK_MAX_WEEKS = 8       # never reached the base by then: that's the new normal
+# The injury guard while coming back: no run more than 10% longer than the
+# longest run of the last 30 days. Frandsen et al., BJSM 2025 (5,205 runners):
+# overuse-injury hazard x1.64 for a 10-30% spike, x1.52 for 30-100%, x2.28
+# beyond; week-to-week change showed no clear link. The ladder is the
+# ceiling on the week, this is the ceiling on each run.
+SINGLE_RUN_CAP = 1.10
+SINGLE_RUN_WINDOW_DAYS = 30
+COMEBACK_FIRST_RUN_KM = 5.0        # single-run cap floor: a first run back
+COMEBACK_FIRST_LONG_RUN_MIN = 30   # long run when the window holds no run
+_DETECT = object()  # _get_weekly_run_target: detect the comeback itself
+
 
 # ─── Shared workout menu building blocks ──────────────────────────────────────
 # These are reused across multiple distance profiles to reduce duplication.
@@ -1195,16 +1222,35 @@ class PeriodizationEngine:
         # Phase
         phase_info = self._determine_phase(weeks_to_race, race_distance)
 
-        # Build/Recovery cycle
-        cycle_info = self._get_cycle_week(athlete.training_start_date, today)
+        start_of_week = today - timedelta(days=today.weekday())
+
+        # Coming back from a break? Replayed from the watch's runs each time.
+        comeback = self._detect_comeback(db, start_of_week)
+        comeback_active = bool(comeback and comeback["active"])
+
+        # Build/Recovery cycle — counted from the end of the last comeback
+        cycle_info = self._get_cycle_week(self._cycle_anchor(athlete, comeback), today)
 
         # Workout menu — from distance-specific profile, minus sports the
         # athlete has disabled (empty availability string = never)
         menus = profile["workout_menus"]
         menu_info = menus.get(phase_info["phase"], menus.get("foundation", _FOUNDATION_MENU))
         menu_allowed = self._filter_by_availability(menu_info["allowed"], athlete)
-
-        start_of_week = today - timedelta(days=today.weekday())
+        forbidden = list(menu_info["forbidden"])
+        forbidden_reason = menu_info["reason"]
+        if comeback_active and "running" in menu_allowed:
+            # Easy running only until the athlete is back to the normal week:
+            # never add volume and intensity together (knowledge/periodization.md).
+            menu_allowed["running"] = list(_FOUNDATION_MENU["allowed"]["running"])
+            forbidden += sorted(
+                t for t in ("Tempo Run", "Cruise Intervals", "VO2max Intervals",
+                            "Marathon Pace Long Run", "Progressive Run")
+                if t not in forbidden
+            )
+            forbidden_reason = (
+                "Comeback — easy running and strides only until the athlete is "
+                "back to the pre-break week. " + forbidden_reason
+            )
         # Same window predicate for the GOAL race: the plan week that contains
         # race day gets an explicit flag (phase=="taper" alone can't tell race
         # week from taper week 3).
@@ -1219,7 +1265,14 @@ class PeriodizationEngine:
         # "THIS IS A RECOVERY WEEK, reduce all volumes 20-25%" beside
         # "RACE WEEK". _get_weekly_run_target already resolves the same
         # collision in favour of the race; references have to agree with it.
-        deload_week = cycle_info["is_recovery_week"] and not race_week
+        # Nor inside a comeback (its reduced weeks already are the recovery),
+        # the taper (the taper IS the recovery — they used to stack, 0.45 x
+        # 0.75 of peak), or the week right before the taper, which is the
+        # last full week the athlete gets.
+        deload_week = self._deload_applies(
+            cycle_info["is_recovery_week"], race_week, comeback_active,
+            weeks_to_race, race_distance,
+        )
 
         # Sports an active injury blocks this week (sport -> reason). Read
         # through the enforcer's query so expiry is handled once. The
@@ -1244,10 +1297,23 @@ class PeriodizationEngine:
         race_week_km = RACE_KM.get(race_distance) if race_week else None
         volume_targets = self._get_weekly_run_target(
             db, self._phase_def(profile, phase_info),
-            cycle_info["is_recovery_week"], today,
+            deload_week, today,
             race_week_km=race_week_km,
             phase_id=phase_info.get("id"), weeks_to_race=weeks_to_race,
+            comeback=comeback,
         )
+        recovery_note = cycle_info["recovery_note"]
+        if comeback_active:
+            # Quality comes back once the athlete is back to the normal week.
+            volume_refs["max_quality_sessions"] = 0
+            recovery_note = (
+                f"Comeback step {comeback['step'] + 1} of {comeback['steps']}: "
+                f"building back to the {comeback['base_km']:g} km pre-break "
+                f"week. No recovery week until the comeback is done."
+            )
+        elif cycle_info["is_recovery_week"] and not deload_week and not race_week:
+            recovery_note = ("Recovery week skipped — the taper is the recovery "
+                             "from here to the race.")
 
         # After the hours window AND the long run are fixed: an injury changes
         # which sport holds the week, not how much of it there is.
@@ -1305,12 +1371,12 @@ class PeriodizationEngine:
             # Build or recovery week?
             "cycle_week": cycle_info["cycle_week"],
             "is_recovery_week": deload_week,
-            "recovery_note": cycle_info["recovery_note"],
+            "recovery_note": recovery_note,
 
             # Workout toolbox
             "workout_menu": menu_allowed,
-            "forbidden_workouts": menu_info["forbidden"],
-            "forbidden_reason": menu_info["reason"],
+            "forbidden_workouts": forbidden,
+            "forbidden_reason": forbidden_reason,
 
             # Volume references (NOT hard limits — reference data for the LLM)
             "volume_references": volume_refs,
@@ -1406,17 +1472,38 @@ class PeriodizationEngine:
         weeks_list = []
         current_week_number = 1
         today_monday = today - timedelta(days=today.weekday())
-        
+
+        # Same comeback compute_context plans from. Its remaining steps are
+        # projected forward (assuming each one gets run), and the 3:1 cycle
+        # restarts where the projection ends — as it will once it's run.
+        comeback = self._detect_comeback(db, today_monday)
+        anchor = self._cycle_anchor(athlete, comeback) or t_start
+        projected_km: dict = {}
+        projected_end = None
+        if comeback and comeback["active"]:
+            remaining = comeback["ladder"][comeback["step"]:]
+            for k, frac in enumerate(remaining):
+                projected_km[today_monday + timedelta(weeks=k)] = round(
+                    frac * comeback["base_km"], 1)
+            projected_end = today_monday + timedelta(weeks=len(remaining))
+
         for i in range(total_weeks):
             week_start = start_monday + timedelta(weeks=i)
             week_end = week_start + timedelta(days=6)
-            
+
             # Weeks to race from this week's start
             w_to_race = (race_monday - week_start).days // 7
-            
+
             # Determine phase & cycle week — distance-aware
             phase_info = self._determine_phase(w_to_race, race_distance)
-            cycle_info = self._get_cycle_week(t_start, week_start)
+            cycle_anchor = (projected_end if projected_end and week_start >= projected_end
+                            else anchor)
+            cycle_info = self._get_cycle_week(cycle_anchor, week_start)
+            deload = self._deload_applies(
+                cycle_info["is_recovery_week"],
+                bool(athlete.race_date and week_start <= athlete.race_date <= week_end),
+                week_start in projected_km, w_to_race, race_distance,
+            )
             
             is_current = (week_start == today_monday)
             if is_current:
@@ -1470,7 +1557,7 @@ class PeriodizationEngine:
                 # If no plan exists yet, provide projected target values from the phase
                 hours_range = phase_def["hours_range"]
                 # Apply recovery week adjustment if it is a recovery week
-                if cycle_info["is_recovery_week"]:
+                if deload:
                     hours_parts = hours_range.split("-")
                     if len(hours_parts) == 2:
                         try:
@@ -1485,7 +1572,9 @@ class PeriodizationEngine:
                 run_info = phase_def["sport_sessions"].get("running", {})
                 vol_note = run_info.get("volume_note", "")
                 match = re.search(r"(\d+-\d+|\d+)\s*km", vol_note)
-                if match:
+                if week_start in projected_km:
+                    expected_run_km = f"{projected_km[week_start]:g}"
+                elif match:
                     expected_run_km = match.group(1)
                 else:
                     expected_run_km = "20-28"  # fallback default
@@ -1502,13 +1591,9 @@ class PeriodizationEngine:
                 "phase": phase_info["phase"],
                 "phase_name": phase_info["phase_name"],
                 "cycle_week": cycle_info["cycle_week"],
-                # Same rule as compute_context: a race week is never also a
-                # deload week, or the calendar labels race week "recovery".
-                "is_recovery_week": (
-                    cycle_info["is_recovery_week"]
-                    and not (athlete.race_date
-                             and week_start <= athlete.race_date <= week_end)
-                ),
+                # Same rule as compute_context (_deload_applies): never on race
+                # week, inside a comeback, in the taper or the week before it.
+                "is_recovery_week": deload,
                 "is_current_week": is_current,
                 "has_plan": has_plan,
                 "plan_summary": plan_summary,
@@ -1564,6 +1649,106 @@ class PeriodizationEngine:
             "phase_total_weeks": fallback["total_weeks"],
             "phase_priorities": fallback["priorities"],
         }
+
+    def _detect_comeback(self, db: Session, monday: date) -> Optional[dict]:
+        """Where the athlete stands coming back from the most recent break,
+        for the plan week starting `monday`.
+
+        Replayed from the watch's runs every time — no comeback column to
+        drift from reality. A break is a run of weeks at or under
+        RUN_NOISE_FLOOR_KM. The normal week is the BEST of the
+        COMEBACK_BASE_WEEKS weeks before the break, so the week the break
+        started in (cut short by the injury itself) can never drag it down.
+        The ladder depends on how long the break was and climbs one step per
+        week, only when the previous step was actually run
+        (>= COMEBACK_STEP_DONE of its km) — a skipped run is a step not taken.
+
+        Returns None when the history holds no break with a usable normal
+        week. Otherwise {"active": True, ...} while climbing, or
+        {"active": False, "ended": <Monday after the top step>} once back,
+        which is where the 3:1 cycle restarts (_cycle_anchor). A comeback
+        still short of its top step after COMEBACK_MAX_WEEKS ends there too:
+        by then the lower volume is the athlete's normal and the ramp takes
+        over.
+        """
+        rows = db.query(Activity.start_time, Activity.distance_m).filter(
+            Activity.sport == "running",
+            Activity.start_time < datetime.combine(monday, datetime.min.time()),
+        ).all()
+        week_km: dict[date, float] = {}
+        for start, dist in rows:
+            if not start:
+                continue
+            day = start.date() if isinstance(start, datetime) else start
+            wk = day - timedelta(days=day.weekday())
+            week_km[wk] = week_km.get(wk, 0.0) + (dist or 0) / 1000
+        if not week_km:
+            return None
+        first = min(week_km)
+        weeks = [first + timedelta(weeks=i) for i in range((monday - first).days // 7)]
+        km = [week_km.get(w, 0.0) for w in weeks]
+
+        # Walk back over the comeback (or normal) weeks to the latest break.
+        i = len(km) - 1
+        while i >= 0 and km[i] > RUN_NOISE_FLOOR_KM:
+            i -= 1
+        if i < 0:
+            return None
+        break_end = i
+        while i >= 0 and km[i] <= RUN_NOISE_FLOOR_KM:
+            i -= 1
+        if i < 0:
+            return None  # the history starts inside the break: no normal week
+        break_weeks = break_end - i
+        # Rounded first: the steps are shown as "65% of 38.7 km" and have
+        # to multiply out to the numbers planned.
+        base = round(max(km[max(0, i - COMEBACK_BASE_WEEKS + 1): i + 1]), 1)
+        if base <= RUN_NOISE_FLOOR_KM:
+            return None
+        ladder = next(steps for min_weeks, steps in COMEBACK_LADDERS
+                      if break_weeks >= min_weeks)
+
+        summary = {"base_km": base, "break_weeks": break_weeks}
+        step = 0
+        for j in range(break_end + 1, len(km)):
+            if km[j] >= COMEBACK_STEP_DONE * ladder[step] * base:
+                step += 1
+            if step == len(ladder) or j - break_end >= COMEBACK_MAX_WEEKS:
+                return {**summary, "active": False,
+                        "ended": weeks[j] + timedelta(weeks=1)}
+        return {
+            **summary,
+            "active": True,
+            "step": step,
+            "steps": len(ladder),
+            "ladder": ladder,
+            "target_km": round(ladder[step] * base, 1),
+        }
+
+    @staticmethod
+    def _cycle_anchor(athlete: Athlete, comeback: Optional[dict]) -> Optional[date]:
+        """The 3:1 cycle counts from the end of the last comeback. Its reduced
+        weeks already did a deload's job, and counting on from
+        training_start_date could land a deload on the first full week back."""
+        ended = (comeback or {}).get("ended")
+        start = athlete.training_start_date
+        if ended and (start is None or ended > start):
+            return ended
+        return start
+
+    def _deload_applies(self, cycle_recovery: bool, race_week: bool,
+                        comeback_active: bool, weeks_to_race: int,
+                        race_distance: str) -> bool:
+        """Whether the calendar's recovery week actually cuts volume: not on
+        race week, not inside a comeback, not in the taper (it stacked:
+        0.45 x 0.75 of peak in the last taper week), and not in the week
+        right before the taper — the last full week the athlete gets."""
+        if not cycle_recovery or race_week or comeback_active:
+            return False
+        for w in (weeks_to_race, weeks_to_race - 1):
+            if w >= 0 and self._determine_phase(w, race_distance)["phase"] == "taper":
+                return False
+        return True
 
     def _get_cycle_week(self, training_start_date: Optional[date], current_date: date) -> dict:
         """Compute position in the 3:1 build/recovery cycle."""
@@ -1819,16 +2004,23 @@ class PeriodizationEngine:
         is_recovery_week: bool, today: date,
         race_week_km: float = None,
         phase_id: str = None, weeks_to_race: int = None,
+        comeback=_DETECT,
     ) -> Optional[dict]:
         """THE weekly run-km target, derived from what the athlete actually ran.
 
         RUN_RAMP x the best of the last 3 weeks' actual run km, clamped to the
         phase floor/ceiling — but a hard ramp cap of RUN_RAMP_HARD_CAP x
-        demonstrated volume beats the phase floor, so thin history (post-wipe,
-        post-break) rebuilds gradually instead of cliff-jumping to the phase
-        range. Best-of-3 rather than mean: one missed week can't crater the
-        target (the false-detraining signal _get_last_week_summary warns
-        about must never shrink a plan).
+        demonstrated volume beats the phase floor, so thin history (post-wipe)
+        rebuilds gradually instead of cliff-jumping to the phase range.
+        Best-of-3 rather than mean: one missed week can't crater the target
+        (the false-detraining signal _get_last_week_summary warns about must
+        never shrink a plan).
+
+        After a break the comeback ladder replaces the ramp (_detect_comeback;
+        `comeback` is detected here unless the caller passes it): the target
+        is the ladder step, never raised by the taper or a deload, and every
+        run is capped at SINGLE_RUN_CAP x the longest run of the last
+        SINGLE_RUN_WINDOW_DAYS (single_run_cap_km, enforced by the gate).
 
         Returns None when the phase has no run range (triathlon stubs without
         km in their volume_note) — callers and the prompt degrade to the
@@ -1846,6 +2038,9 @@ class PeriodizationEngine:
         long_run_cap = phase_def.get("long_run_cap_min")
 
         monday = today - timedelta(days=today.weekday())
+        if comeback is _DETECT:
+            comeback = self._detect_comeback(db, monday)
+        comeback_active = bool(comeback and comeback.get("active"))
         window_start = monday - timedelta(days=21)
         activities = db.query(Activity).filter(
             Activity.start_time >= datetime.combine(window_start, datetime.min.time()),
@@ -1893,20 +2088,50 @@ class PeriodizationEngine:
                     f"phase floor, building back gradually"
                 )
 
+        # Coming back from a break: the ladder replaces the ramp. The 3-week
+        # window can't see the normal week from before the break.
+        if comeback_active:
+            step = comeback["step"]
+            target = min(ceiling, comeback["target_km"])
+            hard_cap = min(ceiling * 1.05, comeback["target_km"])
+            basis = (
+                f"comeback step {step + 1} of {comeback['steps']}: "
+                f"{comeback['ladder'][step]:.0%} of the {comeback['base_km']:g} km "
+                f"pre-break week ({comeback['break_weeks']} break week(s)); "
+                f"the next step unlocks once this one is run"
+            )
+
         # Rebuild mode with no 8 km+ run in the window means a comeback on
         # short runs. Step up from the longest of those, not from the
         # fresh-athlete 70-minute default: on 2026-09-26 that default would
         # have planned a 70-minute long run for an ankle two weeks off a
         # sprain whose longest run back was 38 minutes.
-        if rebuild_mode and longest_run_min == 0:
+        if (rebuild_mode or comeback_active) and longest_run_min == 0:
             longest_run_min = longest_any_min
 
         if longest_run_min > 0:
             long_run = longest_run_min + LONG_RUN_STEP_MIN
             if long_run_cap:
                 long_run = min(long_run_cap, long_run)
+        elif comeback_active:
+            long_run = COMEBACK_FIRST_LONG_RUN_MIN
         else:
             long_run = min(long_run_cap, 70) if long_run_cap else 70
+
+        # The comeback's injury guard: no run more than SINGLE_RUN_CAP x the
+        # longest run of the last 30 days (runs already done today count).
+        single_run_cap_km = longest_30d_km = None
+        if comeback_active:
+            since = today - timedelta(days=SINGLE_RUN_WINDOW_DAYS)
+            recent = db.query(Activity.distance_m).filter(
+                Activity.sport == "running",
+                Activity.start_time >= datetime.combine(since, datetime.min.time()),
+                Activity.start_time < datetime.combine(
+                    today + timedelta(days=1), datetime.min.time()),
+            ).all()
+            longest_30d_km = max(((d or 0) / 1000 for (d,) in recent), default=0.0)
+            single_run_cap_km = round(
+                max(COMEBACK_FIRST_RUN_KM, longest_30d_km * SINGLE_RUN_CAP), 1)
 
         # Taper: step down from demonstrated peak instead of sitting on the
         # phase ceiling. ramp_base is best-of-last-3-weeks, so through the whole
@@ -1920,10 +2145,16 @@ class PeriodizationEngine:
                 f"taper week {weeks_to_race} to go: {taper_pct:.0%} of the "
                 f"{ramp_base:.1f} km peak — volume down, pace unchanged"
             )
+        if comeback_active:
+            # The taper reads the 3-week window, which may still hold the
+            # pre-break peak; the ladder stays the ceiling.
+            target = min(target, comeback["target_km"])
+            hard_cap = min(hard_cap, comeback["target_km"])
 
         # A race week outranks a recovery week — 0.6x is already the deeper
         # cut, and stacking both (0.6 x 0.75) would leave almost nothing.
         # The GOAL race week outranks everything: its budget IS the race.
+        # No deload inside a comeback or the taper either (_deload_applies).
         if race_week_km:
             target = race_week_km + RACE_WEEK_EASY_KM
             hard_cap = race_week_km + RACE_WEEK_EASY_CAP_KM
@@ -1932,7 +2163,7 @@ class PeriodizationEngine:
                 f"goal race week: {race_week_km:g} km race + up to "
                 f"{RACE_WEEK_EASY_KM:g} km of shakeouts"
             )
-        elif is_recovery_week:
+        elif is_recovery_week and not comeback_active and phase_id != "taper":
             target *= 0.75
             hard_cap *= 0.80
             long_run *= 0.7
@@ -1947,6 +2178,13 @@ class PeriodizationEngine:
             "ramp_base_km": round(ramp_base, 1),
             "rebuild_mode": rebuild_mode,
             "basis": basis,
+            # JSON-safe: the context is persisted inside plan_json.
+            "comeback": ({k: comeback[k] for k in
+                          ("step", "steps", "base_km", "target_km", "break_weeks")}
+                         if comeback_active else None),
+            "single_run_cap_km": single_run_cap_km,
+            "longest_run_30d_km": (round(longest_30d_km, 1)
+                                   if longest_30d_km is not None else None),
         }
 
     def _get_recovery_status(self, db: Session) -> dict:
