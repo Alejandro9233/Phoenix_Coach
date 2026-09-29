@@ -265,21 +265,82 @@ extension DS {
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @State private var breathing = false
 
+        /// Where the light's centre rests, in points below the anchor;
+        /// breathing lifts it `breathLift`. 297 sits it under the readiness
+        /// ring; 0 hangs it from the top bar.
+        let centerY: CGFloat
+
+        init(centerY: CGFloat = 297) {
+            self.centerY = centerY
+        }
+
+        private let breathLift: CGFloat = 27
+        private let height: CGFloat = 900
+        /// Drawn this far above the anchor so the light runs under the
+        /// status bar instead of stopping at the safe-area line — that stop
+        /// was a hard-edged black band across the top of Today (2026-09-27).
+        /// Comfortably more than any status bar; the gradient is clear long
+        /// before it gets there. The centre does not move, only the frame.
+        private let topBleed: CGFloat = 120
+
         var body: some View {
             RadialGradient(colors: [.white.opacity(breathing ? 0.38 : 0.30), .clear],
-                           center: UnitPoint(x: 0.5, y: breathing ? 0.30 : 0.33),
+                           center: center(breathing ? centerY - breathLift : centerY),
                            startRadius: 0, endRadius: breathing ? 460 : 430)
-                .frame(height: 900)
+                .frame(height: height + topBleed)
+                .padding(.top, -topBleed)
                 .allowsHitTesting(false)
                 .onAppear {
                     guard !reduceMotion else { return }
                     withAnimation(DS.Animation.ambient) { breathing = true }
                 }
         }
+
+        /// `y` is the centre in points below the anchor; shifted so the
+        /// bleed above leaves the light where it was.
+        private func center(_ y: CGFloat) -> UnitPoint {
+            UnitPoint(x: 0.5, y: (y + topBleed) / (height + topBleed))
+        }
+    }
+
+    /// The screen's light, hanging from the top bar and leaving as the
+    /// content scrolls: it rises at half the content's speed and is gone by
+    /// `fadeDistance`. Background-light round 1, V3 "drift", with the light
+    /// moved up to the top bar (Alex, 2026-09-28). Attach with
+    /// `.driftingLight()`, which feeds it the scroll distance.
+    struct DriftingLight: View {
+        /// Scroll distance, 0 at rest.
+        let offset: CGFloat
+
+        private let fadeDistance: CGFloat = 480
+
+        var body: some View {
+            let y = max(0, offset)
+            HorizonGlow(centerY: 0)
+                .offset(y: -y / 2)
+                .opacity(1 - min(1, y / fadeDistance))
+        }
+    }
+
+    /// The screen ground everywhere but Today: background plus the rising
+    /// grain. Alex, 2026-09-27: "make that background the default for all
+    /// views", motion included. The light is not in here — it comes from
+    /// `.driftingLight()` on the screen's scroll view, because it has to
+    /// know the scroll distance (2026-09-28: "that stays for all the
+    /// views"). Drop this in as the first child of a screen's ZStack, or as
+    /// a `.background`. Sheets stay plain: they are utility surfaces.
+    struct AmbientBackground: View {
+        var body: some View {
+            ZStack {
+                DS.Colors.background.ignoresSafeArea()
+                GrainOverlay(mode: .embers)
+            }
+        }
     }
 
     /// How the film grain behaves. `.embers` is Today's pick from the grain
-    /// rounds of 2026-09-13; `.still` is the plain layer for anywhere else.
+    /// rounds of 2026-09-13, and since 2026-09-27 every screen's; `.still`
+    /// is the plain layer for anything that must not move.
     enum GrainMode { case still, embers }
 
     /// Film grain: white dust over the background, seeded so a still frame
@@ -371,3 +432,73 @@ extension EnvironmentValues {
         set { self[GrainModeKey.self] = newValue }
     }
 }
+
+// MARK: - Drifting light
+
+extension View {
+    /// Pins `DS.DriftingLight` behind a scroll view and feeds it the scroll
+    /// distance. Attach it to the ScrollView itself, before the screen's
+    /// background, so the light draws above the grain and under the
+    /// content. The offset lives in the modifier, so a scroll frame redraws
+    /// the light, not the screen.
+    func driftingLight() -> some View {
+        modifier(DriftingLightModifier())
+    }
+}
+
+private struct DriftingLightModifier: ViewModifier {
+    @State private var offset: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y + $0.contentInsets.top }) { _, y in
+                offset = y
+            }
+            .background {
+                Color.clear.overlay(alignment: .top) { DS.DriftingLight(offset: offset) }
+            }
+            #if DEBUG
+            .modifier(DemoScroll())
+            #endif
+    }
+}
+
+#if DEBUG
+/// Screenshot harness for the light: `--demo-scroll` scrolls down 480 pt
+/// and back on its own, `--offset Y` opens scrolled to Y. Inert without
+/// the launch arguments. Waits for the screen's first load before moving.
+private struct DemoScroll: ViewModifier {
+    private static let args = CommandLine.arguments
+    private static let enabled = args.contains("--demo-scroll") || args.contains("--offset")
+
+    @State private var position = ScrollPosition(edge: .top)
+
+    func body(content: Content) -> some View {
+        if Self.enabled {
+            content
+                .scrollPosition($position)
+                .task { await drive() }
+        } else {
+            content
+        }
+    }
+
+    private func drive() async {
+        let args = Self.args
+        try? await Task.sleep(for: .seconds(4))
+        if let i = args.firstIndex(of: "--offset"), i + 1 < args.count, let y = Double(args[i + 1]) {
+            position.scrollTo(y: y)
+        }
+        guard args.contains("--demo-scroll") else { return }
+        for y in stride(from: 0.0, through: 480, by: 4) {
+            position.scrollTo(y: y)
+            try? await Task.sleep(for: .milliseconds(16))
+        }
+        try? await Task.sleep(for: .seconds(1.2))
+        for y in stride(from: 480.0, through: 0, by: -6) {
+            position.scrollTo(y: y)
+            try? await Task.sleep(for: .milliseconds(16))
+        }
+    }
+}
+#endif

@@ -61,14 +61,18 @@ struct BlockCalendarView: View {
     
     var body: some View {
         ZStack {
-            DS.Colors.background.ignoresSafeArea()
+            DS.AmbientBackground()
             
             if isLoading {
                 ProgressView("Loading timeline...")
                     .scaleEffect(1.1)
                     .foregroundStyle(DS.Colors.outline)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .driftingLight()
             } else if let error = errorMessage {
                 errorView(error)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .driftingLight()
             } else if calendarData != nil {
                 timelineContent
             }
@@ -186,6 +190,7 @@ struct BlockCalendarView: View {
             }
             .padding(.top, 16)
         }
+        .driftingLight()
         .scrollIndicators(.hidden)
     }
     

@@ -16,12 +16,7 @@ struct HistoryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DS.Colors.background.ignoresSafeArea()
-                RadialGradient(
-                    gradient: Gradient(colors: [DS.Colors.accent.opacity(0.12), .clear]),
-                    center: .top, startRadius: 0, endRadius: 400
-                )
-                .ignoresSafeArea()
+                DS.AmbientBackground()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
@@ -61,6 +56,7 @@ struct HistoryView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 24)
                 }
+                .driftingLight()
                 .refreshable { await load(reset: true) }
             }
         }

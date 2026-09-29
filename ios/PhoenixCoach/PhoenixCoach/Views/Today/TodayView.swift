@@ -284,9 +284,10 @@ struct TodayView: View {
                 .padding(.horizontal, DS.Spacing.page)
                 .padding(.top, DS.Spacing.s)
                 .padding(.bottom, DS.Spacing.section)
-                // The light is the ring's, so it scrolls away with it.
-                .background(alignment: .top) { DS.HorizonGlow() }
             }
+            // The light hangs from the top bar and drifts away as the content
+            // scrolls (background-light round 1, V3, 2026-09-28).
+            .driftingLight()
             // The pill is the gesture's readout and the sync's progress. It
             // only exists while one of those is happening; at rest the header's
             // corner labels carry the date and the last sync.

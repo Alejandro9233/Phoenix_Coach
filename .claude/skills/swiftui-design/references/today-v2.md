@@ -7,12 +7,13 @@ candidate is `Views/Variants/CurrentVariants.swift` at round 13 in git history
 of this session's working tree; the pieces are reusable as-is.
 
 ## Screen
-- Background: `DS.Colors.background`. The **horizon glow** (white radial,
-  radius ~440, opacity ~0.34) rises from under the ring and is the *content's*
-  top-aligned background, so it scrolls away with the header (Alex,
-  2026-09-13: "top anchored"). Replaces the top radial on this screen only. It breathes (`DS.Animation.ambient`,
-  12 s, ±3% opacity, a few points of drift), off under Reduce Motion. The one
-  non-state animation in the app, Alex's call 2026-09-13.
+- Background: `DS.Colors.background`. The **light** (white radial, radius
+  ~440, opacity ~0.34) hangs from the top bar via `.driftingLight()` on the
+  ScrollView: pinned to the screen, it rises at half the scroll speed and is
+  gone by 480pt (2026-09-28, background-light round 1 V3 — replaced the
+  2026-09-13 content-anchored glow that scrolled away with the ring). Same
+  light on every screen now. It breathes (`DS.Animation.ambient`, 12 s, ±3%
+  opacity, a few points of drift), off under Reduce Motion.
 - **Film grain** on the screen (fixed, does not scroll): `DS.GrainOverlay(.embers)`
   — ~12k seeded dots denser toward the bottom, plus ~140 brighter specks born
   in the bottom third that climb and fade (12 fps Canvas, frozen under Reduce

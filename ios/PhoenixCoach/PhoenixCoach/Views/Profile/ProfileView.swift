@@ -68,20 +68,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Obsidian Dark Background
-                DS.Colors.background
-                    .ignoresSafeArea()
-                
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        DS.Colors.accent.opacity(0.12),
-                        .clear
-                    ]),
-                    center: .top,
-                    startRadius: 0,
-                    endRadius: 400
-                )
-                .ignoresSafeArea()
+                DS.AmbientBackground()
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -151,6 +138,7 @@ struct ProfileView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                 }
+                .driftingLight()
                 .scrollIndicators(.hidden)
             }
             .preferredColorScheme(.dark)

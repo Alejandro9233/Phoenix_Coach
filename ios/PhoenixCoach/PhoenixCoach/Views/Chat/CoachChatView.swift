@@ -36,6 +36,7 @@ struct CoachChatView: View {
                         }
                         .padding()
                     }
+                    .driftingLight()
                     .scrollDismissesKeyboard(.interactively)
                     .onChange(of: messages.count) {
                         scrollToBottom(proxy: proxy)
@@ -73,7 +74,7 @@ struct CoachChatView: View {
                     }
                 }
             }
-            .background(DS.Colors.background)
+            .background(DS.AmbientBackground())
             .task {
                 await network.checkConnection()
                 await loadSessions()

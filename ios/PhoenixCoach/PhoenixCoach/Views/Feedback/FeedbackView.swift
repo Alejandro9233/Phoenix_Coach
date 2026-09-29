@@ -50,19 +50,7 @@ struct FeedbackView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DS.Colors.background
-                    .ignoresSafeArea()
-                
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        DS.Colors.accent.opacity(0.12),
-                        .clear
-                    ]),
-                    center: .top,
-                    startRadius: 0,
-                    endRadius: 400
-                )
-                .ignoresSafeArea()
+                DS.AmbientBackground()
                 
                 ScrollView {
                     VStack(spacing: 40) {
@@ -172,6 +160,7 @@ struct FeedbackView: View {
                     }
                     .padding(24)
                 }
+                .driftingLight()
                 .scrollIndicators(.hidden)
             }
             .preferredColorScheme(.dark)

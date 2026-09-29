@@ -27,12 +27,14 @@ struct InjuryLogView: View {
 
     var body: some View {
         ZStack {
-            DS.Colors.background.ignoresSafeArea()
+            DS.AmbientBackground()
 
             if isLoading {
                 loadingState
             } else if let error = errorMessage {
                 errorState(error)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .driftingLight()
             } else {
                 content
             }
@@ -82,6 +84,7 @@ struct InjuryLogView: View {
             .padding(.horizontal, DS.Spacing.page)
             .padding(.top, DS.Spacing.l)
         }
+        .driftingLight()
         .redacted(reason: .placeholder)
         .accessibilityLabel("Loading injuries")
     }
@@ -154,6 +157,7 @@ struct InjuryLogView: View {
                 }
             }
         }
+        .driftingLight()
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .padding(.horizontal, DS.Spacing.page)

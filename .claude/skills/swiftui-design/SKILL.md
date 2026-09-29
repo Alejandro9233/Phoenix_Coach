@@ -33,14 +33,12 @@ Every screen and component is built from these roles. Match them exactly.
 ```swift
 NavigationStack {
     ZStack {
-        DS.Colors.background.ignoresSafeArea()
-        RadialGradient(colors: [DS.Colors.accent.opacity(0.12), .clear],
-                       center: .top, startRadius: 0, endRadius: 400)
-            .ignoresSafeArea()
+        DS.AmbientBackground()   // ground + rising grain
         ScrollView(showsIndicators: false) {
             VStack(spacing: DS.Spacing.section) { ... }
                 .padding(.horizontal, DS.Spacing.page)
         }
+        .driftingLight()         // the light: hangs from the top bar, drifts off as you scroll
     }
     .navigationTitle("")
     .navigationBarTitleDisplayMode(.inline)
@@ -177,10 +175,19 @@ be smaller than the gap between cards (`section`), or grouping dissolves.
 moves). The hand-rolled `spring(response: 0.3, dampingFraction: 0.8)`
 scattered through the app IS `DS.Animation.normal` — reference it.
 
-- **Ambient motion exists on Today only**: the horizon glow breathes on
-  `DS.Animation.ambient` and the grain's embers climb (`DS.GrainOverlay(.embers)`).
-  Both decided by Alex 2026-09-13 from recorded clips; do not add ambient
-  motion elsewhere without a /variants round.
+- **Ambient motion is the background, everywhere**: the horizon glow
+  breathes on `DS.Animation.ambient` and the grain's embers climb. Both
+  decided by Alex 2026-09-13 from recorded clips for Today, then made the
+  default for every screen on 2026-09-27 ("make that background the default
+  for all views", full motion). The light hangs from the top bar and,
+  as you scroll, rises at half the content's speed and fades out by 480pt
+  (background-light round 1, V3, 2026-09-28 — Today included, it no
+  longer scrolls away with the ring). Screens get the grain from
+  `DS.AmbientBackground` and the light from `.driftingLight()` on their
+  scroll view; a loading or error state outside the scroll view fills the
+  screen and takes `.driftingLight()` too, so the light never pops in with
+  the data. Sheets stay plain. No other ambient motion without a
+  /variants round.
 - **Animate by frequency.** Every-refresh paths (Today sync, tab switches)
   get no animation — a haptic acknowledges instead. Occasional events
   (sheet present, proposal card, plan change) get `.normal`. Rare moments
@@ -248,8 +255,9 @@ Every screen designs four: loading, empty, error, content.
 - New hues or hex colors. The palette is DS + semantic
   success/warning/danger. Sport/step categorical colors live in one shared
   helper, not per-view.
-- Gradients, except: the screen's top radial glow, chart area fills, and
-  the glass card's hairline stroke. No gradient buttons, text, or washes.
+- Gradients, except: the screen's light (`.driftingLight()`, built on
+  `DS.HorizonGlow`), chart area fills, and the glass card's hairline
+  stroke. No gradient buttons, text, or washes.
 - Emoji as icons. SF Symbols, `.symbolRenderingMode(.hierarchical)`, one
   weight per screen. Verify names — an invalid symbol renders as blank.
 - Default `List` / `Form` styling on designed screens. `ScrollView` +
@@ -318,3 +326,5 @@ rule, not the component.
 - 2026-09-13 Today grain (clips): shimmer, weave, lit-by-glow, flicker — lost to rising dust. Then ascending motion: slow drift, fast drift, whole-texture scroll, breathe — lost to embers (brighter specks born in the bottom third, climb and fade). Also: the horizon glow is top-anchored to the content, not the screen; the "HRV RHR FORM LOAD" labels under the arc removed; corner date is the newest snapshot's date ("data · Sep 12"), not the device's last fetch.
 - 2026-09-15 Deep-sync Live Activity (island + lock screen): V1 instrument (label + stage, thin timer right), V2 sentence-first (stage as hero, mono footer), V4 glow + grain material with a 36pt timer, V5 four-segment ring with the glyph inside — lost to V3's step strip (the sync's four stages as a lit strip with labels, current step bright, upcoming faint; compact island shows the strip as four ticks). "Third one looks fine."
 - 2026-09-26 Deep-sync Live Activity, revisited: V3 step strip (shipped 2026-09-15) replaced by V5 ring at Alex's call — "I prefer the variant 5 design." V5 is no longer a loser; V3 is.
+- 2026-09-27 Today's black band under the status bar (the horizon glow stopped at the safe-area line) fixed by bleeding the glow 120pt above its anchor. Then Alex made Today's light + grain the default background for every screen, full motion, cards untouched for now ("background only, decide cards after") — the accent-0.12 radial scaffold is gone. A cards round on the new background is still owed: glass on glow is the combo he rejected on 2026-09-12.
+- 2026-09-28 Background light on scroll (round 1, clips on a History-shaped list): V1 dims in place over 240pt, V2 sets into the top edge (shrinks as it fades), V4 switches off at 100pt, V5 flattens into a horizon band — lost to V3 drift (pinned light rises at half the scroll speed, gone by 480pt). Alex's change: light moved up to hang from the top bar; approved on Today ("loved it"), then made the behavior for every screen.

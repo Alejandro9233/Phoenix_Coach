@@ -1,8 +1,20 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedTab = 0
-    
+    /// `--tab N` opens on that tab; screenshot runs use it to reach a tab
+    /// without a tap. Debug builds only, like `--variant`.
+    @State private var selectedTab = ContentView.launchTab ?? 0
+
+    private static var launchTab: Int? {
+        #if DEBUG
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--tab"), i + 1 < args.count else { return nil }
+        return Int(args[i + 1])
+        #else
+        return nil
+        #endif
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             TodayView()
