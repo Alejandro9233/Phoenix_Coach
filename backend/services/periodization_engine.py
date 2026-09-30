@@ -41,6 +41,7 @@ sessions onto non-strength days for months.
 """
 import copy
 import re
+import statistics
 from datetime import date, datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -114,6 +115,17 @@ SINGLE_RUN_CAP = 1.10
 SINGLE_RUN_WINDOW_DAYS = 30
 COMEBACK_FIRST_RUN_KM = 5.0        # single-run cap floor: a first run back
 COMEBACK_FIRST_LONG_RUN_MIN = 30   # long run when the window holds no run
+# Marathon long-run path (_get_weekly_run_target). LONG_RUN_STEP_MIN a week
+# can't reach a marathon-length long run from a short build: after the
+# 2026-09 ankle-sprain comeback it reached ~18 km by the last week before the
+# taper, against the 27 km the Nov 8 half-marathon trial commits to. In these
+# phases the long run climbs a geometric path to the profile's
+# peak_long_run_km instead, re-solved each week from the longest run actually
+# run. Steps of ~28% a week sit in the band Frandsen 2025 ties to more
+# overuse injuries — Alex took that trade on 2026-09-29: "either I do the
+# marathon or not".
+LONG_RUN_PATH_PHASES = ("build", "peak")
+LONG_RUN_PACE_MIN_KM = 3.0   # shorter runs (strides, warm-ups) don't set the pace
 _DETECT = object()  # _get_weekly_run_target: detect the comeback itself
 
 
@@ -523,6 +535,9 @@ DISTANCE_PROFILES = {
     # RUNNING — MARATHON
     # ══════════════════════════════════════════════════════════════════════════
     "Marathon": {
+        # The long run the build must reach by the last week before the
+        # taper (LONG_RUN_PATH_PHASES in _get_weekly_run_target).
+        "peak_long_run_km": 27.0,
         "phases": [
             {
                 "id": "taper",
@@ -1295,12 +1310,22 @@ class PeriodizationEngine:
         # race itself, or the gate would repair the marathon out of its own
         # race week.
         race_week_km = RACE_KM.get(race_distance) if race_week else None
+        # The long-run path aims at the last week before the taper.
+        peak_long_run_km = profile.get("peak_long_run_km") if athlete.race_date else None
+        taper_top = next((p["weeks_range"][1] for p in profile["phases"]
+                          if p["id"] == "taper"), None)
+        weeks_to_peak = (weeks_to_race - taper_top - 1
+                         if peak_long_run_km and taper_top is not None else None)
+        # phase_info carries the id under "phase". This passed
+        # phase_info.get("id") — always None — so the taper never stepped
+        # volume down: three ~50 km weeks into a marathon (found 2026-09-29).
         volume_targets = self._get_weekly_run_target(
             db, self._phase_def(profile, phase_info),
             deload_week, today,
             race_week_km=race_week_km,
-            phase_id=phase_info.get("id"), weeks_to_race=weeks_to_race,
+            phase_id=phase_info["phase"], weeks_to_race=weeks_to_race,
             comeback=comeback,
+            peak_long_run_km=peak_long_run_km, weeks_to_peak=weeks_to_peak,
         )
         recovery_note = cycle_info["recovery_note"]
         if comeback_active:
@@ -2005,6 +2030,7 @@ class PeriodizationEngine:
         race_week_km: float = None,
         phase_id: str = None, weeks_to_race: int = None,
         comeback=_DETECT,
+        peak_long_run_km: float = None, weeks_to_peak: int = None,
     ) -> Optional[dict]:
         """THE weekly run-km target, derived from what the athlete actually ran.
 
@@ -2021,6 +2047,10 @@ class PeriodizationEngine:
         is the ladder step, never raised by the taper or a deload, and every
         run is capped at SINGLE_RUN_CAP x the longest run of the last
         SINGLE_RUN_WINDOW_DAYS (single_run_cap_km, enforced by the gate).
+
+        In LONG_RUN_PATH_PHASES the long run is at least the next step of a
+        geometric path to peak_long_run_km, reached `weeks_to_peak` weeks from
+        now (0 = this is the last week before the taper). See long_run_path.
 
         Returns None when the phase has no run range (triathlon stubs without
         km in their volume_note) — callers and the prompt degrade to the
@@ -2050,16 +2080,21 @@ class PeriodizationEngine:
         week_km: dict[int, float] = {}
         longest_run_min = 0.0
         longest_any_min = 0.0
+        longest_km = 0.0
+        paces: list[float] = []  # min/km
         for a in activities:
             if (a.sport or "") != "running" or not a.start_time:
                 continue
             km = (a.distance_m or 0) / 1000
             wk = (a.start_time.date() - window_start).days // 7
             week_km[wk] = week_km.get(wk, 0.0) + km
+            longest_km = max(longest_km, km)
             if a.duration_sec:
                 longest_any_min = max(longest_any_min, a.duration_sec / 60)
                 if km >= 8:
                     longest_run_min = max(longest_run_min, a.duration_sec / 60)
+                if km >= LONG_RUN_PACE_MIN_KM:
+                    paces.append(a.duration_sec / 60 / km)
 
         weeks_with_data = [v for v in week_km.values() if v > RUN_NOISE_FLOOR_KM]
 
@@ -2118,6 +2153,28 @@ class PeriodizationEngine:
         else:
             long_run = min(long_run_cap, 70) if long_run_cap else 70
 
+        # The long-run path: when the step above can't reach peak_long_run_km
+        # by the last week before the taper, climb a geometric path to it.
+        # Re-solved every week from the longest run of the window, so a missed
+        # long run makes the next steps bigger. A floor under the rule above,
+        # and it outranks the phase's long-run cap: 27 km at 6:00/km is
+        # 162 min, over Peak's 150. Minutes come from the MEDIAN pace of the
+        # window's runs, so the half-marathon trial's race pace can't shrink
+        # the long run that follows it. Not in a comeback (the single-run cap
+        # rules there) or a recovery week (the next week re-solves).
+        long_run_path = None
+        if (peak_long_run_km and weeks_to_peak is not None and weeks_to_peak >= 0
+                and phase_id in LONG_RUN_PATH_PHASES and not comeback_active
+                and not is_recovery_week and paces
+                and 0 < longest_km < peak_long_run_km):
+            path_km = longest_km * (peak_long_run_km / longest_km) ** (1 / (weeks_to_peak + 1))
+            path_min = path_km * statistics.median(paces)
+            if path_min > long_run:
+                long_run = path_min
+                long_run_path = {"km": round(path_km, 1),
+                                 "peak_km": peak_long_run_km,
+                                 "weeks_to_peak": weeks_to_peak}
+
         # The comeback's injury guard: no run more than SINGLE_RUN_CAP x the
         # longest run of the last 30 days (runs already done today count).
         single_run_cap_km = longest_30d_km = None
@@ -2174,6 +2231,7 @@ class PeriodizationEngine:
             "run_km_ceiling": ceiling,
             "run_km_hard_cap": round(hard_cap, 1),
             "long_run_minutes": int(round(long_run)),
+            "long_run_path": long_run_path,
             "history_weeks": len(weeks_with_data),
             "ramp_base_km": round(ramp_base, 1),
             "rebuild_mode": rebuild_mode,

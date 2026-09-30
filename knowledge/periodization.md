@@ -196,3 +196,19 @@ The plan detects it from the watch; nothing to switch on.
   small hops) cut repeat sprains by a third (Hupperets et al., BMJ 2009).
   A lace-up brace helps too (Vuurberg et al. 2018 guideline). Smooth, flat
   ground first; trails last.
+
+## The Marathon Long Run
+<!-- The numbers here are the ones periodization_engine.py enforces
+(peak_long_run_km, LONG_RUN_PATH_PHASES, TAPER_LONG_RUN_MIN). Change both together. -->
+
+- **The long run reaches 27 km by the last week before the taper.** The usual
+  step is +12 minutes a week. When that can't get there in time (a short
+  build, or a comeback that ended late), the long run grows by the same
+  percentage every week instead, and lands on 27 km that last week.
+- The step is worked out again every week from the longest run actually run.
+  Miss a long run and the steps after it get bigger.
+- A half-marathon time trial counts as its week's long run.
+- Steps that big (~25-30% a week) are in the range tied to more overuse
+  injuries (Frandsen et al., BJSM 2025). It's a deliberate trade: the
+  distance on time, at a higher risk.
+- In the taper the long run drops to 110, then 80, then 50 minutes.

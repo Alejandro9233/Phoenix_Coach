@@ -180,7 +180,14 @@ def _format_training_context(ctx: dict) -> str:
         lines.append("\nTHIS WEEK'S RUN VOLUME (computed — the week's running MUST total within 10% of this):")
         lines.append(f"  Run km target: {vt['run_km_target']} km"
                      f" (hard cap {vt['run_km_hard_cap']} km — the system trims anything above)")
-        if vt.get("long_run_minutes"):
+        path = vt.get("long_run_path")
+        if path:
+            lines.append(
+                f"  Long run: {path['km']:g} km (~{vt['long_run_minutes']} min) — "
+                f"a step on the path to {path['peak_km']:g} km by the last week "
+                f"before the taper. Plan it at this distance."
+            )
+        elif vt.get("long_run_minutes"):
             lines.append(f"  Long run: ~{vt['long_run_minutes']} min")
         if vt.get("comeback"):
             lines.append("  COMEBACK: easy running only (strides allowed) — no "
