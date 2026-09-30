@@ -27,10 +27,14 @@ finalize_plan_write() cures two audit findings:
 - Stale metadata: partial replans rewrote only {"days"}, so week_summary and
   the stored _context drifted from the plan they described. Every write now
   recomputes _context (DB + date math, no LLM) and stamps week_summary's
-  expected_total_hours AND expected_run_km as the deterministic sums of the
-  planned week (strength excluded from hours — gym time never counts). The
-  LLM's numbers never survive; the week's TARGET lives separately in
-  _context.volume_targets (single writer: C3).
+  expected_total_hours AND expected_run_km as deterministic sums (week_sums:
+  the planned week, or for a mid-week write the watch's past days plus the
+  plan from today; strength excluded from hours — gym time never counts).
+  The LLM's numbers never survive; the week's TARGET lives separately in
+  _context.volume_targets (single writer: C3). The summary's prose is the
+  LLM's: a replan asks for a fresh focus/rationale along with its days,
+  so the text describes the week that is (2026-09-29: a replan's summary
+  still said "running blocked, bike carries load" over four easy runs).
 
 - No provenance: after the 2026-08-17 template incident there was still no
   way to see which path wrote a week. Every write appends a receipt to
@@ -40,12 +44,38 @@ finalize_plan_write() cures two audit findings:
   themselves — gate repairs included. Kept to the last MAX_REVISIONS entries.
 """
 
+from datetime import timedelta
+
 from backend.services.plan_normalizer import VALID_DAYS, normalize_plan
 from backend.services import volume_gate
+from backend.utils.timezone import get_local_today
 
 REVISIONS_KEY = "_revisions"
 MAX_REVISIONS = 40
 GATE_ATTEMPTS = 2  # 1 initial + 1 retry with numeric feedback
+
+
+def week_sums(db, plan_json: dict, days_written) -> tuple[float, float]:
+    """(hours excluding strength, run km) the week adds up to.
+
+    A full write sums the plan. A partial write is mid-week, and its past
+    days are history: they count what the watch recorded, not what the plan
+    said; today and the rest of the week count the plan. After the
+    2026-09-29 replan the calendar read 20.2 km — Monday's planned 2.2 km,
+    when 7.2 km had been run — against the 25.2 km the gate had enforced.
+    """
+    partial = days_written is not None and set(days_written) < set(VALID_DAYS)
+    if not partial:
+        return (round(volume_gate.planned_hours(plan_json), 1),
+                round(volume_gate.planned_run_km(plan_json), 1))
+    today = get_local_today()
+    done_km = done_hours = 0.0
+    if today.weekday():
+        done_km, done_hours = volume_gate.completed_week_actuals(
+            db, today - timedelta(days=today.weekday()), today - timedelta(days=1))
+    ahead = VALID_DAYS[today.weekday():]
+    return (round(done_hours + volume_gate.planned_hours(plan_json, days=ahead), 1),
+            round(done_km + volume_gate.planned_run_km(plan_json, days=ahead), 1))
 
 
 def capture_before(plan_json: dict, days=None) -> dict:
@@ -89,14 +119,11 @@ def finalize_plan_write(db, plan_json: dict, *, source: str, days_written,
     plan_json["_context"] = PeriodizationEngine().compute_context(db)
 
     # Single writer of the week_summary sums: the gate's accounting. These
-    # are what the schedule adds up to; the target lives in _context.
+    # are what the week adds up to (week_sums); the target lives in _context.
     plan_json.setdefault("week_summary", {})
-    plan_json["week_summary"]["expected_total_hours"] = round(
-        volume_gate.planned_hours(plan_json), 1
-    )
-    plan_json["week_summary"]["expected_run_km"] = round(
-        volume_gate.planned_run_km(plan_json), 1
-    )
+    hours, run_km = week_sums(db, plan_json, days_written)
+    plan_json["week_summary"]["expected_total_hours"] = hours
+    plan_json["week_summary"]["expected_run_km"] = run_km
     if gate_report is not None:
         # Soft violations warn by design. A hard violation still standing
         # here survived retry AND repair (e.g. a travel rebuild that can't
@@ -282,9 +309,8 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
     # so the audited bands stay honest; only the bookkeeping moves.
     if any("step_from" in c for c in pace_fixes):
         candidate.setdefault("week_summary", {})
-        candidate["week_summary"]["expected_total_hours"] = round(
-            volume_gate.planned_hours(candidate), 1)
-        candidate["week_summary"]["expected_run_km"] = round(
-            volume_gate.planned_run_km(candidate), 1)
+        hours, run_km = week_sums(db, candidate, days if days is not None else VALID_DAYS)
+        candidate["week_summary"]["expected_total_hours"] = hours
+        candidate["week_summary"]["expected_run_km"] = run_km
 
     return candidate, violations

@@ -851,11 +851,13 @@ Account for the training already done. You must:
 {(chr(10) + feedback + chr(10)) if feedback else ""}
 OUTPUT FORMAT — respond ONLY with valid JSON containing ONLY the days listed above:
 {{
+  "week_summary": {{ "focus": "one line for the WHOLE week", "rationale": "2-3 sentences" }},
   "days": {{
 {days_json_template}
   }}
 }}
 
+"week_summary" describes the whole week as it now stands — the training already completed plus the days above — not just the days you are planning. It replaces the old summary, so don't describe a week that no longer exists.
 Each day must have: "summary", "workouts" (array), "rationale", "coach_note".
 Each workout: "sport", "title", "steps" (array), "total_time", "hr_target", "distance_km" (for running/cycling/swimming), "pace_target" (for running, copied from RUN PACES), "muscle_groups" (for strength).
 Each step: "type" (warmup|main|recovery|cooldown), "duration" (MM:SS), "zone" (1-5), "description".

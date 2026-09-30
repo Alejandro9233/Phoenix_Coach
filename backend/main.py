@@ -1033,6 +1033,15 @@ def replan_remaining_days(db: Session = Depends(get_db)):
                 new_day.pop("adaptation", None)
                 new_day.pop("original_workouts", None)
                 merged["days"][day_name] = new_day
+        # The summary's prose describes the week; the days are most of it.
+        # Left alone, it kept describing the week the first generation
+        # planned (2026-09-29: "running blocked, bike carries load" over
+        # four easy runs). The sums are restamped by finalize regardless.
+        new_summary = result.get("week_summary") or {}
+        for key in ("focus", "rationale"):
+            text = new_summary.get(key)
+            if isinstance(text, str) and text.strip():
+                merged.setdefault("week_summary", {})[key] = text.strip()
         return merged
 
     # Single persist pipeline, scoped to the replanned days only — enforcing

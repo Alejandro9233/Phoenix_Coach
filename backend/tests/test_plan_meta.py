@@ -2,8 +2,10 @@
 
 Rules locked in here:
 - finalize_plan_write stamps week_summary.expected_total_hours AND
-  expected_run_km as the deterministic sums of the planned week (strength
-  excluded from hours — gym time never counts toward volume targets). The
+  expected_run_km as deterministic sums: the planned week, or for a mid-week
+  write the watch's past days plus the plan from today (strength excluded
+  from hours — gym time never counts toward volume targets). A replan's
+  fresh focus/rationale replace the first generation's (2026-09-29). The
   LLM's numbers never survive; the week's TARGET lives separately in
   _context.volume_targets, written only by C3.
 - Every write appends a receipt to plan_json["_revisions"] (source, days,
@@ -16,7 +18,7 @@ Rules locked in here:
 """
 import ast
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -27,7 +29,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.agents.response_agent import ResponseAgent
 from backend.main import app, get_db
-from backend.models.database import Athlete, Base, WeeklyPlan
+from backend.models.database import Activity, Athlete, Base, WeeklyPlan
 from backend.services.plan_meta import (
     MAX_REVISIONS,
     capture_before,
@@ -162,10 +164,21 @@ def test_replan_receipt_and_fresh_context(client, test_db_session, monkeypatch):
     locked = VALID_DAYS[:today.weekday()]
 
     seeded = normalize_plan({
+        "week_summary": {"focus": "Running blocked, bike carries load",
+                         "rationale": "the week the first generation planned"},
         "days": {d: _day("running", f"{d} Run", "45 min") for d in VALID_DAYS},
     })
     test_db_session.add(WeeklyPlan(week_start=week_start, athlete_id=1,
                                    plan_json=seeded))
+    # The locked days are history: what the watch recorded on them (a 30-min
+    # run each), not the 45 min the plan said, is what the week adds up to.
+    for i, _ in enumerate(locked):
+        test_db_session.add(Activity(
+            id=f"locked-{i}", sport="running", source="test",
+            start_time=datetime.combine(week_start + timedelta(days=i),
+                                        datetime.min.time()) + timedelta(hours=7),
+            distance_m=5000, duration_sec=30 * 60,
+        ))
 
     # Availability changed since the seeded plan's context was written — the
     # stored _context must reflect the NEW value after the replan.
@@ -181,7 +194,10 @@ def test_replan_receipt_and_fresh_context(client, test_db_session, monkeypatch):
         fixed_days[d]["workouts"][0]["distance_km"] = 6.0
     monkeypatch.setattr(
         ResponseAgent, "generate_remaining_days",
-        lambda self, **kwargs: {"days": json.loads(json.dumps(fixed_days))})
+        lambda self, **kwargs: {
+            "week_summary": {"focus": "Easy running, comeback step 1",
+                             "rationale": "the week as it now stands"},
+            "days": json.loads(json.dumps(fixed_days))})
 
     resp = client.post("/weekly-plan/replan-remaining")
     assert resp.status_code == 200
@@ -197,8 +213,12 @@ def test_replan_receipt_and_fresh_context(client, test_db_session, monkeypatch):
 
     assert stored["_context"]["availability"]["swim_days"] == "sat"
 
-    expected_hours = round((len(locked) * 45 + len(remaining) * 60) / 60, 1)
+    expected_hours = round((len(locked) * 30 + len(remaining) * 60) / 60, 1)
     assert stored["week_summary"]["expected_total_hours"] == expected_hours
+    assert stored["week_summary"]["expected_run_km"] == len(locked) * 5 + len(remaining) * 6
+    # The replan's summary replaces the one the first generation wrote.
+    assert stored["week_summary"]["focus"] == "Easy running, comeback step 1"
+    assert stored["week_summary"]["rationale"] == "the week as it now stands"
 
 
 def _functions_writing_plan_json(tree):
