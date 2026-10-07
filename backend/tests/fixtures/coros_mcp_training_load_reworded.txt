@@ -1,0 +1,14 @@
+Training Load Assessment
+========================
+
+2026-03-08
+Comment: Performance
+7-Day Load: 46
+28-Day Load: 60
+Acute:Chronic Ratio: 0.76
+
+2026-03-07
+Comment: Maintaining
+7-Day Load: 71
+28-Day Load: 62
+Acute:Chronic Ratio: 1.15
