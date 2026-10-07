@@ -612,3 +612,68 @@ def test_engine_race_week_budget_contains_the_race(db):
     assert vt["run_km_hard_cap"] == round(42.195 + RACE_WEEK_EASY_CAP_KM, 1)
     assert vt["long_run_minutes"] == 0
     assert "goal race week" in vt["basis"]
+
+
+# --- COROS MCP shadow read (docs/COROS_MCP.md) -------------------------------
+# The shadow compares and writes nothing; its report rides the event; any
+# failure is a line in the event, never a failed refresh. conftest switches it
+# off globally (COROS_MCP_SHADOW=0) so these opt in explicitly.
+
+class _BoomScraper:
+    async def scrape_all(self, backfill_days=0):
+        raise RuntimeError("coros down")
+
+
+def test_shadow_off_leaves_event_field_none(db, monkeypatch):
+    import backend.main as main_mod
+    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    result = asyncio.run(_run_smart_refresh(db))
+    assert result["event"]["mcp_shadow"] is None
+    assert result["event"]["schema_version"] == 2
+
+
+def test_shadow_error_rides_event_and_never_fails_refresh(db, monkeypatch):
+    import backend.main as main_mod
+    from backend.services import coros_mcp
+    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(coros_mcp, "shadow_enabled", lambda: True)
+
+    def _boom():
+        raise coros_mcp.CorosMcpError("token refresh failed: HTTP 400")
+    monkeypatch.setattr(coros_mcp, "fetch_gate_rows", _boom)
+
+    result = asyncio.run(_run_smart_refresh(db))
+    shadow = result["event"]["mcp_shadow"]
+    assert shadow["status"] == "error"
+    assert "token refresh failed" in shadow["reason"]
+    assert shadow["snapshot_present"] is False
+    assert result["sync_status"] == "partial"        # the scraper's verdict, untouched
+    assert result["event_recorded"] is True
+    assert db.query(RefreshEvent).first().payload_json["mcp_shadow"]["status"] == "error"
+
+
+def test_shadow_compares_todays_snapshot_and_writes_nothing(db, monkeypatch):
+    import backend.main as main_mod
+    from backend.services import coros_mcp
+    today = get_local_today()
+    db.add(RecoverySnapshot(date=today, hrv_ms=47.0, hrv_baseline=77.0, resting_hr=55,
+                            ati=46.0, cti=60.0, tib=14.0, fatigue_pct=-14.0,
+                            fatigue_state=2, load_ratio=0.76, load_ratio_state=2))
+    db.commit()
+    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(coros_mcp, "shadow_enabled", lambda: True)
+    row = {"hrv_ms": 47, "hrv_baseline": 77, "resting_hr": 61, "ati": 46, "cti": 60,
+           "load_ratio": 0.76, "hrv_eval": "Below normal", "load_comment": "Performance"}
+    row.update(coros_mcp.derive_load_fields(46, 60, 0.76))
+    monkeypatch.setattr(coros_mcp, "fetch_gate_rows",
+                        lambda days=7: {"rows": {today: row}, "calls": 4, "elapsed_ms": 900})
+
+    result = asyncio.run(_run_smart_refresh(db))
+    shadow = result["event"]["mcp_shadow"]
+    assert shadow["status"] == "diff"
+    assert shadow["mismatches"] == ["resting_hr"]          # 61 vs 55, everything else equal
+    assert shadow["missing"] == [] and shadow["history_days"] == 1
+    assert shadow["fields"]["tib"] == {"mcp": 14.0, "db": 14.0, "match": True}
+    # Shadow wrote nothing: one snapshot, the scraper's values intact.
+    snaps = db.query(RecoverySnapshot).all()
+    assert len(snaps) == 1 and snaps[0].resting_hr == 55

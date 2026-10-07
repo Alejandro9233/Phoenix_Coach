@@ -15,6 +15,7 @@ from backend.models.database import (
 )
 from backend.services.fit_importer import parse_fit_file
 from backend.services.coros_scraper import CorosScraper
+from backend.services import coros_mcp
 from backend.utils.timezone import (
     get_local_today, get_timezone_name, is_valid_timezone, set_athlete_timezone,
 )
@@ -1639,6 +1640,31 @@ async def _run_smart_refresh(db: Session, progress=None):
         sync_status = "partial"
         sync_message = f"Scraper error: {str(e)}. Using cached data."
 
+    # 1b. Shadow read from the official COROS MCP (docs/COROS_MCP.md):
+    # fetch today's gate fields over OAuth, compare them with what the
+    # scrape just persisted, write NOTHING. The diff rides the refresh
+    # event so parity becomes a record instead of a feeling. Off unless a
+    # token file exists on this machine (coros_mcp.shadow_enabled). The
+    # network work runs in a thread (requests is blocking) and is bounded
+    # so it can never eat the phone's 180s budget; a failure here is a
+    # line in the event, never a failed refresh.
+    mcp_shadow = None
+    if coros_mcp.shadow_enabled():
+        report("Checking COROS MCP...")
+        shadow_day = get_local_today()
+        shadow_snapshot = db.query(RecoverySnapshot).filter(
+            RecoverySnapshot.date == shadow_day).first()
+        try:
+            fetched = await asyncio.wait_for(
+                asyncio.to_thread(coros_mcp.fetch_gate_rows), timeout=45)
+            mcp_shadow = coros_mcp.shadow_report(shadow_day, shadow_snapshot, fetch=fetched)
+        except Exception as e:  # asyncio.TimeoutError included
+            mcp_shadow = coros_mcp.shadow_report(
+                shadow_day, shadow_snapshot, error=f"{type(e).__name__}: {e}")
+        print(f"MCP shadow: {mcp_shadow.get('status')} "
+              f"mismatches={mcp_shadow.get('mismatches')} "
+              f"missing={mcp_shadow.get('missing')}")
+
     # 2. Get latest recovery snapshot
     report("Evaluating recovery...")
     latest = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).first()
@@ -1813,6 +1839,7 @@ async def _run_smart_refresh(db: Session, progress=None):
             stale_reason=stale_reason,
             triggers=triggers,
             adaptation=adaptation,
+            mcp_shadow=mcp_shadow,
         )
         event_id = record_refresh_event(db, event)
         event_recorded = True

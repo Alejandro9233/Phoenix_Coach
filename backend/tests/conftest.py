@@ -17,6 +17,11 @@ import dotenv
 
 dotenv.load_dotenv = lambda *args, **kwargs: False
 os.environ["DATABASE_URL"] = "sqlite://"
+# The COROS MCP shadow read switches on whenever a token file exists on the
+# machine (~/.phoenix/coros_mcp). Alex's laptop has one, so without this a
+# refresh test would make live OAuth calls. Tests that want the shadow path
+# monkeypatch coros_mcp.shadow_enabled and fetch_gate_rows explicitly.
+os.environ["COROS_MCP_SHADOW"] = "0"
 
 assert os.environ["DATABASE_URL"].startswith("sqlite"), (
     "Tests must never see a non-sqlite DATABASE_URL"
