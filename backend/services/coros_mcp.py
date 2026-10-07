@@ -1,16 +1,18 @@
 """
-COROS MCP — the official COROS data path. Read-only, shadow mode.
+COROS MCP — the official COROS data path. Read-only; the live source for
+the morning refresh since 2026-10-07, with the Playwright scraper as fallback.
 
 COROS ships an MCP server (https://mcp.coros.com/mcp, repo coroslab/COROS-MCP)
 that returns the same recovery numbers the Playwright scraper sniffs, over
 OAuth 2.0 instead of a headless Chromium login. The spike and field map live
 in docs/COROS_MCP.md; the council verdict (2026-10-07) that shaped this file:
 
-- **Shadow only.** This module fetches, parses and COMPARES. It never writes
-  `recovery_snapshots` or `activities`. Ingestion's dedupe would turn a second
-  writer into a silent no-op and hide the very diff we need, and last-write-
-  wins would make the morning gates depend on run order. The diff rides the
-  refresh event (`mcp_shadow`) so parity is a record, not a feeling.
+- **One writer.** This module fetches and parses; `fetch_scrape_shaped` hands
+  ingestion the SAME dict shape the scraper produces, so `ingest_coros_data`
+  stays the only code that touches `recovery_snapshots` / `activities` and its
+  tests keep applying. Alex's call (2026-10-07, after the council): no test
+  period — MCP first, scraper only when the MCP fails or parses today only
+  partially. `compare_with_snapshot` / `shadow_report` remain for spot checks.
 - **None, never 0.** Every tool answers in formatted prose, not JSON. A line
   COROS rewords must come back as None and show up in `missing`, not slide
   through ingestion's `.get(x, 0)` defaults as "all clear".
@@ -21,9 +23,11 @@ in docs/COROS_MCP.md; the council verdict (2026-10-07) that shaped this file:
   Recommended weekly load band = 7 × previous Sunday's cti, max = 1.8 × min.
 - **Write tools are refused here.** Pushing workouts to the watch is a
   separate council decision; `WRITE_PREFIXES` makes that explicit in code.
-- The scraper stays the live path until Alex lifts the hold. Nothing in this
-  module is reachable from the refresh unless a token file exists and
-  COROS_MCP_SHADOW is not "0".
+- Wrong-but-present values are the risk the council flagged for this mode:
+  `BOUNDS` turns an implausible number into None, a partially parsed today
+  falls back to the scraper, and the refresh event records which source fed
+  the day (`coros_source`). Nothing here runs unless a token file exists and
+  COROS_MCP_ENABLED is not "0".
 
 Token: ~/.phoenix/coros_mcp/<region>/token.json (0600), never in the repo,
 never in the DB, never printed. One-time bootstrap on the VM:
@@ -61,6 +65,10 @@ COMPARE_FIELDS = GATE_FIELDS + ("fatigue_pct", "load_ratio_state")
 # Scraper stores floats that COROS rounds in prose; ints must match exactly.
 TOLERANCE = {"load_ratio": 0.011, "tib": 0.51, "fatigue_pct": 0.51,
              "ati": 0.51, "cti": 0.51}
+# Plausibility bounds for parsed gate inputs. A value outside its band is a
+# parse that "worked" on the wrong line; it becomes None and shows in missing.
+BOUNDS = {"hrv_ms": (10, 250), "hrv_baseline": (10, 250), "resting_hr": (30, 120),
+          "ati": (0, 500), "cti": (0, 500), "load_ratio": (0, 5)}
 
 
 class CorosMcpError(Exception):
@@ -491,6 +499,167 @@ def parse_training_load(text: str) -> dict[date, dict]:
     return out
 
 
+_REC_HEAD = re.compile(r"^(\d+)\.\s+(.+?)\s+[—–-]\s+(\d{4}-\d{2}-\d{2})\s*$")
+
+
+def _hms(s: str | None) -> int | None:
+    """'1:10:05' → 4205, '35:00' → 2100."""
+    if not s:
+        return None
+    try:
+        parts = [int(x) for x in s.split(":")]
+    except ValueError:
+        return None
+    if len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return None
+
+
+def _mins(s: str | None) -> int | None:
+    """'11h 4min' → 664, '58 min' → 58."""
+    if not s:
+        return None
+    h = re.search(r"(\d+)\s*h", s)
+    m = re.search(r"(\d+)\s*min", s)
+    if not h and not m:
+        return None
+    return (int(h.group(1)) * 60 if h else 0) + (int(m.group(1)) if m else 0)
+
+
+def _num(s: str | None):
+    """First number in a value such as '396 kcal', '151 spm', '6 m / 19 m'."""
+    if s is None:
+        return None
+    m = re.search(r"-?\d+(?:\.\d+)?", s.replace(",", ""))
+    if not m:
+        return None
+    v = float(m.group(0))
+    return int(v) if v.is_integer() else v
+
+
+def _kv(text: str) -> dict:
+    out = {}
+    for line in text.splitlines():
+        m = re.match(r"^\s*([A-Za-z0-9][A-Za-z0-9 /()%-]*?):\s*(.+?)\s*$", line)
+        if m:
+            out[m.group(1).strip()] = m.group(2)
+    return out
+
+
+def parse_sport_records(text: str) -> list[dict]:
+    """querySportRecords → one dict per activity. Rows without a labelId or
+    sport code are dropped (nothing downstream can use them)."""
+    recs, cur = [], None
+    for raw in text.splitlines():
+        line = raw.strip()
+        m = _REC_HEAD.match(line) if not raw[:1].isspace() else None
+        if m:
+            cur = {"sport": m.group(2), "date": _to_date(m.group(3)), "_lines": []}
+            recs.append(cur)
+        elif cur is not None and line:
+            cur["_lines"].append(line)
+    out = []
+    for r in recs:
+        body = "\n".join(r.pop("_lines"))
+
+        def g(rx, cast=str):
+            mm = re.search(rx, body)
+            if not mm:
+                return None
+            try:
+                return cast(mm.group(1))
+            except (TypeError, ValueError):
+                return None
+
+        r.update({
+            "name": g(r"Location:\s*(.+)"),
+            "start": g(r"startTimestamp=(\d+)", int),
+            "end": g(r"endTimestamp=(\d+)", int),
+            "duration_s": _hms(g(r"Duration:\s*([\d:]+)")),
+            "distance_km": g(r"Distance:\s*([\d.]+)\s*km", float),
+            "pace_s": _hms(g(r"Average Pace:\s*([\d:]+)\s*/km")),
+            "avg_hr": g(r"Avg HR:\s*(\d+)", int),
+            "calories": g(r"Calories:\s*([\d,]+)", lambda x: int(x.replace(",", ""))),
+            "sets": g(r"Sets:\s*(\d+)", int),
+            "labelId": g(r"LabelId:\s*(\d+)"),
+            "sportType": g(r"SportType:\s*(\d+)", int),
+        })
+        if r["labelId"] and r["sportType"] is not None and r["date"]:
+            out.append(r)
+    return out
+
+
+def parse_activity_detail(text: str) -> dict:
+    """getActivityDetail → the per-activity numbers ingestion can store."""
+    kv = _kv(text)
+    return {
+        "training_load": _num(kv.get("Training Load")),
+        "cadence": _num(kv.get("Average Cadence")),
+        "stride_m": _num(kv.get("Average Stride Length")),
+        "power_w": _num(kv.get("Average Power")),
+        "elevation_gain_m": _num(kv.get("Elevation Gain / Loss")),
+        "calories": _num(kv.get("Calories")),
+        "avg_hr": _num(kv.get("Average Heart Rate")),
+        "aerobic_te": _num(kv.get("Aerobic TE")),
+        "anaerobic_te": _num(kv.get("Anaerobic TE")),
+        "focus": kv.get("Training Focus"),
+        "performance": kv.get("Performance"),
+    }
+
+
+def parse_sleep_overview(text: str) -> dict[date, dict]:
+    """querySleepOverview → {wake-up date: {sleep_score, main_sleep_min,
+    daily_sleep_min, deep_pct, rem_pct, awake_min, naps_min}}."""
+    out = {}
+    for d, lines in _day_blocks(text).items():
+        kv = _kv("\n".join(lines))
+        out[d] = {
+            "sleep_score": _num(kv.get("Sleep Score")),
+            "main_sleep_min": _mins(kv.get("Main Sleep (asleep)")),
+            "daily_sleep_min": _mins(kv.get("Daily Sleep")),
+            "deep_pct": _num(kv.get("Deep Sleep Ratio")),
+            "rem_pct": _num(kv.get("REM Ratio")),
+            "awake_min": _mins(kv.get("Awake Time")),
+            "naps_min": _mins(kv.get("Naps Total")),
+        }
+    return out
+
+
+def parse_stress_level(text: str) -> dict[date, int | None]:
+    """queryStressLevel → {date: daily average or None}."""
+    out = {}
+    for d, lines in _day_blocks(text).items():
+        out[d] = _first(re.compile(r"Average Stress:\s*(\d+)"), lines)
+    return out
+
+
+def parse_fitness_overview(text: str) -> dict:
+    kv = _kv(text)
+    return {
+        "vo2max": _num(kv.get("VO2max")),
+        "running_level": _num(kv.get("Running Level")),
+        "threshold_pace_s": _hms((kv.get("Threshold Pace") or "").replace("/km", "").strip() or None),
+        "pred_5k_s": _hms(kv.get("5 km Prediction")),
+        "pred_10k_s": _hms(kv.get("10 km Prediction")),
+        "pred_half_s": _hms(kv.get("Half Marathon Prediction")),
+        "pred_marathon_s": _hms(kv.get("Marathon Prediction")),
+    }
+
+
+def parse_recovery_status(text: str) -> dict:
+    kv = _kv(text)
+    return {"recovery_pct": _num(kv.get("Recovery")), "level": kv.get("Level"),
+            "full_recovery_h": _num(kv.get("Estimated Full Recovery"))}
+
+
+def parse_user_info(text: str) -> dict:
+    kv = _kv(text)
+    return {"height_cm": _num(kv.get("Height")), "weight_kg": _num(kv.get("Weight")),
+            "gender": kv.get("Gender")}
+
+
 # --------------------------------------------------------------------------
 # Derivations
 # --------------------------------------------------------------------------
@@ -554,6 +723,9 @@ def gate_rows(sleep_hrv: dict, resting_hr: dict, load: dict) -> dict[date, dict]
             "load_ratio": l.get("load_ratio"),
             "load_comment": l.get("comment"),
         }
+        for f, (lo, hi) in BOUNDS.items():
+            if row.get(f) is not None and not (lo <= float(row[f]) <= hi):
+                row[f] = None
         row.update(derive_load_fields(row["ati"], row["cti"], row["load_ratio"]))
         rows[d] = row
     return rows
@@ -566,16 +738,19 @@ def missing_gate_fields(row: dict | None) -> list[str]:
 
 
 # --------------------------------------------------------------------------
-# Shadow run
+# Enablement, live sync (scraper-shaped payload), shadow compare
 # --------------------------------------------------------------------------
 
-def shadow_enabled() -> bool:
-    """On when a token exists and COROS_MCP_SHADOW isn't "0". Tests set it to
-    "0" in conftest so no test ever reaches COROS."""
-    flag = os.getenv("COROS_MCP_SHADOW", "1").strip().lower()
+def enabled() -> bool:
+    """On when a token exists and COROS_MCP_ENABLED isn't "0". Tests set it
+    to "0" in conftest so no test ever reaches COROS."""
+    flag = os.getenv("COROS_MCP_ENABLED", "1").strip().lower()
     if flag in ("0", "false", "off", "no"):
         return False
     return find_token_path() is not None
+
+
+shadow_enabled = enabled  # older name
 
 
 def fetch_gate_rows(days: int = 7) -> dict:
@@ -620,7 +795,8 @@ def compare_with_snapshot(row: dict | None, snapshot) -> dict:
 
 def shadow_report(today: date, snapshot, fetch: dict | None = None,
                   error: str | None = None) -> dict:
-    """The `mcp_shadow` document on the refresh event. Never raises.
+    """Parity report for a manual spot check (CLI); the refresh no longer
+    ships it. Never raises.
     status: ok | diff | no_today_row | no_snapshot | error. `no_snapshot` means
     the MCP side answered but the scrape left no row for today to compare
     against — a scraper verdict, never a pass for the MCP."""
@@ -651,3 +827,157 @@ def shadow_report(today: date, snapshot, fetch: dict | None = None,
     else:
         report["status"] = "ok"
     return report
+
+
+# --------------------------------------------------------------------------
+# Live sync: the scraper's dict shape, built from MCP answers
+# --------------------------------------------------------------------------
+
+def _yyyymmdd(d: date) -> str:
+    return d.strftime("%Y%m%d")
+
+
+def build_scrape_payload(today: date, tz_name: str, records: list[dict], details: dict,
+                         sleep_hrv: dict, resting_hr: dict, load: dict,
+                         sleep: dict | None = None, stress: dict | None = None,
+                         fitness: dict | None = None, recovery: dict | None = None,
+                         user: dict | None = None) -> dict:
+    """Pure assembly: parsed MCP answers → the dict `ingest_coros_data` eats.
+
+    Keys are only present when a value exists; ingestion preserves the column
+    otherwise (None, never 0). Activity start times are converted to the
+    athlete's timezone and shipped as `startTimeLocal`: 46 of 86 recent
+    sessions start after 18:00 local, which naive UTC would file under the
+    next day (compliance by weekday, "today's training done")."""
+    from zoneinfo import ZoneInfo
+    from datetime import datetime, timedelta
+
+    tz = ZoneInfo(tz_name)
+    sleep, stress = sleep or {}, stress or {}
+    rows = gate_rows(sleep_hrv, resting_hr, load)
+
+    day_list = []
+    for d in sorted(set(rows) | set(sleep) | set(stress)):
+        r = rows.get(d) or {}
+        day = {"happenDay": int(_yyyymmdd(d))}
+        for src, dst in (("hrv_ms", "avgSleepHrv"), ("resting_hr", "testRhr"), ("ati", "ati"),
+                         ("cti", "cti"), ("tib", "tib"), ("fatigue_pct", "tiredRateNew"),
+                         ("fatigue_state", "tiredRateStateNew"), ("load_ratio", "trainingLoadRatio"),
+                         ("load_ratio_state", "trainingLoadRatioState"), ("hrv_baseline", "sleepHrvBase")):
+            if r.get(src) is not None:
+                day[dst] = r[src]
+        prev_sunday = d - timedelta(days=d.weekday() + 1)
+        band = recommended_band((load.get(prev_sunday) or {}).get("cti"))
+        if band:
+            day["recomendTlMin"], day["recomendTlMax"] = band
+        sl = sleep.get(d) or {}
+        if sl.get("sleep_score") is not None:
+            day["sleepScore"] = sl["sleep_score"]
+        if sl.get("main_sleep_min") is not None:
+            day["sleepDurationMin"] = sl["main_sleep_min"]
+        if stress.get(d) is not None:
+            day["stressAvg"] = stress[d]
+        if d == today and fitness:
+            if fitness.get("vo2max") is not None:
+                day["vo2max"] = fitness["vo2max"]
+            if fitness.get("running_level") is not None:
+                day["staminaLevel"] = fitness["running_level"]
+            if fitness.get("threshold_pace_s") is not None:
+                day["ltsp"] = fitness["threshold_pace_s"]
+        day_list.append(day)
+
+    hrv_list = [{"happenDay": int(_yyyymmdd(d)), "avgSleepHrv": r["hrv_ms"], "sleepHrvBase": r["hrv_baseline"]}
+                for d, r in sorted(rows.items()) if r.get("hrv_ms") is not None and r.get("hrv_baseline") is not None]
+    summary = {"sleepHrvData": {"sleepHrvList": hrv_list}}
+    if recovery and recovery.get("recovery_pct") is not None:
+        summary["recoveryPct"] = recovery["recovery_pct"]
+    evolab = {"analyse_query": {"dayList": day_list}, "dashboard_query": {"summaryInfo": summary}}
+    if user and user.get("weight_kg"):
+        evolab["mcp_user_profile"] = {"weight": user["weight_kg"]}
+
+    activities = []
+    for rec in records:
+        if not rec.get("start"):
+            continue
+        det = details.get(rec["labelId"]) or {}
+        local = datetime.fromtimestamp(rec["start"], tz).replace(tzinfo=None)
+        duration = rec.get("duration_s") or 0
+        dist_km = rec.get("distance_km") or 0
+        activities.append({
+            "labelId": rec["labelId"],
+            "sportType": rec["sportType"],
+            "timestamp": rec["start"],
+            "startTimeLocal": local.isoformat(timespec="seconds"),
+            "duration": duration,
+            "distance": round(dist_km * 1000, 2),
+            "avgHeartRate": rec.get("avg_hr") or det.get("avg_hr"),
+            # ingestion expects pace in s/km here (the scraper's field name is a lie)
+            "avgSpeed": round(duration / dist_km, 2) if dist_km and duration else 0,
+            "avgPower": det.get("power_w") or 0,
+            "totalElevation": det.get("elevation_gain_m") or 0,
+            "trainingLoad": det.get("training_load") or 0,
+            "pitch": det.get("cadence"),
+            "sets": rec.get("sets"),
+            "subMode": None,
+            "name": rec.get("name"),
+            "calories": rec.get("calories") or det.get("calories"),
+            "source": "coros_mcp",
+        })
+
+    today_row = rows.get(today)
+    if today_row is None or all(today_row.get(f) is None for f in GATE_FIELDS):
+        today_status, missing = "no_today_row", []   # the watch hasn't synced; not an MCP fault
+    else:
+        missing = missing_gate_fields(today_row)
+        today_status = "partial" if missing else "ok"
+    return {"activities": activities, "evolab": evolab, "missing": missing,
+            "today_status": today_status, "source": "coros_mcp", "backfill_pages": 0}
+
+
+def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_days: int = 2,
+                        tz_name: str | None = None, today: date | None = None) -> dict:
+    """Network side of the live sync. ~10 calls plus one detail call per
+    activity that is new or from the last `detail_recent_days` days (so a
+    day's load total is complete once its sessions have synced)."""
+    from datetime import timedelta
+    from backend.utils.timezone import get_local_today, get_timezone_name
+
+    started = time.monotonic()
+    today = today or get_local_today()
+    tz_name = tz_name or get_timezone_name()
+    known = set(known_activity_ids or ())
+    client = McpClient(ensure_token())
+    start = today - timedelta(days=days)
+
+    records = parse_sport_records(client.call_text("querySportRecords", {
+        "startDate": _yyyymmdd(start), "endDate": _yyyymmdd(today), "sportTypeCodes": None,
+        "minDistanceKm": None, "maxDistanceKm": None, "minDurationMinutes": None,
+        "maxDurationMinutes": None, "maxAveragePace": None, "locationKeyword": None, "limit": 200}))
+    details = {}
+    recent_cut = today - timedelta(days=detail_recent_days)
+    for rec in records:
+        if rec["labelId"] in known and rec["date"] < recent_cut:
+            continue
+        try:
+            details[rec["labelId"]] = parse_activity_detail(client.call_text(
+                "getActivityDetail", {"labelId": rec["labelId"], "sportType": rec["sportType"]}))
+        except CorosMcpError as e:   # detail is enrichment, never a reason to fail the sync
+            print(f"  MCP detail {rec['labelId']} skipped: {e}")
+
+    span = min(max(days, 7), 30)
+    span_start = today - timedelta(days=span - 1)
+    hrv = parse_sleep_hrv(client.call_text("querySleepHrv", {"startDate": _yyyymmdd(span_start), "endDate": _yyyymmdd(today)}))
+    rhr = parse_resting_hr(client.call_text("queryRestingHeartRate", {"days": span}))
+    load = parse_training_load(client.call_text("queryTrainingLoadAssessment", {"days": span}))
+    sleep = parse_sleep_overview(client.call_text("querySleepOverview", {"startDate": _yyyymmdd(span_start), "endDate": _yyyymmdd(today)}))
+    stress = parse_stress_level(client.call_text("queryStressLevel", {"days": span}))
+    fitness = parse_fitness_overview(client.call_text("queryFitnessAssessmentOverview", {}))
+    recovery = parse_recovery_status(client.call_text("queryRecoveryStatus", {}))
+    user = parse_user_info(client.call_text("queryUserInfo", {}))
+
+    payload = build_scrape_payload(today, tz_name, records, details, hrv, rhr, load,
+                                   sleep=sleep, stress=stress, fitness=fitness,
+                                   recovery=recovery, user=user)
+    payload["calls"] = client.calls
+    payload["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+    return payload

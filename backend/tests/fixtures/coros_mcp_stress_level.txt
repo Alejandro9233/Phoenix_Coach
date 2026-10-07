@@ -1,0 +1,16 @@
+Stress Level — Last 7 days
+========================
+
+2026-03-08:
+Average Stress: 30 (Low)
+Relaxed: No data
+Low: No data
+Medium: No data
+High: No data
+
+2026-03-07:
+Average Stress: 41 (Low)
+Relaxed: No data
+Low: No data
+Medium: No data
+High: No data

@@ -1520,10 +1520,10 @@ async def pull_to_refresh(db: Session = Depends(get_db)):
     sync_status = "ok"
     sync_message = ""
     
-    # 1. Try running the COROS scraper
+    # 1. Pull COROS (MCP first, scraper fallback — see _pull_coros)
+    coros_source = {}
     try:
-        scraper = CorosScraper()
-        data = await scraper.scrape_all()
+        data = await _pull_coros(db, lambda stage: None, 0, coros_source)
 
         # 2. Ingest into database
         service = IngestionService()
@@ -1533,7 +1533,7 @@ async def pull_to_refresh(db: Session = Depends(get_db)):
             sync_status = "partial"
             sync_message = f"Synced, but missing: {', '.join(missing)}."
         else:
-            sync_message = "COROS data synced successfully."
+            sync_message = f"COROS data synced successfully (via {coros_source['source']})."
     except Exception as e:
         sync_status = "partial"
         sync_message = f"Scraper error: {str(e)}. Using cached data."
@@ -1605,6 +1605,53 @@ def _backfill_days_needed(db) -> int:
     return 0
 
 
+async def _pull_coros(db: Session, report, backfill_days: int, source: dict):
+    """COROS data for one refresh: the official MCP first, the Playwright
+    scraper only when the MCP is off, fails, or parses today only partially.
+
+    Alex's decision after the 2026-10-07 council: no shadow period — the
+    MCP is seconds instead of minutes and carries sleep, stress and real
+    start times the scraper never had. The council's warning for this mode
+    was wrong-but-present values; the MCP service answers with plausibility
+    bounds (None, never 0) and a `partial` verdict for today that routes the
+    whole pull to the scraper. Fills `source` in place (so it survives a
+    failing fallback scrape) and returns the payload; the record rides the
+    refresh event as `coros_source`.
+    """
+    from datetime import datetime, time as time_type, timedelta
+
+    from backend.models.database import Activity
+
+    source.update({"source": "mcp", "fallback_reason": None, "elapsed_ms": None,
+                   "calls": None, "today_status": None, "missing": []})
+    if coros_mcp.enabled():
+        report("Syncing COROS...")
+        try:
+            days = 90 if backfill_days else 10
+            since = datetime.combine(get_local_today() - timedelta(days=days + 1), time_type.min)
+            known = {row[0] for row in db.query(Activity.id).filter(Activity.start_time >= since).all()}
+            data = await asyncio.wait_for(
+                asyncio.to_thread(coros_mcp.fetch_scrape_shaped, days, known), timeout=120)
+            source.update(elapsed_ms=data.get("elapsed_ms"), calls=data.get("calls"),
+                          today_status=data.get("today_status"), missing=data.get("missing") or [])
+            if data.get("today_status") == "partial":
+                raise coros_mcp.CorosMcpError(
+                    f"today parsed partially, missing {', '.join(data.get('missing') or [])}")
+            print(f"COROS via MCP: {len(data.get('activities') or [])} activities, "
+                  f"{data.get('calls')} calls, {data.get('elapsed_ms')} ms, today {data.get('today_status')}")
+            return data
+        except Exception as e:  # asyncio.TimeoutError included
+            source["source"] = "scraper"
+            source["fallback_reason"] = f"{type(e).__name__}: {e}"[:200]
+            print(f"COROS MCP failed ({source['fallback_reason']}) — falling back to the scraper")
+    else:
+        source["source"] = "scraper"
+        source["fallback_reason"] = "mcp not enabled on this host (no token)"
+
+    report("Scraping COROS...")
+    return await CorosScraper().scrape_all(backfill_days=backfill_days)
+
+
 async def _run_smart_refresh(db: Session, progress=None):
     """Scrape → ingest → evaluate recovery → auto-adapt. Shared by the
     synchronous endpoint above and the background job below. `progress`
@@ -1619,12 +1666,11 @@ async def _run_smart_refresh(db: Session, progress=None):
     sync_message = ""
     new_activity_ids = []
 
-    # 1. Scrape COROS — with history backfill when the DB is shallow, so a
-    # wiped DB self-heals on the next morning refresh.
+    # 1. Pull COROS — MCP first, scraper as fallback — with history backfill
+    # when the DB is shallow, so a wiped DB self-heals on the next refresh.
+    coros_source = {}
     try:
-        report("Scraping COROS...")
-        scraper = CorosScraper()
-        data = await scraper.scrape_all(backfill_days=_backfill_days_needed(db))
+        data = await _pull_coros(db, report, _backfill_days_needed(db), coros_source)
         service = IngestionService()
         new_activity_ids = service.ingest_coros_data(data) or []
         # A scrape can finish without the payloads ingestion needs (cold CPU,
@@ -1634,36 +1680,13 @@ async def _run_smart_refresh(db: Session, progress=None):
         if missing:
             sync_status = "partial"
             sync_message = f"Synced, but missing: {', '.join(missing)}."
-        else:
+        elif coros_source["source"] == "mcp":
             sync_message = "Biometrics synced."
+        else:
+            sync_message = "Biometrics synced (via scraper)."
     except Exception as e:
         sync_status = "partial"
         sync_message = f"Scraper error: {str(e)}. Using cached data."
-
-    # 1b. Shadow read from the official COROS MCP (docs/COROS_MCP.md):
-    # fetch today's gate fields over OAuth, compare them with what the
-    # scrape just persisted, write NOTHING. The diff rides the refresh
-    # event so parity becomes a record instead of a feeling. Off unless a
-    # token file exists on this machine (coros_mcp.shadow_enabled). The
-    # network work runs in a thread (requests is blocking) and is bounded
-    # so it can never eat the phone's 180s budget; a failure here is a
-    # line in the event, never a failed refresh.
-    mcp_shadow = None
-    if coros_mcp.shadow_enabled():
-        report("Checking COROS MCP...")
-        shadow_day = get_local_today()
-        shadow_snapshot = db.query(RecoverySnapshot).filter(
-            RecoverySnapshot.date == shadow_day).first()
-        try:
-            fetched = await asyncio.wait_for(
-                asyncio.to_thread(coros_mcp.fetch_gate_rows), timeout=45)
-            mcp_shadow = coros_mcp.shadow_report(shadow_day, shadow_snapshot, fetch=fetched)
-        except Exception as e:  # asyncio.TimeoutError included
-            mcp_shadow = coros_mcp.shadow_report(
-                shadow_day, shadow_snapshot, error=f"{type(e).__name__}: {e}")
-        print(f"MCP shadow: {mcp_shadow.get('status')} "
-              f"mismatches={mcp_shadow.get('mismatches')} "
-              f"missing={mcp_shadow.get('missing')}")
 
     # 2. Get latest recovery snapshot
     report("Evaluating recovery...")
@@ -1839,7 +1862,7 @@ async def _run_smart_refresh(db: Session, progress=None):
             stale_reason=stale_reason,
             triggers=triggers,
             adaptation=adaptation,
-            mcp_shadow=mcp_shadow,
+            coros_source=coros_source,
         )
         event_id = record_refresh_event(db, event)
         event_recorded = True

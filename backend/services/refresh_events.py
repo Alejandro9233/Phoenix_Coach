@@ -27,7 +27,7 @@ from datetime import datetime, timedelta
 from backend.models.database import Activity, RecoverySnapshot, RefreshEvent
 from backend.utils.timezone import get_local_now, get_local_today
 
-SCHEMA_VERSION = 2  # 2: + mcp_shadow (COROS MCP parity report, docs/COROS_MCP.md)
+SCHEMA_VERSION = 3  # 3: coros_source (which path fed the day: mcp | scraper, docs/COROS_MCP.md)
 REFRESH_EVENTS_KEEP = 200   # months of history for one athlete
 MAX_ACTIVITIES_STORED = 20  # deep backfills report a count beyond this
 
@@ -126,7 +126,7 @@ def _week_after(db) -> dict | None:
 
 def build_refresh_event(db, *, sync_status, sync_message, new_activity_ids,
                         recovery, recovery_stale, stale_reason, triggers,
-                        adaptation, mcp_shadow=None) -> dict:
+                        adaptation, coros_source=None) -> dict:
     """Assemble the frozen event document for one refresh run."""
     ids = list(new_activity_ids or [])
     stored = []
@@ -153,9 +153,11 @@ def build_refresh_event(db, *, sync_status, sync_message, new_activity_ids,
         "triggers": triggers,
         "adaptation": adaptation,
         "week_after": _week_after(db),
-        # COROS MCP shadow read vs this refresh's snapshot — None when the
-        # shadow is off (no token on the machine). Never influences the plan.
-        "mcp_shadow": mcp_shadow,
+        # Which COROS path fed this refresh: {"source": "mcp"|"scraper",
+        # "fallback_reason", "elapsed_ms", "calls", "today_status", "missing"}.
+        # The scraper is the fallback since 2026-10-07; the reason it ran is
+        # the thing to read when a morning looks wrong.
+        "coros_source": coros_source,
     }
 
 

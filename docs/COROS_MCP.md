@@ -3,8 +3,13 @@
 COROS ships an official MCP server open to any app (support article "Build on
 COROS MCP", repo `coroslab/COROS-MCP`). This is what the spike verified against
 Alex's account, side by side with a raw scraper payload from the same morning.
-**Decision 2026-10-07 (code-council, full mode): Option C with changes — shadow
-read first, scraper stays live until Alex lifts the hold.** See "Shadow run" below.
+**Decision 2026-10-07.** The code-council (full mode) recommended a shadow
+period first. Alex, having read the verdict, chose to go live the same day: **MCP
+first, Playwright scraper only as fallback** when the MCP is off, fails, or parses
+today only partially. The council's risk for this mode — a wrong number that
+parses "fine" — is answered with plausibility bounds, a per-field `partial`
+verdict that routes the pull to the scraper, and a `coros_source` record on
+every refresh event. See "Live sync" below.
 
 Client: `backend/services/coros_mcp.py` (read-only; refuses create/update/schedule).
 CLI: `scripts/coros_mcp_cli.py` (login, whoami, tools, call, gate).
@@ -146,61 +151,60 @@ Phoenix's step vocabulary. The costs are a text parser and the lthr/zones gap.
 Next step: code-council, full mode (dependency swap + auth surface). Scraper
 stays as the live path and as fallback throughout.
 
-## Shadow run (live since the commit that added `backend/services/coros_mcp.py`)
+## Live sync (MCP first, scraper fallback)
 
-What runs: inside `_run_smart_refresh`, right after the scrape and ingest, the
-backend calls three MCP read tools (`querySleepHrv`, `queryRestingHeartRate`,
-`queryTrainingLoadAssessment`, ~2.5 s), parses the prose, derives tib / fatigue
-/ load-ratio state, and compares today's row with the `recovery_snapshots` row
-the scrape just wrote. **It writes nothing.** The report lands on the refresh
-event as `payload_json.mcp_shadow` (schema_version 2):
+`_pull_coros` in `backend/main.py` runs for both `/smart-refresh` and
+`/pull-to-refresh`:
 
-```
-status        ok | diff | no_today_row | no_snapshot (scrape left no row today) | error
-mismatches    fields where both sides have a value and they differ
-mcp_missing   MCP None where the DB has a value  → parser or COROS gap (the alarm)
-db_missing    DB None where MCP has a value      → scraper gap
-missing       gate fields None on the MCP side today
-fields        {name: {mcp, db, match}} for the 10 compared columns
-```
-
-Switches: on whenever a token file exists on the machine; `COROS_MCP_SHADOW=0`
-turns it off; `COROS_MCP_TOKEN_PATH` / `COROS_MCP_TOKEN_ROOT` relocate the
-token. Bounded by a 45 s `asyncio.wait_for`; any failure is `status=error` on
-the event, never a failed refresh. Tests set `COROS_MCP_SHADOW=0` in conftest.
-
-Arm it on the VM once (same `.env` credentials the scraper uses):
-```bash
-cd ~/phoenix && ./venv/bin/python3 scripts/coros_mcp_cli.py login && ./venv/bin/python3 scripts/coros_mcp_cli.py whoami
-```
-The access token lasts 30 days and refreshes itself; if refresh ever fails the
-event says `error: token refresh failed` and `login` must be run again.
+1. If a token file exists on the host and `COROS_MCP_ENABLED` isn't `0`,
+   `coros_mcp.fetch_scrape_shaped(days, known_activity_ids)` runs in a thread
+   under a 120 s cap: `querySportRecords` for the window (10 days, 90 when the
+   DB is shallow), `getActivityDetail` for every activity that is new or from
+   the last 2 days, then sleep HRV, resting HR, load, sleep overview, stress,
+   fitness, recovery and profile. About 10 calls plus details, a few seconds.
+2. `build_scrape_payload` turns the parsed answers into **the scraper's dict
+   shape**, so `ingest_coros_data` stays the only writer. Keys the MCP can't
+   supply (daily training load, LTHR, zones, t7d/t28d, HRV sd) are simply
+   absent and ingestion now leaves those columns alone. New keys:
+   `sleepScore`, `sleepDurationMin`, `stressAvg` → `sleep_quality_score`,
+   `sleep_duration_hr`, `stress_level`; activities carry `startTimeLocal`
+   (athlete's wall clock), `name`, `calories`, `source="coros_mcp"`.
+3. `today_status`: `ok` → ingest; `no_today_row` (watch not synced yet) →
+   ingest, staleness guard handles the morning; `partial` (today present but a
+   gate field unparsable or out of bounds) → **fall back to the scraper**. Any
+   exception or timeout also falls back.
+4. The refresh event records `coros_source = {source, fallback_reason,
+   elapsed_ms, calls, today_status, missing}` (schema_version 3). When a
+   morning looks wrong, read that first.
 
 Reading the record (read-only, prod):
 ```sql
-select local_day, payload_json->'mcp_shadow'->>'status' as status,
-       payload_json->'mcp_shadow'->'mismatches' as mismatches,
-       payload_json->'mcp_shadow'->'mcp_missing' as mcp_missing
+select local_day, payload_json->'coros_source'->>'source' as source,
+       payload_json->'coros_source'->>'fallback_reason' as reason,
+       payload_json->'coros_source'->>'elapsed_ms' as ms
 from refresh_events order by created_at desc limit 30;
 ```
 
-**Pass condition for cutover (council):** 3 weeks of refreshes with zero
-`mismatches` and zero `mcp_missing` on the eight gate fields, including at
-least one day where `fatigue_state` crosses 4 or the two 82/84 boundary days
-explained. Then, each as its own commit: MCP becomes the source for the gate
-fields; activities with real start times converted to the athlete's timezone
-(12 of 27 recent activities would otherwise land on the next day through
-`utcfromtimestamp`); the write path as its own council.
+Arm a host once (same `.env` credentials the scraper uses):
+```bash
+cd ~/phoenix && ./venv/bin/python3 scripts/coros_mcp_cli.py login && ./venv/bin/python3 scripts/coros_mcp_cli.py whoami
+```
+`scripts/coros_mcp_cli.py pull` runs the exact fetch the refresh runs and prints
+the payload without touching a database. The access token lasts 30 days and
+refreshes itself; if refresh fails the event says so and `login` must be run again.
 
-Council notes that shaped this: shadow must not write (dedupe hides diffs,
-last-write-wins decides gates by run order); None never 0 (ingestion's
-`.get(x, 0)` turns a missing field into "no gate fires"); "seed LTHR/zones from
-the last scrape" was dropped because ingestion already preserves them.
+Switches: `COROS_MCP_ENABLED=0` forces the scraper; `COROS_MCP_TOKEN_PATH` /
+`COROS_MCP_TOKEN_ROOT` relocate the token. Tests set `COROS_MCP_ENABLED=0`.
+
+Known differences from the scraper path: per-activity lap/block compliance
+(`standardRate`) is not in the MCP lap output, so `activity_blocks.py` keeps the
+old detail endpoint; HR/pace zones and LTHR keep their last scraped values;
+`hrv_sd`, `t7d/t28d`, daily `training_load` on the snapshot stop updating (no
+reader uses them).
 
 ## Readers to build next (playground 2026-10-07, Alex's order of priority)
 
-Each gives a new field a consumer on day one; none is started until the shadow
-run has a record. Playground raw outputs and INSIGHTS.md live in
+Each gives a new field a consumer on day one. Playground raw outputs and INSIGHTS.md live in
 `samples/coros_mcp/playground/` (gitignored, personal).
 
 1. **Readiness on COROS's own terms.** Use sleeping HR (`queryDailyHealthData`)

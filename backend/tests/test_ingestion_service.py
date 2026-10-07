@@ -5,7 +5,7 @@ import tempfile
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from backend.models.database import Base, Athlete
+from backend.models.database import Base, Athlete, Activity, RecoverySnapshot
 from backend.services.ingestion_service import IngestionService
 
 @pytest.fixture
@@ -317,3 +317,69 @@ def test_missing_recovery_pct_is_harmless(temp_db_url):
     finally:
         session.close()
         engine.dispose()
+
+
+# --- MCP-shaped payloads (docs/COROS_MCP.md) ---------------------------------
+# Same ingest, same writer. The MCP path omits keys it couldn't parse and adds
+# the sleep/stress fields that were NULL for the scraper's whole life.
+
+def _snapshot(db_url, day):
+    from datetime import date as _date
+    engine = create_engine(db_url)
+    with sessionmaker(bind=engine)() as s:
+        return s.query(RecoverySnapshot).filter_by(date=_date(*day)).first()
+
+
+def _mcp_day(**extra):
+    base = {"happenDay": 20260308, "avgSleepHrv": 52, "testRhr": 54, "ati": 46, "cti": 60,
+            "tib": 14.0, "tiredRateNew": -14.0, "tiredRateStateNew": 2,
+            "trainingLoadRatio": 0.76, "trainingLoadRatioState": 2}
+    base.update(extra)
+    return {"activities": [], "evolab": {
+        "analyse_query": {"dayList": [base]},
+        "dashboard_query": {"summaryInfo": {"sleepHrvData": {"sleepHrvList": [
+            {"happenDay": 20260308, "avgSleepHrv": 52, "sleepHrvBase": 80}]}}}}}
+
+
+def test_mcp_day_writes_sleep_and_stress_and_never_invents_zeros(temp_db_url):
+    IngestionService(db_url=temp_db_url).ingest_coros_data(
+        _mcp_day(sleepScore=82, sleepDurationMin=500, stressAvg=30))
+    snap = _snapshot(temp_db_url, (2026, 3, 8))
+    assert snap.hrv_ms == 52 and snap.hrv_baseline == 80 and snap.resting_hr == 54
+    assert snap.ati == 46 and snap.cti == 60 and snap.tib == 14 and snap.fatigue_state == 2
+    assert snap.sleep_quality_score == 82 and snap.sleep_duration_hr == 8.33 and snap.stress_level == 30
+    # keys the payload didn't carry stay NULL — not 0.0 as the old code wrote
+    assert snap.hrv_sd is None and snap.vo2_max is None and snap.lthr is None
+    assert snap.training_load is None and snap.recommend_tl_min is None
+
+
+def test_mcp_day_without_a_key_preserves_the_column(temp_db_url):
+    svc = IngestionService(db_url=temp_db_url)
+    svc.ingest_coros_data(_mcp_day(sleepScore=82, sleepDurationMin=500, stressAvg=30))
+    # A later pull parsed only the resting HR line for that day.
+    svc.ingest_coros_data({"activities": [], "evolab": {"analyse_query": {"dayList": [
+        {"happenDay": 20260308, "testRhr": 55}]}}})
+    snap = _snapshot(temp_db_url, (2026, 3, 8))
+    assert snap.resting_hr == 55
+    assert snap.ati == 46 and snap.sleep_quality_score == 82 and snap.hrv_ms == 52
+
+
+def test_mcp_activity_uses_local_start_time_name_calories_source(temp_db_url):
+    from datetime import datetime as _dt
+    act = {"labelId": "900000000000000001", "sportType": 101, "timestamp": 1772996400,
+           "startTimeLocal": "2026-03-08T20:30:00", "duration": 2100, "distance": 4890.0,
+           "avgHeartRate": 151, "avgSpeed": 429.45, "avgPower": 0, "totalElevation": 0,
+           "trainingLoad": 65, "pitch": 151, "sets": None, "subMode": None,
+           "name": "Easy run", "calories": 396, "source": "coros_mcp"}
+    ids = IngestionService(db_url=temp_db_url).ingest_coros_data({"activities": [act], "evolab": {}})
+    assert ids == ["900000000000000001"]
+    engine = create_engine(temp_db_url)
+    with sessionmaker(bind=engine)() as s:
+        row = s.query(Activity).filter_by(id="900000000000000001").first()
+    assert row.start_time == _dt(2026, 3, 8, 20, 30)   # local wall clock, not UTC
+    assert row.source == "coros_mcp" and row.activity_name == "Easy run" and row.calories == 396
+    assert row.sport == "running" and row.cadence == 151 and row.training_load == 65
+    assert round(row.avg_speed_ms, 3) == round(1000 / 429.45, 3)
+    # the same labelId again is a no-op (dedupe by id), even with a different timestamp
+    again = IngestionService(db_url=temp_db_url).ingest_coros_data({"activities": [dict(act, timestamp=1)], "evolab": {}})
+    assert again == []

@@ -1,14 +1,16 @@
-"""COROS MCP shadow client — parsers, derivations, guards, report.
+"""COROS MCP client — parsers, derivations, guards, scraper-shaped payload.
 
 The MCP answers in prose, so the parser is the only piece that can be wrong
 silently. Fixtures mirror the exact templates sampled 2026-10-07 (values are
 invented). The council's rules under test: a missing or reworded line yields
-None (never 0), write tools are refused, and the shadow path never reaches
+None (never 0), write tools are refused, and the MCP path never reaches
 COROS unless explicitly enabled.
 """
 import os
 from datetime import date
+from datetime import datetime
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -221,29 +223,29 @@ def test_shadow_report_statuses():
 
 # ---------------------------------------------------------------- enablement / tokens
 
-def test_shadow_disabled_without_token(monkeypatch, tmp_path):
+def test_disabled_without_token(monkeypatch, tmp_path):
     monkeypatch.setenv("COROS_MCP_TOKEN_ROOT", str(tmp_path))
     monkeypatch.delenv("COROS_MCP_TOKEN_PATH", raising=False)
-    monkeypatch.delenv("COROS_MCP_SHADOW", raising=False)
+    monkeypatch.delenv("COROS_MCP_ENABLED", raising=False)
     assert mcp.find_token_path() is None
-    assert mcp.shadow_enabled() is False
+    assert mcp.enabled() is False
     with pytest.raises(mcp.CorosMcpError, match="no COROS MCP token"):
         mcp.ensure_token()
 
 
-def test_shadow_enabled_with_token_and_off_switch(monkeypatch, tmp_path):
+def test_enabled_with_token_and_off_switch(monkeypatch, tmp_path):
     monkeypatch.setenv("COROS_MCP_TOKEN_ROOT", str(tmp_path))
     monkeypatch.delenv("COROS_MCP_TOKEN_PATH", raising=False)
-    monkeypatch.delenv("COROS_MCP_SHADOW", raising=False)
+    monkeypatch.delenv("COROS_MCP_ENABLED", raising=False)
     path = mcp.save_token({"issuer": "https://mcpus.coros.com", "client_id": "c",
                            "access_token": "a", "refresh_token": "r",
                            "expires_at": 9_999_999_999, "obtained_at": 0})
     assert path == tmp_path / "us" / "token.json"
     assert oct(path.stat().st_mode & 0o777) == "0o600"
-    assert mcp.shadow_enabled() is True
+    assert mcp.enabled() is True
     assert mcp.ensure_token()["access_token"] == "a"  # fresh → no refresh call
-    monkeypatch.setenv("COROS_MCP_SHADOW", "0")
-    assert mcp.shadow_enabled() is False
+    monkeypatch.setenv("COROS_MCP_ENABLED", "0")
+    assert mcp.enabled() is False
 
 
 def test_refresh_keeps_old_refresh_token_when_omitted(monkeypatch):
@@ -261,3 +263,130 @@ def test_refresh_keeps_old_refresh_token_when_omitted(monkeypatch):
 def test_refresh_without_refresh_token_asks_for_login():
     with pytest.raises(mcp.CorosMcpError, match="run login again"):
         mcp.refresh_token({"issuer": "x", "client_id": "c", "access_token": "a"})
+
+
+# ---------------------------------------------------------------- live-sync parsers
+
+def test_parse_sport_records_fixture():
+    recs = mcp.parse_sport_records(fixture("coros_mcp_sport_records.txt"))
+    assert [r["labelId"] for r in recs] == ["900000000000000001", "900000000000000002", "900000000000000003"]
+    run, strength, ride = recs
+    assert run == {"sport": "Indoor Run", "date": date(2026, 3, 8), "name": "Easy run",
+                   "start": 1772996400, "end": 1772998500, "duration_s": 2100, "distance_km": 4.89,
+                   "pace_s": 429, "avg_hr": 151, "calories": 396, "sets": None,
+                   "labelId": "900000000000000001", "sportType": 101}
+    assert strength["sets"] == 25 and strength["duration_s"] == 4205 and strength["distance_km"] is None
+    assert strength["avg_hr"] == 101  # the odd line break before "| Avg HR" doesn't lose it
+    assert ride["sportType"] == 200 and ride["distance_km"] == 35.92 and ride["pace_s"] is None
+
+
+def test_parse_activity_detail_fixture():
+    d = mcp.parse_activity_detail(fixture("coros_mcp_activity_detail.txt"))
+    assert d["training_load"] == 234 and d["cadence"] == 153 and d["stride_m"] == 0.95
+    assert d["power_w"] == 185 and d["elevation_gain_m"] == 6 and d["calories"] == 1276
+    assert d["avg_hr"] == 164 and d["aerobic_te"] == 4.0 and d["anaerobic_te"] == 0
+    assert d["focus"] == "Base" and d["performance"] == "Below Average"
+
+
+def test_parse_sleep_overview_stress_fitness_recovery_user():
+    sl = mcp.parse_sleep_overview(fixture("coros_mcp_sleep_overview.txt"))
+    assert sl[date(2026, 3, 8)] == {"sleep_score": 82, "main_sleep_min": 500, "daily_sleep_min": 524,
+                                    "deep_pct": 19, "rem_pct": 11, "awake_min": 6, "naps_min": 24}
+    assert sl[date(2026, 3, 7)]["main_sleep_min"] == 338
+    st = mcp.parse_stress_level(fixture("coros_mcp_stress_level.txt"))
+    assert st == {date(2026, 3, 8): 30, date(2026, 3, 7): 41}
+    fit = mcp.parse_fitness_overview(fixture("coros_mcp_fitness_overview.txt"))
+    assert fit == {"vo2max": 55, "running_level": 79, "threshold_pace_s": 280, "pred_5k_s": 1330,
+                   "pred_10k_s": 2760, "pred_half_s": 6210, "pred_marathon_s": 13440}
+    rec = mcp.parse_recovery_status(fixture("coros_mcp_recovery_status.txt"))
+    assert rec == {"recovery_pct": 88, "level": "Heavy training allowed", "full_recovery_h": 14}
+    assert mcp.parse_user_info(fixture("coros_mcp_user_info.txt"))["weight_kg"] == 71.3
+
+
+def test_bounds_turn_implausible_values_into_none():
+    rows = mcp.gate_rows({date(2026, 3, 8): {"hrv_ms": 999, "hrv_baseline": 80}},
+                         {date(2026, 3, 8): 54}, {date(2026, 3, 8): {"ati": 46, "cti": 60, "load_ratio": 0.76}})
+    row = rows[date(2026, 3, 8)]
+    assert row["hrv_ms"] is None and row["hrv_baseline"] == 80
+    assert mcp.missing_gate_fields(row) == ["hrv_ms"]
+
+
+# ---------------------------------------------------------------- scraper-shaped payload
+
+def _parsed_fixtures():
+    return dict(
+        records=mcp.parse_sport_records(fixture("coros_mcp_sport_records.txt")),
+        sleep_hrv=mcp.parse_sleep_hrv(fixture("coros_mcp_sleep_hrv.txt")),
+        resting_hr=mcp.parse_resting_hr(fixture("coros_mcp_resting_hr.txt")),
+        load=mcp.parse_training_load(fixture("coros_mcp_training_load.txt")),
+        sleep=mcp.parse_sleep_overview(fixture("coros_mcp_sleep_overview.txt")),
+        stress=mcp.parse_stress_level(fixture("coros_mcp_stress_level.txt")),
+        fitness=mcp.parse_fitness_overview(fixture("coros_mcp_fitness_overview.txt")),
+        recovery=mcp.parse_recovery_status(fixture("coros_mcp_recovery_status.txt")),
+        user=mcp.parse_user_info(fixture("coros_mcp_user_info.txt")),
+    )
+
+
+def test_build_scrape_payload_shapes_like_the_scraper():
+    f = _parsed_fixtures()
+    details = {f["records"][0]["labelId"]: mcp.parse_activity_detail(fixture("coros_mcp_activity_detail.txt"))}
+    payload = mcp.build_scrape_payload(date(2026, 3, 8), "America/Mexico_City", f["records"], details,
+                                       f["sleep_hrv"], f["resting_hr"], f["load"], sleep=f["sleep"],
+                                       stress=f["stress"], fitness=f["fitness"], recovery=f["recovery"], user=f["user"])
+    assert payload["source"] == "coros_mcp" and payload["today_status"] == "ok" and payload["missing"] == []
+    day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
+    assert day["avgSleepHrv"] == 52 and day["sleepHrvBase"] == 80 and day["testRhr"] == 54
+    assert day["ati"] == 46 and day["cti"] == 60 and day["tib"] == 14.0 and day["tiredRateNew"] == -14.0
+    assert day["tiredRateStateNew"] == 2 and day["trainingLoadRatio"] == 0.76 and day["trainingLoadRatioState"] == 2
+    assert day["sleepScore"] == 82 and day["sleepDurationMin"] == 500 and day["stressAvg"] == 30
+    assert day["vo2max"] == 55 and day["staminaLevel"] == 79 and day["ltsp"] == 280
+    # keys the MCP can't supply are ABSENT, so ingestion leaves the columns alone
+    for absent in ("trainingLoad", "lthr", "t7d", "sleepHrvSd", "recomendTlMin"):
+        assert absent not in day
+    si = payload["evolab"]["dashboard_query"]["summaryInfo"]
+    assert si["recoveryPct"] == 88
+    assert {"happenDay": 20260308, "avgSleepHrv": 52, "sleepHrvBase": 80} in si["sleepHrvData"]["sleepHrvList"]
+    assert payload["evolab"]["mcp_user_profile"] == {"weight": 71.3}
+    acts = {a["labelId"]: a for a in payload["activities"]}
+    run = acts["900000000000000001"]
+    assert run["distance"] == 4890.0 and run["duration"] == 2100 and run["avgSpeed"] == round(2100 / 4.89, 2)
+    assert run["trainingLoad"] == 234 and run["pitch"] == 153 and run["avgPower"] == 185
+    assert run["name"] == "Easy run" and run["calories"] == 396 and run["source"] == "coros_mcp"
+    assert run["avgHeartRate"] == 151 and run["sportType"] == 101
+    strength = acts["900000000000000002"]
+    assert strength["sets"] == 25 and strength["distance"] == 0 and strength["avgSpeed"] == 0
+    assert strength["trainingLoad"] == 0 and strength["pitch"] is None  # no detail fetched for it
+    assert acts["900000000000000003"]["avgSpeed"] == round(4732 / 35.92, 2)
+
+
+def test_recommended_band_comes_from_the_previous_sunday():
+    f = _parsed_fixtures()
+    # 2026-03-08 is a Sunday with cti 60; a 03-09 row (via stress) gets 7×60 .. ×1.8
+    payload = mcp.build_scrape_payload(date(2026, 3, 9), "America/Mexico_City", [], {}, f["sleep_hrv"],
+                                       f["resting_hr"], f["load"], stress={date(2026, 3, 9): 22})
+    rows = {d["happenDay"]: d for d in payload["evolab"]["analyse_query"]["dayList"]}
+    assert rows[20260309]["recomendTlMin"] == 420.0 and rows[20260309]["recomendTlMax"] == 756.0
+    assert "recomendTlMin" not in rows[20260308]  # its previous Sunday (03-01) isn't in the window
+    assert payload["today_status"] == "no_today_row" and payload["missing"] == []
+
+
+def test_evening_session_stays_on_its_local_day():
+    start = datetime(2026, 3, 8, 20, 30, tzinfo=ZoneInfo("America/Mexico_City"))
+    rec = {"sport": "Indoor Run", "date": date(2026, 3, 8), "name": "late run", "start": int(start.timestamp()),
+           "end": int(start.timestamp()) + 1800, "duration_s": 1800, "distance_km": 4.0, "pace_s": 450,
+           "avg_hr": 150, "calories": 300, "sets": None, "labelId": "1", "sportType": 101}
+    payload = mcp.build_scrape_payload(date(2026, 3, 8), "America/Mexico_City", [rec], {}, {}, {}, {})
+    assert payload["activities"][0]["startTimeLocal"] == "2026-03-08T20:30:00"
+    # the trap the council caught: naive UTC would have filed it under the next day
+    assert datetime.utcfromtimestamp(rec["start"]).date() == date(2026, 3, 9)
+
+
+def test_partial_today_is_flagged_for_fallback():
+    f = _parsed_fixtures()
+    load = mcp.parse_training_load(fixture("coros_mcp_training_load_reworded.txt"))  # ati/cti None
+    payload = mcp.build_scrape_payload(date(2026, 3, 8), "America/Mexico_City", [], {}, f["sleep_hrv"],
+                                       f["resting_hr"], load)
+    assert payload["today_status"] == "partial"
+    assert set(payload["missing"]) == {"ati", "cti", "tib", "fatigue_state", "load_ratio"}
+    day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
+    assert "ati" not in day and day["avgSleepHrv"] == 52

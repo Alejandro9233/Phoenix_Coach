@@ -21,9 +21,10 @@ breaks travel. The app sends `TimeZone.current.identifier` on every profile save
 
 `OLLAMA_MODEL` and `SCRAPER_DEBUG_DIR` are local-dev only — don't set them on Render.
 
-`COROS_MCP_SHADOW`, `COROS_MCP_TOKEN_PATH`, `COROS_MCP_TOKEN_ROOT` are optional. The
-COROS MCP shadow read (docs/COROS_MCP.md) arms itself when a token file exists at
-`~/.phoenix/coros_mcp/<region>/token.json`; create it once per host with
+`COROS_MCP_ENABLED`, `COROS_MCP_TOKEN_PATH`, `COROS_MCP_TOKEN_ROOT` are optional. The
+morning refresh pulls from the official COROS MCP (docs/COROS_MCP.md) whenever a token
+file exists at `~/.phoenix/coros_mcp/<region>/token.json`, and falls back to the
+Playwright scraper otherwise. Create the token once per host with
 `scripts/coros_mcp_cli.py login`. No new secret in `.env`.
 
 ## Build and start

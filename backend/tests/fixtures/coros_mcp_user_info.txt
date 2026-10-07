@@ -1,0 +1,8 @@
+User Profile Information
+========================
+
+Height: 172.0 cm
+Weight: 71.3 kg
+Birthday: 2000-01-15 (Age: 26)
+Gender: Male
+Nickname: Test Athlete

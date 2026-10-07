@@ -10,11 +10,12 @@ the morning refresh's shadow read). This script only drives it:
   ./venv/bin/python3 scripts/coros_mcp_cli.py tools             # catalog → samples/coros_mcp/tools.json
   ./venv/bin/python3 scripts/coros_mcp_cli.py call --tool queryUserInfo --args '{}'
   ./venv/bin/python3 scripts/coros_mcp_cli.py gate [--days 7]   # parsed gate rows + missing fields
+  ./venv/bin/python3 scripts/coros_mcp_cli.py pull [--days 10]  # the full scraper-shaped payload, no DB
 
 Read-only against COROS: create*/update*/schedule* tools are refused by the
 client. Token: ~/.phoenix/coros_mcp/<region>/token.json (0600), outside the
 repo. Raw outputs: samples/coros_mcp/ (gitignored — personal data). No DB.
-Run `login` once on the VM to arm the shadow read there.
+Run `login` once on the VM: that is what switches the morning refresh to the MCP there.
 """
 import argparse
 import json
@@ -69,7 +70,7 @@ def cmd_whoami(args):
           f"access token {'valid' if ttl > 0 else 'EXPIRED'} ({ttl}s)  "
           f"refresh token {'present' if tok.get('refresh_token') else 'absent'}  "
           f"obtained {time.strftime('%Y-%m-%d %H:%M', time.localtime(tok.get('obtained_at', 0)))}\n"
-          f"shadow read enabled: {mcp.shadow_enabled()}")
+          f"MCP path enabled on this host: {mcp.enabled()}")
 
 
 def cmd_tools(args):
@@ -107,6 +108,22 @@ def cmd_gate(args):
               + (f"  MISSING {missing}" if missing else ""))
 
 
+def cmd_pull(args):
+    """Run the live-sync fetch exactly as the refresh does, print the shape."""
+    payload = mcp.fetch_scrape_shaped(days=args.days)
+    p = dump("pull", payload)
+    acts = payload["activities"]
+    days = payload["evolab"]["analyse_query"]["dayList"]
+    print(f"{payload['calls']} calls in {payload['elapsed_ms']} ms → {len(acts)} activities, {len(days)} day rows; "
+          f"today {payload['today_status']} missing={payload['missing']}")
+    for a in sorted(acts, key=lambda a: a["startTimeLocal"], reverse=True)[:8]:
+        print(f"  {a['startTimeLocal']}  type {a['sportType']:4d}  {a['distance']/1000:6.2f} km  {a['duration']//60:4d} min  "
+              f"HR {a['avgHeartRate']}  TL {a['trainingLoad']}  {a['name']}")
+    today = max(days, key=lambda d: d["happenDay"]) if days else {}
+    print("  latest day row:", {k: v for k, v in today.items()})
+    print(f"  → {p}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -116,6 +133,7 @@ def main():
     s = sub.add_parser("call"); s.add_argument("--tool", required=True); s.add_argument("--args", default="{}")
     s.add_argument("--suffix", default=""); s.set_defaults(fn=cmd_call)
     s = sub.add_parser("gate"); s.add_argument("--days", type=int, default=7); s.set_defaults(fn=cmd_gate)
+    s = sub.add_parser("pull"); s.add_argument("--days", type=int, default=10); s.set_defaults(fn=cmd_pull)
     args = ap.parse_args()
     try:
         args.fn(args)

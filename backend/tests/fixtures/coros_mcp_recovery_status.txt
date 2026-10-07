@@ -1,0 +1,6 @@
+Recovery Status
+========================
+
+Recovery: 88%
+Level: Heavy training allowed
+Estimated Full Recovery: 14h

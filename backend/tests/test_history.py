@@ -614,66 +614,81 @@ def test_engine_race_week_budget_contains_the_race(db):
     assert "goal race week" in vt["basis"]
 
 
-# --- COROS MCP shadow read (docs/COROS_MCP.md) -------------------------------
-# The shadow compares and writes nothing; its report rides the event; any
-# failure is a line in the event, never a failed refresh. conftest switches it
-# off globally (COROS_MCP_SHADOW=0) so these opt in explicitly.
+# --- COROS source: MCP first, scraper fallback (docs/COROS_MCP.md) ----------
+# conftest switches the MCP off globally (COROS_MCP_ENABLED=0); these opt in.
 
 class _BoomScraper:
     async def scrape_all(self, backfill_days=0):
         raise RuntimeError("coros down")
 
 
-def test_shadow_off_leaves_event_field_none(db, monkeypatch):
+class _NeverScraper:
+    async def scrape_all(self, backfill_days=0):
+        raise AssertionError("the scraper must not run when the MCP succeeds")
+
+
+def _mcp_payload(today):
+    from backend.services import coros_mcp
+    return {
+        "activities": [], "source": "coros_mcp", "today_status": "ok", "missing": [],
+        "calls": 9, "elapsed_ms": 1800,
+        "evolab": {"analyse_query": {"dayList": [{
+            "happenDay": int(today.strftime("%Y%m%d")), "avgSleepHrv": 70, "testRhr": 50,
+            "ati": 40, "cti": 60, **{k: v for k, v in coros_mcp.derive_load_fields(40, 60, 0.67).items() if v is not None},
+            "trainingLoadRatio": 0.67}]},
+            "dashboard_query": {"summaryInfo": {"sleepHrvData": {"sleepHrvList": []}}}},
+    }
+
+
+def test_mcp_off_means_scraper_with_reason(db, monkeypatch):
     import backend.main as main_mod
     monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
     result = asyncio.run(_run_smart_refresh(db))
-    assert result["event"]["mcp_shadow"] is None
-    assert result["event"]["schema_version"] == 2
+    src = result["event"]["coros_source"]
+    assert src["source"] == "scraper" and "not enabled" in src["fallback_reason"]
+    assert result["event"]["schema_version"] == 3
 
 
-def test_shadow_error_rides_event_and_never_fails_refresh(db, monkeypatch):
+def test_mcp_success_skips_the_scraper(db, monkeypatch):
     import backend.main as main_mod
     from backend.services import coros_mcp
-    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
-    monkeypatch.setattr(coros_mcp, "shadow_enabled", lambda: True)
-
-    def _boom():
-        raise coros_mcp.CorosMcpError("token refresh failed: HTTP 400")
-    monkeypatch.setattr(coros_mcp, "fetch_gate_rows", _boom)
-
+    monkeypatch.setattr(main_mod, "CorosScraper", _NeverScraper)
+    monkeypatch.setattr(coros_mcp, "enabled", lambda: True)
+    monkeypatch.setattr(coros_mcp, "fetch_scrape_shaped",
+                        lambda days, known, **kw: _mcp_payload(get_local_today()))
     result = asyncio.run(_run_smart_refresh(db))
-    shadow = result["event"]["mcp_shadow"]
-    assert shadow["status"] == "error"
-    assert "token refresh failed" in shadow["reason"]
-    assert shadow["snapshot_present"] is False
-    assert result["sync_status"] == "partial"        # the scraper's verdict, untouched
+    assert result["sync_status"] == "ok" and result["sync_message"] == "Biometrics synced."
+    src = result["event"]["coros_source"]
+    assert src["source"] == "mcp" and src["fallback_reason"] is None
+    assert src["calls"] == 9 and src["today_status"] == "ok" and src["missing"] == []
     assert result["event_recorded"] is True
-    assert db.query(RefreshEvent).first().payload_json["mcp_shadow"]["status"] == "error"
 
 
-def test_shadow_compares_todays_snapshot_and_writes_nothing(db, monkeypatch):
+def test_mcp_failure_falls_back_to_the_scraper(db, monkeypatch):
     import backend.main as main_mod
     from backend.services import coros_mcp
-    today = get_local_today()
-    db.add(RecoverySnapshot(date=today, hrv_ms=47.0, hrv_baseline=77.0, resting_hr=55,
-                            ati=46.0, cti=60.0, tib=14.0, fatigue_pct=-14.0,
-                            fatigue_state=2, load_ratio=0.76, load_ratio_state=2))
-    db.commit()
     monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
-    monkeypatch.setattr(coros_mcp, "shadow_enabled", lambda: True)
-    row = {"hrv_ms": 47, "hrv_baseline": 77, "resting_hr": 61, "ati": 46, "cti": 60,
-           "load_ratio": 0.76, "hrv_eval": "Below normal", "load_comment": "Performance"}
-    row.update(coros_mcp.derive_load_fields(46, 60, 0.76))
-    monkeypatch.setattr(coros_mcp, "fetch_gate_rows",
-                        lambda days=7: {"rows": {today: row}, "calls": 4, "elapsed_ms": 900})
+    monkeypatch.setattr(coros_mcp, "enabled", lambda: True)
 
+    def _boom(days, known, **kw):
+        raise coros_mcp.CorosMcpError("token refresh failed: HTTP 400")
+    monkeypatch.setattr(coros_mcp, "fetch_scrape_shaped", _boom)
     result = asyncio.run(_run_smart_refresh(db))
-    shadow = result["event"]["mcp_shadow"]
-    assert shadow["status"] == "diff"
-    assert shadow["mismatches"] == ["resting_hr"]          # 61 vs 55, everything else equal
-    assert shadow["missing"] == [] and shadow["history_days"] == 1
-    assert shadow["fields"]["tib"] == {"mcp": 14.0, "db": 14.0, "match": True}
-    # Shadow wrote nothing: one snapshot, the scraper's values intact.
-    snaps = db.query(RecoverySnapshot).all()
-    assert len(snaps) == 1 and snaps[0].resting_hr == 55
+    src = result["event"]["coros_source"]
+    assert src["source"] == "scraper" and src["fallback_reason"].startswith("CorosMcpError: token refresh")
+    assert result["sync_status"] == "partial" and "coros down" in result["sync_message"]
+    assert db.query(RefreshEvent).first().payload_json["coros_source"]["source"] == "scraper"
+
+
+def test_mcp_partial_today_falls_back_to_the_scraper(db, monkeypatch):
+    import backend.main as main_mod
+    from backend.services import coros_mcp
+    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(coros_mcp, "enabled", lambda: True)
+    partial = _mcp_payload(get_local_today())
+    partial["today_status"], partial["missing"] = "partial", ["ati", "cti", "tib", "fatigue_state"]
+    monkeypatch.setattr(coros_mcp, "fetch_scrape_shaped", lambda days, known, **kw: partial)
+    result = asyncio.run(_run_smart_refresh(db))
+    src = result["event"]["coros_source"]
+    assert src["source"] == "scraper" and "parsed partially" in src["fallback_reason"]
+    assert src["today_status"] == "partial" and "ati" in src["missing"]

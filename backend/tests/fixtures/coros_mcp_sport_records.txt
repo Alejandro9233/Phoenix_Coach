@@ -1,0 +1,24 @@
+Sport Records — 2026-03-01 to 2026-03-08 (3 records)
+========================
+
+1. Indoor Run — 2026-03-08
+   Location: Easy run
+   Time Window: startTimestamp=1772996400 | endTimestamp=1772998500
+   Duration: 35:00 | Distance: 4.89 km
+   Average Pace: 7:09 /km | Avg HR: 151 bpm | Calories: 396 kcal
+   LabelId: 900000000000000001 | SportType: 101
+
+2. Strength — 2026-03-07
+   Location: calf’s and hip
+   Time Window: startTimestamp=1772920331 | endTimestamp=1772924734
+   Duration: 1:10:05 | Sets: 25
+ | Avg HR: 101 bpm | Calories: 506 kcal
+   LabelId: 900000000000000002 | SportType: 402
+
+3. Cycling — 2026-03-05
+   Location: Road Bike
+   Start Coordinates: 19.432608, -99.133209
+   Time Window: startTimestamp=1772730000 | endTimestamp=1772734732
+   Duration: 1:18:52 | Distance: 35.92 km
+   Average Speed: 27.3 km/h | Avg HR: 154 bpm | Calories: 944 kcal
+   LabelId: 900000000000000003 | SportType: 200

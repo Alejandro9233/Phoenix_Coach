@@ -47,8 +47,14 @@ class IngestionService:
             # 2. Ingest Activities
             activities_data = data.get("activities", [])
             for act in activities_data:
-                # Deduplication check: ID or Start Time
-                start_dt = datetime.utcfromtimestamp(act["timestamp"])
+                # Deduplication check: ID or Start Time. The MCP path ships
+                # startTimeLocal (athlete's wall clock); the scraper's
+                # `timestamp` is midnight of happenDay and reads as a local
+                # date through utcfromtimestamp only by accident.
+                if act.get("startTimeLocal"):
+                    start_dt = datetime.fromisoformat(act["startTimeLocal"])
+                else:
+                    start_dt = datetime.utcfromtimestamp(act["timestamp"])
                 start_window_start = start_dt - timedelta(seconds=10)
                 start_window_end = start_dt + timedelta(seconds=10)
                 existing = session.query(Activity).filter(
@@ -64,7 +70,7 @@ class IngestionService:
                 
                 # Convert pace (sec/km) to speed (m/s)
                 # avgSpeed in JSON is actually pace in sec/km
-                pace_sec_km = act.get("avgSpeed", 0)
+                pace_sec_km = act.get("avgSpeed") or 0
                 speed_ms = 1000 / pace_sec_km if pace_sec_km > 0 else 0
 
                 # Map sport codes to strings
@@ -86,20 +92,22 @@ class IngestionService:
                     id=str(act["labelId"]),
                     athlete_id=athlete_id,
                     sport=sport_str,
-                    start_time=datetime.utcfromtimestamp(act["timestamp"]),
+                    start_time=start_dt,
                     duration_sec=float(act["duration"]),
                     distance_m=float(act["distance"]),
                     avg_hr=act.get("avgHeartRate"),
-                    avg_power_watts=float(act.get("avgPower", 0)),
+                    avg_power_watts=float(act.get("avgPower") or 0),
                     avg_speed_ms=speed_ms,
-                    total_ascent_m=float(act.get("totalElevation", 0)),
-                    source="coros_scraper",
-                    training_load=float(act.get("trainingLoad", 0)),
+                    total_ascent_m=float(act.get("totalElevation") or 0),
+                    source=act.get("source") or "coros_scraper",
+                    training_load=float(act.get("trainingLoad") or 0),
                     step_count=act.get("step"),
                     sets=act.get("sets"),
                     cadence=act.get("pitch"),
                     sport_code=act.get("sportType"),
-                    sub_mode=act.get("subMode")
+                    sub_mode=act.get("subMode"),
+                    activity_name=act.get("name"),
+                    calories=act.get("calories"),
                 )
                 session.add(new_act)
                 new_activity_ids.append(new_act.id)
@@ -120,27 +128,43 @@ class IngestionService:
                     snapshot = RecoverySnapshot(date=date_obj, athlete_id=athlete_id)
                     session.add(snapshot)
                 
+                # A key the payload doesn't carry leaves the column alone.
+                # The scraper's dayList always carries them; the MCP path
+                # omits what it couldn't parse, so a reworded COROS line can
+                # never land as a 0 that reads "all clear" to the gates.
+                def _set(attr, value, cast=float):
+                    if value is None:
+                        return
+                    setattr(snapshot, attr, cast(value))
+
                 # Prioritize testRhr (manual/test) over rhr (automatic)
-                rhr_val = day.get("testRhr") if day.get("testRhr", 0) > 0 else day.get("rhr")
-                snapshot.resting_hr = rhr_val
-                snapshot.hrv_ms = float(day.get("avgSleepHrv", 0)) if day.get("avgSleepHrv") else None
-                snapshot.training_load = float(day.get("trainingLoad", 0))
-                snapshot.vo2_max = float(day.get("vo2max", 0))
-                snapshot.ati = float(day.get("ati", 0))
-                snapshot.cti = float(day.get("cti", 0))
-                snapshot.tib = float(day.get("tib", 0))
-                snapshot.fatigue_pct = float(day.get("tiredRateNew", 0))
-                snapshot.fatigue_state = day.get("tiredRateStateNew")
-                snapshot.load_ratio = float(day.get("trainingLoadRatio", 0))
-                snapshot.load_ratio_state = day.get("trainingLoadRatioState")
-                snapshot.t7d_load = float(day.get("t7d", 0))
-                snapshot.t28d_load = float(day.get("t28d", 0))
-                snapshot.recommend_tl_max = float(day.get("recomendTlMax", 0))
-                snapshot.recommend_tl_min = float(day.get("recomendTlMin", 0))
-                snapshot.lthr = day.get("lthr")
-                snapshot.ltsp = day.get("ltsp")
-                snapshot.performance_index = float(day.get("staminaLevel", 0))
-                snapshot.performance_score = day.get("performance")
+                if day.get("testRhr") or day.get("rhr"):
+                    _set("resting_hr", day.get("testRhr") if (day.get("testRhr") or 0) > 0 else day.get("rhr"), int)
+                if day.get("avgSleepHrv"):
+                    _set("hrv_ms", day["avgSleepHrv"])
+                _set("training_load", day.get("trainingLoad"))
+                _set("vo2_max", day.get("vo2max"))
+                _set("ati", day.get("ati"))
+                _set("cti", day.get("cti"))
+                _set("tib", day.get("tib"))
+                _set("fatigue_pct", day.get("tiredRateNew"))
+                _set("fatigue_state", day.get("tiredRateStateNew"), int)
+                _set("load_ratio", day.get("trainingLoadRatio"))
+                _set("load_ratio_state", day.get("trainingLoadRatioState"), int)
+                _set("t7d_load", day.get("t7d"))
+                _set("t28d_load", day.get("t28d"))
+                _set("recommend_tl_max", day.get("recomendTlMax"))
+                _set("recommend_tl_min", day.get("recomendTlMin"))
+                _set("lthr", day.get("lthr"), int)
+                _set("ltsp", day.get("ltsp"), int)
+                _set("performance_index", day.get("staminaLevel"))
+                _set("performance_score", day.get("performance"), int)
+                # New with the MCP path (docs/COROS_MCP.md): the columns that
+                # were NULL for the scraper's whole life.
+                if day.get("sleepDurationMin") is not None:
+                    snapshot.sleep_duration_hr = round(float(day["sleepDurationMin"]) / 60, 2)
+                _set("sleep_quality_score", day.get("sleepScore"))
+                _set("stress_level", day.get("stressAvg"), int)
 
             # 4. Ingest Detailed HRV Data
             # From dashboard_query -> summaryInfo -> sleepHrvData -> sleepHrvList
@@ -159,8 +183,10 @@ class IngestionService:
                 
                 if hrv_entry.get("avgSleepHrv"):
                     snapshot.hrv_ms = float(hrv_entry["avgSleepHrv"])
-                snapshot.hrv_baseline = float(hrv_entry.get("sleepHrvBase", 0))
-                snapshot.hrv_sd = float(hrv_entry.get("sleepHrvSd", 0))
+                if hrv_entry.get("sleepHrvBase") is not None:
+                    snapshot.hrv_baseline = float(hrv_entry["sleepHrvBase"])
+                if hrv_entry.get("sleepHrvSd") is not None:
+                    snapshot.hrv_sd = float(hrv_entry["sleepHrvSd"])
 
             # 4b. COROS's own recovery percentage (summaryInfo.recoveryPct)
             # feeds the previously-dead recovery_score column. Advisory prose
