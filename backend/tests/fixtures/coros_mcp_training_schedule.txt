@@ -1,0 +1,26 @@
+Training Schedule
+========================
+
+2026-03-09
+Phoenix 1 · Easy run
+Standalone workout (scheduled from the workout library)
+idInPlan: 101
+Estimated Time: 45:00
+Distance: 7.20 km
+Load: 66 TL
+To view or modify this workout, use queryScheduledWorkoutDetails then updateScheduledWorkout with this date and idInPlan. To reschedule or remove it, use the COROS app.
+calf’s and hip
+Standalone workout (scheduled from the workout library)
+idInPlan: 102
+Estimated Time: 51:10
+To view or modify this workout, use queryScheduledWorkoutDetails then updateScheduledWorkout with this date and idInPlan. To reschedule or remove it, use the COROS app.
+
+2026-03-10
+Easy run
+Standalone workout (scheduled from the workout library)
+idInPlan: 82
+Status: completed
+Distance: 5.54 km
+Estimated Time: 35:00
+Load: 51 TL
+To view or modify this workout, use queryScheduledWorkoutDetails then updateScheduledWorkout with this date and idInPlan. To reschedule or remove it, use the COROS app.
