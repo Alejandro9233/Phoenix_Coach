@@ -11,6 +11,10 @@ the morning refresh's shadow read). This script only drives it:
   ./venv/bin/python3 scripts/coros_mcp_cli.py call --tool queryUserInfo --args '{}'
   ./venv/bin/python3 scripts/coros_mcp_cli.py gate [--days 7]   # parsed gate rows + missing fields
   ./venv/bin/python3 scripts/coros_mcp_cli.py pull [--days 10]  # the full scraper-shaped payload, no DB
+  ./venv/bin/python3 scripts/coros_mcp_cli.py dry-run --plan week.json [--week-start 2026-03-09]
+      # the courses Phoenix WOULD put on the watch, next to what the watch has; writes nothing.
+      # --from-api https://host fetches GET /weekly-plan instead (note: that endpoint generates a
+      # plan when the week has none, so prefer a saved file).
 
 Read-only against COROS: create*/update*/schedule* tools are refused by the
 client. Token: ~/.phoenix/coros_mcp/<region>/token.json (0600), outside the
@@ -124,6 +128,63 @@ def cmd_pull(args):
     print(f"  → {p}")
 
 
+def cmd_dry_run(args):
+    """Map this week's plan to courses and show the watch's calendar beside it.
+    No write tool is ever called here."""
+    from datetime import date, timedelta
+    from backend.services import coros_watch as cw
+
+    if args.plan:
+        plan = json.loads(Path(args.plan).read_text())
+    elif args.from_api:
+        import requests
+        plan = requests.get(f"{args.from_api.rstrip('/')}/weekly-plan", timeout=60).json()
+    else:
+        raise mcp.CorosMcpError("dry-run needs --plan FILE or --from-api URL")
+    plan = plan.get("plan") if isinstance(plan, dict) and "plan" in plan and "days" not in plan else plan
+    today = date.today()
+    week_start = date.fromisoformat(args.week_start) if args.week_start else today - timedelta(days=today.weekday())
+    week = cw.plan_day_courses(plan, week_start)
+
+    schedule = {}
+    try:
+        text = mcp.McpClient(mcp.ensure_token()).call_text("queryTrainingSchedule", {
+            "startDate": week_start.strftime("%Y%m%d"),
+            "endDate": (week_start + timedelta(days=6)).strftime("%Y%m%d")})
+        schedule = cw.parse_training_schedule(text)
+        print(f"watch calendar read for {week_start} → {len(schedule)} days with items")
+    except mcp.CorosMcpError as e:
+        print(f"watch calendar not read ({e}); showing the plan side only")
+
+    from backend.services import coros_watch_sync as ws
+    decisions = {}
+    if schedule or week:
+        dates = [d for d in sorted(week) if d >= today]
+        for a in ws.decide_actions(week, schedule, {}, dates):
+            decisions.setdefault(a.date, []).append(a)
+    print(f"\nwould write: {sum(1 for acts in decisions.values() for a in acts if a.kind != 'skip')} "
+          f"(flag COROS_WATCH_PUSH={os.getenv('COROS_WATCH_PUSH', 'unset')}; this command writes nothing)")
+    for d in sorted(week):
+        dc = week[d]
+        print(f"\n{d} {d.strftime('%A')}" + (f"   [stripped: {dc.enforced_reason}]" if dc.enforced_reason else ""))
+        for a in decisions.get(d, []):
+            print(f"   decide slot {a.slot}: {a.kind.upper()} — {a.reason}" + (f" (idInPlan {a.id_in_plan})" if a.id_in_plan else ""))
+        for slot, course in dc.courses:
+            def _int(sec):
+                if "sectionIntensity" in sec:
+                    return f"Z{sec['sectionIntensity']}"
+                return f"{sec.get('intensityValueStart')}-{sec.get('intensityValueEnd')}bpm"
+            secs = " · ".join(f"{s['sectionType']}:{s.get('targetValue', 'free')}s {_int(s)}" for s in course["sections"])
+            print(f"   plan  slot {slot}: {course['courseName']}  [{secs}]  hash {cw.course_hash(course)}")
+        for err in dc.errors:
+            print(f"   plan  REFUSED: {err}")
+        for it in schedule.get(d, []):
+            tag = f"Phoenix slot {it['phoenix_slot']}" if it.get("phoenix_slot") else "athlete"
+            print(f"   watch {tag}: {it['name']}  idInPlan {it['idInPlan']}" + ("  (completed)" if it.get("completed") else ""))
+        if not dc.courses and not dc.errors and not schedule.get(d):
+            print("   —")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -134,6 +195,8 @@ def main():
     s.add_argument("--suffix", default=""); s.set_defaults(fn=cmd_call)
     s = sub.add_parser("gate"); s.add_argument("--days", type=int, default=7); s.set_defaults(fn=cmd_gate)
     s = sub.add_parser("pull"); s.add_argument("--days", type=int, default=10); s.set_defaults(fn=cmd_pull)
+    s = sub.add_parser("dry-run"); s.add_argument("--plan"); s.add_argument("--from-api"); s.add_argument("--week-start")
+    s.set_defaults(fn=cmd_dry_run)
     args = ap.parse_args()
     try:
         args.fn(args)

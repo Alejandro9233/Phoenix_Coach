@@ -646,7 +646,8 @@ def test_mcp_off_means_scraper_with_reason(db, monkeypatch):
     result = asyncio.run(_run_smart_refresh(db))
     src = result["event"]["coros_source"]
     assert src["source"] == "scraper" and "not enabled" in src["fallback_reason"]
-    assert result["event"]["schema_version"] == 3
+    assert result["event"]["schema_version"] == 4
+    assert result["event"]["watch"] is None          # COROS_WATCH_PUSH unset → no push, no report
 
 
 def test_mcp_success_skips_the_scraper(db, monkeypatch):

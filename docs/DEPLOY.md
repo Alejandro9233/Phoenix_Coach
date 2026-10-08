@@ -27,6 +27,10 @@ file exists at `~/.phoenix/coros_mcp/<region>/token.json`, and falls back to the
 Playwright scraper otherwise. Create the token once per host with
 `scripts/coros_mcp_cli.py login`. No new secret in `.env`.
 
+`COROS_WATCH_PUSH=1` turns on the watch push (plan → COROS calendar, docs/COROS_MCP.md
+"Watch push"). Default off. Unsetting it stops future writes; courses already on the
+watch stay until deleted in the COROS app.
+
 ## Build and start
 
 - **Build**: `pip install -r requirements.txt && playwright install chromium --with-deps`

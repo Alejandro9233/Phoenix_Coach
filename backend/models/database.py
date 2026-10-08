@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, Date, ForeignKey, JSON, Boolean, Text
+from sqlalchemy import UniqueConstraint, Column, Integer, Float, String, DateTime, Date, ForeignKey, JSON, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -195,6 +195,26 @@ class WeeklyPlan(Base):
     plan_json = Column(JSON)  # Stores the full 7-day plan structure
     created_at = Column(DateTime, default=None)
     last_adapted = Column(DateTime, nullable=True)
+
+class WatchWorkout(Base):
+    """One row per (date, slot) Phoenix has pushed — or decided not to push —
+    onto the COROS watch calendar (docs/COROS_MCP.md, "Watch push").
+    Keyed by date, not by plan row: normalize_plan drops unknown keys and
+    regenerate deletes the WeeklyPlan row, so ids can't live in plan_json.
+    status: creating | pushed | cancelled | failed | locked | removed |
+    athlete_scheduled. ~5 rows a week, pruned after 60 days."""
+    __tablename__ = "watch_workouts"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, index=True)
+    slot = Column(Integer)
+    course_name = Column(String, nullable=True)
+    id_in_plan = Column(String, nullable=True)      # COROS's 64-bit id, as text
+    course_hash = Column(String, nullable=True)
+    status = Column(String)
+    last_error = Column(String, nullable=True)
+    pushed_at = Column(DateTime, nullable=True)
+    attempts = Column(Integer, default=0)
+    __table_args__ = (UniqueConstraint("date", "slot", name="uq_watch_workout_date_slot"),)
 
 class RefreshEvent(Base):
     """One row per smart-refresh run — the durable answer to "what happened

@@ -16,6 +16,7 @@ from backend.models.database import (
 from backend.services.fit_importer import parse_fit_file
 from backend.services.coros_scraper import CorosScraper
 from backend.services import coros_mcp
+from backend.services import coros_watch_sync
 from backend.utils.timezone import (
     get_local_today, get_timezone_name, is_valid_timezone, set_athlete_timezone,
 )
@@ -693,6 +694,22 @@ def get_weekly_plan(db: Session = Depends(get_db)):
     return _get_or_generate_weekly_plan(db)
 
 
+def _watch_sync_safe(db, plan_json, week_start, days=None):
+    """Push/update this week's courses on the COROS watch after a plan commit
+    (docs/COROS_MCP.md, "Watch push"). Off unless COROS_WATCH_PUSH=1 and the
+    MCP token exists. Never raises: the watch is downstream of the plan, and a
+    failed push is a row in watch_workouts, not a failed request."""
+    try:
+        report = coros_watch_sync.sync_watch(db, plan_json, week_start, days=days)
+        if report.get("status") not in ("off", "nothing"):
+            print(f"⌚ watch sync {report.get('status')}: {len(report.get('writes') or [])} writes, "
+                  f"{len(report.get('skipped') or [])} skipped" + (f" — {report['error']}" if report.get("error") else ""))
+        return report
+    except Exception as e:
+        print(f"⚠️ watch sync failed: {e}")
+        return {"status": "error", "error": str(e)[:200], "writes": [], "skipped": []}
+
+
 def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
                                  reason="Weekly plan generated"):
     """The GET /weekly-plan body, callable with regenerate's extras.
@@ -743,7 +760,11 @@ def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
         plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
         if plan_record:
             return normalize_plan(plan_record.plan_json)
-        return _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason)
+        new_plan = _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason)
+    # The week goes to the watch once, here: after the generation commit and
+    # outside the lock (a rolled-back plan must never leave courses behind).
+    _watch_sync_safe(db, new_plan, start_of_week)
+    return new_plan
 
 
 def _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason):
@@ -1088,6 +1109,7 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     db.commit()
 
     print(f"✅ Replanned {len(days_to_replan)} days: {days_to_replan}")
+    _watch_sync_safe(db, plan_json, start_of_week, days=list(days_to_replan))
 
     return {
         "status": "replanned",
@@ -1434,6 +1456,9 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     
     db.commit()
 
+    # Today's course on the watch follows the adapted day (update in place).
+    _watch_sync_safe(db, plan_json, start_of_week, days=[today_day_name])
+
     return adapted_day
 
 
@@ -1506,6 +1531,12 @@ def get_history(limit: int = 30, before: str = None, db: Session = Depends(get_d
     from backend.services.history_feed import build_history_feed
 
     return build_history_feed(db, limit=limit, before=before)
+
+
+@app.get("/watch/status")
+def watch_status(db: Session = Depends(get_db)):
+    """This week's watch pushes and the newest failure (docs/COROS_MCP.md)."""
+    return coros_watch_sync.watch_status(db)
 
 
 @app.get("/weekly-plan/status")
@@ -1865,6 +1896,24 @@ async def _run_smart_refresh(db: Session, progress=None):
         "receipt_at": adapt_receipt_at,
     }
 
+    # 5b. Watch backstop (docs/COROS_MCP.md, "Watch push"): reconcile this
+    # week's plan with the COROS calendar from today forward, so a plan change
+    # made elsewhere (issue triage, a replan) reaches the watch by the next
+    # refresh. Off unless COROS_WATCH_PUSH=1. Bounded; never fails the refresh.
+    watch = None
+    if coros_watch_sync.push_enabled():
+        report("Updating watch...")
+        try:
+            from datetime import timedelta as _wtd
+            _today = get_local_today()
+            _ws = _today - _wtd(days=_today.weekday())
+            _plan_row = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == _ws).order_by(WeeklyPlan.id.desc()).first()
+            if _plan_row:
+                watch = await asyncio.wait_for(
+                    asyncio.to_thread(_watch_sync_safe, db, _plan_row.plan_json, _ws), timeout=90)
+        except Exception as e:  # asyncio.TimeoutError included
+            watch = {"status": "error", "error": f"{type(e).__name__}: {e}"[:200], "writes": [], "skipped": []}
+
     # 6. Freeze the event — the durable answer to "what happened when I
     # refreshed". Sits after every swallowed-exception stage so partial
     # scrapes still record. A lost log line must never fail the sync.
@@ -1887,6 +1936,7 @@ async def _run_smart_refresh(db: Session, progress=None):
             triggers=triggers,
             adaptation=adaptation,
             coros_source=coros_source,
+            watch=watch,
         )
         event_id = record_refresh_event(db, event)
         event_recorded = True

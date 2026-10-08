@@ -228,3 +228,56 @@ Each gives a new field a consumer on day one. Playground raw outputs and INSIGHT
 6. Later: nightly HRV curve shape (window by the sleep window first; 18% of raw points
    are awake), outdoor FIT running power/dynamics on demand, real start times after
    timezone conversion.
+
+## Watch push (write path) — council 2026-10-07
+
+Full council, verdict "yes with changes" on the athlete's shape (push the week
+once at generation, edit the day on adaptation). Decisions:
+
+- **Encoding:** HR zone on every section, Phoenix `zone` n → `sectionIntensity` n
+  (Phoenix zones are the athlete's COROS LTHR zones already). `pace_target` goes
+  in the description so he can set the treadmill. Pace sections for outdoor quality
+  runs are a follow-up. Steps map 1:1 to time-target sections. No interval groups
+  (Phoenix steps are a flat list).
+- **Stripped day:** overwrite with `Phoenix <slot> · CANCELLED — <enforced_reason>`,
+  one free section, description "Don't train this. Delete it in the COROS app."
+  Never an "optional easy" run: the enforcer stripped the day because running was
+  ruled out.
+- **Identifiers:** a small `watch_workouts` table keyed by (date, slot) AND a read of
+  `queryTrainingSchedule` before every create. Phoenix names its courses
+  `Phoenix <slot> · <title>` so the watch can be matched back. Ids in `plan_json`
+  are impossible: `normalize_plan` drops unknown keys and regenerate deletes the row.
+  A table alone misses the create-timed-out-but-landed retry; the watch alone
+  misses a bad parse. If the schedule read fails to parse, nothing is created.
+- **When:** after `db.commit()`, outside `_PLAN_GENERATION_LOCK`, from today
+  forward only. Running and cycling only; strength is not pushed in v1 (the
+  athlete's library templates have empty descriptions and may never be editable).
+- **Safety:** `McpClient.call` stays read-only; a separate write entry allows exactly
+  `createScheduledWorkout` and `updateScheduledWorkout`. Env flag `COROS_WATCH_PUSH`,
+  default off. Every write leaves a row (status, returned id, error).
+- **Mapper refuses rather than guesses:** a step without an integer zone, a
+  duration that isn't M:SS, a sport COROS can't create.
+
+Code: `backend/services/coros_watch.py` (pure mapper, placeholder, schedule
+parser; tests in `backend/tests/test_coros_watch.py`) and
+`backend/services/coros_watch_sync.py` (decisions + idempotent sync + status;
+tests in `backend/tests/test_coros_watch_sync.py` against a fake client).
+
+Wiring (`backend/main.py::_watch_sync_safe`, never raises):
+- weekly plan generation → push the whole week, after the commit, outside the lock;
+- `adapt-today` → update today's course in place;
+- `replan-remaining` → update the replanned days;
+- morning refresh → backstop reconcile from today forward (covers issue-triage
+  writes), report on the refresh event as `watch` (schema_version 4);
+- `GET /watch/status` → this week's rows and the newest failure, for Today.
+
+Arming: set `COROS_WATCH_PUSH=1` in the VM's `.env` (needs the MCP token too).
+Before that, dry run: `scripts/coros_mcp_cli.py dry-run --plan week.json` prints
+each day's course, the watch calendar and the decision (CREATE / UPDATE / SKIP
+with reason) and writes nothing. Rollback: unset the flag; existing courses stay
+on the watch until deleted in the COROS app.
+
+Known limits in v1: the id returned by create/update is parsed from prose
+(`idInPlan: N`); if the format differs the row is marked failed and the next run
+adopts the workout by its Phoenix name. The athlete's own hand-scheduled items
+block a push for that day (skip, reason recorded) until he removes them.

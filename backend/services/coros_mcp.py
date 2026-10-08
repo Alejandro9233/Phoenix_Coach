@@ -55,6 +55,10 @@ CLIENT_NAME = "Phoenix Coach"
 REDIRECT_URI = "http://127.0.0.1:43123/callback"
 PROTOCOL_VERSION = "2025-06-18"
 WRITE_PREFIXES = ("create", "update", "schedule", "delete", "remove")
+# The only two write tools Phoenix may call, and only through McpClient.write
+# (write-path council 2026-10-07). Delete/move don't exist; plans and library
+# templates stay refused.
+WRITE_ALLOWLIST = ("createScheduledWorkout", "updateScheduledWorkout")
 HTTP_TIMEOUT = (10, 25)  # connect, read — the refresh caller bounds the whole run too
 
 # The eight recovery_snapshots columns the adaptation gates and the engine
@@ -407,6 +411,14 @@ class McpClient:
 
     def call_text(self, name: str, arguments: dict | None = None) -> str:
         return tool_text(self.call(name, arguments))
+
+    def write(self, name: str, arguments: dict) -> dict:
+        """The one door for writes: exactly the two scheduled-workout tools.
+        `call` keeps refusing them so a read path can never write by accident."""
+        if name not in WRITE_ALLOWLIST:
+            raise CorosMcpError(f"refusing {name}: only {', '.join(WRITE_ALLOWLIST)} may be written")
+        self._ensure_initialized()
+        return self._rpc("tools/call", {"name": name, "arguments": arguments})
 
 
 # --------------------------------------------------------------------------
