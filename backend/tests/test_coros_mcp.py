@@ -391,3 +391,21 @@ def test_partial_today_is_flagged_for_fallback():
     assert set(payload["missing"]) == {"ati", "cti", "tib", "fatigue_state", "load_ratio"}
     day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
     assert "ati" not in day and day["avgSleepHrv"] == 52
+
+
+def test_parse_daily_health_fixture():
+    rows = mcp.parse_daily_health(fixture("coros_mcp_daily_health.txt"))
+    assert set(rows) == {date(2026, 3, 6), date(2026, 3, 7), date(2026, 3, 8)}
+    assert rows[date(2026, 3, 8)] == {"steps": 11526, "calories": 885, "exercise_min": 58, "stress_avg": 36,
+                                      "sleep_hr_avg": 57, "sleep_hr_min": 44, "sleep_hr_max": 76}
+    assert rows[date(2026, 3, 7)]["exercise_min"] == 128 and rows[date(2026, 3, 6)]["sleep_hr_min"] == 39
+
+
+def test_payload_carries_sleeping_hr_by_name():
+    f = _parsed_fixtures()
+    health = mcp.parse_daily_health(fixture("coros_mcp_daily_health.txt"))
+    payload = mcp.build_scrape_payload(date(2026, 3, 8), "America/Mexico_City", [], {}, f["sleep_hrv"],
+                                       f["resting_hr"], f["load"], health=health)
+    day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
+    assert day["sleepHrAvg"] == 57 and day["sleepHrMin"] == 44
+    assert "sleepHrAvg" not in next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260305)

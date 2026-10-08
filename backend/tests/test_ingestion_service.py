@@ -399,3 +399,9 @@ def test_hrv_normal_range_lands_from_both_paths(temp_db_url):
             {"happenDay": 20260310, "avgSleepHrv": 64, "sleepHrvBase": 78, "sleepHrvIntervalList": [5, 41, 60, 98]}]}}}}})
     assert (_snapshot(temp_db_url, (2026, 3, 9)).hrv_normal_low, _snapshot(temp_db_url, (2026, 3, 9)).hrv_normal_high) == (59.0, 96.0)
     assert (_snapshot(temp_db_url, (2026, 3, 10)).hrv_normal_low, _snapshot(temp_db_url, (2026, 3, 10)).hrv_normal_high) == (60.0, 98.0)
+
+
+def test_sleeping_hr_lands_from_the_mcp_payload(temp_db_url):
+    IngestionService(db_url=temp_db_url).ingest_coros_data(_mcp_day(sleepHrAvg=55, sleepHrMin=44))
+    snap = _snapshot(temp_db_url, (2026, 3, 8))
+    assert (snap.sleep_hr_avg, snap.sleep_hr_min) == (55.0, 44.0)

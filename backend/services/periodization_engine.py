@@ -114,6 +114,12 @@ COMEBACK_MAX_WEEKS = 8       # never reached the base by then: that's the new no
 SINGLE_RUN_CAP = 1.10
 SINGLE_RUN_WINDOW_DAYS = 30
 COMEBACK_FIRST_RUN_KM = 5.0        # single-run cap floor: a first run back
+# Sleep readiness (COROS MCP data): under this many hours, or under this
+# COROS sleep score, is a concern. Sleeping HR this far over its 30-day
+# median is called out (altitude acclimatization, illness).
+SLEEP_SHORT_HOURS = 6.0
+SLEEP_POOR_SCORE = 60
+SLEEP_HR_ELEVATED_BPM = 4
 COMEBACK_FIRST_LONG_RUN_MIN = 30   # long run when the window holds no run
 # Marathon long-run path (_get_weekly_run_target). LONG_RUN_STEP_MIN a week
 # can't reach a marathon-length long run from a short build: after the
@@ -2257,9 +2263,10 @@ class PeriodizationEngine:
         """
         snapshots = db.query(RecoverySnapshot).order_by(
             RecoverySnapshot.date.desc()
-        ).limit(7).all()
+        ).limit(31).all()   # 7 for the trends below, 30 for the sleeping-HR norm
 
-        checks = {"hrv": "unknown", "rhr": "unknown", "form": "unknown", "load": "unknown"}
+        checks = {"hrv": "unknown", "rhr": "unknown", "form": "unknown", "load": "unknown",
+                  "sleep": "unknown"}
 
         if not snapshots:
             return {
@@ -2270,6 +2277,8 @@ class PeriodizationEngine:
                 "status": "unknown",
                 "detail": "No recovery data available. Train conservatively.",
                 "checks": checks,
+                "sleep": None,
+                "sleep_hr": None,
             }
 
         latest = snapshots[0]
@@ -2355,6 +2364,33 @@ class PeriodizationEngine:
                 checks["load"] = "concern"
                 concerns.append(f"Load ratio {load_ratio:.2f} — approaching overreach, monitor carefully")
 
+        # Sleep (COROS MCP path writes sleep_duration_hr / sleep_quality_score;
+        # the scraper never did, so older rows stay "unknown"). Short or poor
+        # sleep is a concern on its own; it is not an adaptation trigger yet.
+        sleep = None
+        if latest.sleep_duration_hr is not None or latest.sleep_quality_score is not None:
+            sleep = {"hours": latest.sleep_duration_hr, "score": latest.sleep_quality_score}
+            checks["sleep"] = "pass"
+            if latest.sleep_duration_hr is not None and latest.sleep_duration_hr < SLEEP_SHORT_HOURS:
+                checks["sleep"] = "concern"
+                concerns.append(f"Short sleep — {latest.sleep_duration_hr:.1f} h last night")
+            elif latest.sleep_quality_score is not None and latest.sleep_quality_score < SLEEP_POOR_SCORE:
+                checks["sleep"] = "concern"
+                concerns.append(f"Poor sleep — COROS score {latest.sleep_quality_score:.0f}")
+
+        # Sleeping heart rate vs its 30-day norm: the acclimatization marker
+        # after a move to altitude (and an illness tell). Readout, not a check.
+        sleep_hr = None
+        if latest.sleep_hr_min is not None:
+            history = [x.sleep_hr_min for x in snapshots[1:31] if x.sleep_hr_min is not None]
+            norm = sorted(history)[len(history) // 2] if len(history) >= 7 else None
+            sleep_hr = {"min": latest.sleep_hr_min, "avg": latest.sleep_hr_avg,
+                        "norm_30d": norm,
+                        "delta": round(latest.sleep_hr_min - norm, 1) if norm is not None else None}
+            if norm is not None and latest.sleep_hr_min - norm >= SLEEP_HR_ELEVATED_BPM:
+                concerns.append(f"Sleeping HR {latest.sleep_hr_min:.0f} bpm — "
+                                f"{latest.sleep_hr_min - norm:.0f} above your 30-day norm")
+
         # Determine status color
         if len(concerns) >= 2 or any("HIGH" in c or "significant" in c or "deep fatigue" in c for c in concerns):
             status = "red"
@@ -2374,6 +2410,8 @@ class PeriodizationEngine:
             "status": status,
             "detail": detail,
             "checks": checks,
+            "sleep": sleep,
+            "sleep_hr": sleep_hr,
         }
 
     def _get_last_week_summary(self, db: Session) -> dict:

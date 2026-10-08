@@ -145,6 +145,17 @@ class DataAgent:
             if latest.hrv_ms: lines.append(f"  {_tag} HRV: {latest.hrv_ms:.0f} ms")
             if latest.recovery_score is not None:
                 lines.append(f"  COROS Recovery: {latest.recovery_score:.0f}%")
+            if latest.sleep_duration_hr is not None or latest.sleep_quality_score is not None:
+                lines.append("  Sleep: " + ", ".join(x for x in (
+                    f"{latest.sleep_duration_hr:.1f} h" if latest.sleep_duration_hr is not None else "",
+                    f"COROS score {latest.sleep_quality_score:.0f}" if latest.sleep_quality_score is not None else "") if x))
+            if latest.sleep_hr_min is not None:
+                _hist = [x.sleep_hr_min for x in snapshots[1:31] if x.sleep_hr_min is not None]
+                _norm = sorted(_hist)[len(_hist) // 2] if len(_hist) >= 7 else None
+                lines.append(f"  Sleeping HR: min {latest.sleep_hr_min:.0f} bpm"
+                             + (f" (30-day norm {_norm:.0f})" if _norm is not None else ""))
+            if latest.stress_level is not None:
+                lines.append(f"  Daily stress (COROS): {latest.stress_level}")
             if latest.t7d_load: lines.append(f"  7-day Load: {latest.t7d_load:.0f}")
             if latest.t28d_load: lines.append(f"  28-day Load: {latest.t28d_load:.0f}")
             if latest.recommend_tl_min and latest.recommend_tl_max:

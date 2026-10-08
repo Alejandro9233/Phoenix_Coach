@@ -116,6 +116,11 @@ class RecoverySnapshot(Base):
     # scraper's sleepHrvIntervalList[2:4]). The gates use it when present.
     hrv_normal_low = Column(Float, nullable=True)
     hrv_normal_high = Column(Float, nullable=True)
+    # Sleeping heart rate (MCP queryDailyHealthData). The acclimatization
+    # marker after the 2026-09 move to altitude: it rose ~5 bpm and should
+    # settle back as the body adapts.
+    sleep_hr_avg = Column(Float, nullable=True)
+    sleep_hr_min = Column(Float, nullable=True)
     vo2_max = Column(Float, nullable=True)
     ati = Column(Float, nullable=True)
     cti = Column(Float, nullable=True)

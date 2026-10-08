@@ -639,6 +639,47 @@ def parse_sleep_overview(text: str) -> dict[date, dict]:
     return out
 
 
+_RE_HEALTH_DAY = re.compile(r"^---\s*(\d{8})\s*---$")
+
+
+def parse_daily_health(text: str) -> dict[date, dict]:
+    """queryDailyHealthData → {date: {steps, calories, exercise_min, stress_avg,
+    sleep_hr_avg, sleep_hr_min, sleep_hr_max}}. Day headers are '--- yyyyMMdd ---'."""
+    out, cur = {}, None
+    for raw in text.splitlines():
+        line = raw.strip()
+        m = _RE_HEALTH_DAY.match(line)
+        if m:
+            try:
+                cur = date(int(m.group(1)[:4]), int(m.group(1)[4:6]), int(m.group(1)[6:8]))
+            except ValueError:
+                cur = None
+                continue
+            out[cur] = {"steps": None, "calories": None, "exercise_min": None, "stress_avg": None,
+                        "sleep_hr_avg": None, "sleep_hr_min": None, "sleep_hr_max": None}
+            continue
+        if cur is None or not line:
+            continue
+        d = out[cur]
+        if line.startswith("Steps:"):
+            for part in line.split("|"):
+                k, _, v = part.partition(":")
+                k = k.strip().lower()
+                if k == "steps":
+                    d["steps"] = _num(v)
+                elif k == "calories":
+                    d["calories"] = _num(v)
+                elif k == "exercise":
+                    d["exercise_min"] = _mins(v)
+        elif line.startswith("Stress:"):
+            d["stress_avg"] = _num(line.split(":", 1)[1])
+        elif line.startswith("Sleep HR:"):
+            mm = re.search(r"Avg\s*(\d+)\s*bpm\s*\|\s*Min\s*(\d+)\s*bpm\s*\|\s*Max\s*(\d+)\s*bpm", line)
+            if mm:
+                d["sleep_hr_avg"], d["sleep_hr_min"], d["sleep_hr_max"] = int(mm.group(1)), int(mm.group(2)), int(mm.group(3))
+    return out
+
+
 def parse_stress_level(text: str) -> dict[date, int | None]:
     """queryStressLevel → {date: daily average or None}."""
     out = {}
@@ -853,7 +894,7 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
                          sleep_hrv: dict, resting_hr: dict, load: dict,
                          sleep: dict | None = None, stress: dict | None = None,
                          fitness: dict | None = None, recovery: dict | None = None,
-                         user: dict | None = None) -> dict:
+                         user: dict | None = None, health: dict | None = None) -> dict:
     """Pure assembly: parsed MCP answers → the dict `ingest_coros_data` eats.
 
     Keys are only present when a value exists; ingestion preserves the column
@@ -865,11 +906,11 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
     from datetime import datetime, timedelta
 
     tz = ZoneInfo(tz_name)
-    sleep, stress = sleep or {}, stress or {}
+    sleep, stress, health = sleep or {}, stress or {}, health or {}
     rows = gate_rows(sleep_hrv, resting_hr, load)
 
     day_list = []
-    for d in sorted(set(rows) | set(sleep) | set(stress)):
+    for d in sorted(set(rows) | set(sleep) | set(stress) | set(health)):
         r = rows.get(d) or {}
         day = {"happenDay": int(_yyyymmdd(d))}
         for src, dst in (("hrv_ms", "avgSleepHrv"), ("resting_hr", "testRhr"), ("ati", "ati"),
@@ -890,6 +931,11 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
             day["sleepDurationMin"] = sl["main_sleep_min"]
         if stress.get(d) is not None:
             day["stressAvg"] = stress[d]
+        hl = health.get(d) or {}
+        if hl.get("sleep_hr_avg") is not None:
+            day["sleepHrAvg"] = hl["sleep_hr_avg"]
+        if hl.get("sleep_hr_min") is not None:
+            day["sleepHrMin"] = hl["sleep_hr_min"]
         if d == today and fitness:
             if fitness.get("vo2max") is not None:
                 day["vo2max"] = fitness["vo2max"]
@@ -984,13 +1030,14 @@ def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_day
     load = parse_training_load(client.call_text("queryTrainingLoadAssessment", {"days": span}))
     sleep = parse_sleep_overview(client.call_text("querySleepOverview", {"startDate": _yyyymmdd(span_start), "endDate": _yyyymmdd(today)}))
     stress = parse_stress_level(client.call_text("queryStressLevel", {"days": span}))
+    health = parse_daily_health(client.call_text("queryDailyHealthData", {"days": span}))
     fitness = parse_fitness_overview(client.call_text("queryFitnessAssessmentOverview", {}))
     recovery = parse_recovery_status(client.call_text("queryRecoveryStatus", {}))
     user = parse_user_info(client.call_text("queryUserInfo", {}))
 
     payload = build_scrape_payload(today, tz_name, records, details, hrv, rhr, load,
                                    sleep=sleep, stress=stress, fitness=fitness,
-                                   recovery=recovery, user=user)
+                                   recovery=recovery, user=user, health=health)
     payload["calls"] = client.calls
     payload["elapsed_ms"] = int((time.monotonic() - started) * 1000)
     return payload

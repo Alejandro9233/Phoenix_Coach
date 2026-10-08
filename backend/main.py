@@ -120,7 +120,7 @@ def _ensure_columns():
 
     if "recovery_snapshots" in tables:
         existing = {c["name"] for c in inspector.get_columns("recovery_snapshots")}
-        for col in ("hrv_normal_low", "hrv_normal_high"):
+        for col in ("hrv_normal_low", "hrv_normal_high", "sleep_hr_avg", "sleep_hr_min"):
             if col not in existing:
                 with engine.begin() as conn:
                     conn.execute(text(f"ALTER TABLE recovery_snapshots ADD COLUMN {col} FLOAT"))
@@ -1879,6 +1879,9 @@ async def _run_smart_refresh(db: Session, progress=None):
         "hrv_ms": latest.hrv_ms if latest else None,
         "hrv_normal_low": latest.hrv_normal_low if latest else None,
         "hrv_normal_high": latest.hrv_normal_high if latest else None,
+        "sleep_hours": latest.sleep_duration_hr if latest else None,
+        "sleep_score": latest.sleep_quality_score if latest else None,
+        "sleep_hr_min": latest.sleep_hr_min if latest else None,
         "resting_hr": latest.resting_hr if latest else None,
         "load_ratio": latest.load_ratio if latest else None,
         "load_ratio_label": _load_ratio_label(latest.load_ratio) if latest else None,

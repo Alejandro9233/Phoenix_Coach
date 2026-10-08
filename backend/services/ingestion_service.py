@@ -165,6 +165,8 @@ class IngestionService:
                     snapshot.sleep_duration_hr = round(float(day["sleepDurationMin"]) / 60, 2)
                 _set("sleep_quality_score", day.get("sleepScore"))
                 _set("stress_level", day.get("stressAvg"), int)
+                _set("sleep_hr_avg", day.get("sleepHrAvg"))
+                _set("sleep_hr_min", day.get("sleepHrMin"))
                 # COROS's own HRV normal range. MCP sends it by name; the
                 # scraper's sleepHrvIntervalList carries it at indexes 2 and 3
                 # (verified equal to the MCP "Normal Range" on every day compared).

@@ -213,8 +213,12 @@ Each gives a new field a consumer on day one. Playground raw outputs and INSIGHT
    has it, the `hrv_drop` gate, the Today readiness check and the LLM alert all
    use "below the band" instead of −15% vs the stored baseline, which had fired
    on 6 of the 7 refreshes after the move. Rows without a band keep the legacy
-   rule. Still to do here: sleeping HR (`queryDailyHealthData`) as the
-   acclimatization marker.
+   rule. **Sleep shipped 2026-10-08:** `sleep_duration_hr` / `sleep_quality_score`
+   feed a fifth readiness check (`checks.sleep`: under 6 h or COROS score under 60
+   is a concern); `sleep_hr_avg` / `sleep_hr_min` (from `queryDailyHealthData`) are
+   stored daily and reported as `sleep_hr` with the 30-day median — 4 bpm or more
+   above it is called out in the detail. The Today arc still draws four segments;
+   showing the fifth is an iOS design pass.
 2. **Weekly volume that shows what disappeared.** Hours per sport per week from
    `querySportRecords` (cycling went to zero after the move with nothing recorded in
    its place; elliptical is never on the watch). Surfaces the gap the engine can't see.
