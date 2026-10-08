@@ -291,3 +291,89 @@ def enforce_paces(plan_json: dict, pace_model: dict, days=None) -> tuple:
             ws["rationale"] = f"{rationale} {note}".strip()
 
     return plan_json, corrections
+
+
+# --- Distances -----------------------------------------------------------
+# The LLM copies the prompt's example distance the way it copies "zone": 1:
+# the week of 2026-10-05 shipped distance_km 4.2 on every run, including a
+# 62-minute long run, so the volume gate under-counted the week and the watch
+# description said "About 4.2 km" for an hour of running. Distance is
+# arithmetic on things Python owns — the total time and the pace band — so
+# Python stamps it. Steps that spell out every kilometre win over the
+# estimate; a declared figure survives only when its implied pace sits
+# inside the band (±15%). Never touches rides, strength or rest.
+
+DISTANCE_BAND_TOLERANCE = 0.15
+DISTANCE_MIN_MINUTES = 5
+
+
+def _band_seconds(pace_model: dict, band_key: str):
+    bands = (pace_model or {}).get("bands") or {}
+    if band_key == "progressive":
+        lo = (bands.get("marathon") or {}).get("lo")
+        hi = (bands.get("easy") or {}).get("hi")
+    else:
+        b = bands.get(band_key) or {}
+        lo, hi = b.get("lo"), b.get("hi")
+    if lo is None or hi is None or lo <= 0 or hi <= 0:
+        return None
+    return float(lo), float(hi)
+
+
+def expected_run_km(workout: dict, pace_model: dict):
+    """(km, basis) a running workout should declare, or (None, None).
+    basis: 'steps' when every step names its km, else 'pace'."""
+    from backend.services.volume_gate import steps_sum_km
+
+    minutes = parse_minutes(workout.get("total_time"))
+    band = _band_seconds(pace_model, classify_run_workout(workout.get("title")))
+    total, complete = steps_sum_km(workout)
+    if total and complete:
+        return round(float(total), 1), "steps"
+    if not minutes or minutes < DISTANCE_MIN_MINUTES or not band:
+        return None, None
+    lo, hi = band
+    return round(minutes * 60 / ((lo + hi) / 2), 1), "pace"
+
+
+def declared_km_is_plausible(workout: dict, pace_model: dict) -> bool:
+    """True when distance_km's implied pace sits inside the workout's band."""
+    declared = workout.get("distance_km")
+    if not isinstance(declared, (int, float)) or isinstance(declared, bool) or declared <= 0:
+        return False
+    minutes = parse_minutes(workout.get("total_time"))
+    band = _band_seconds(pace_model, classify_run_workout(workout.get("title")))
+    if not minutes or not band:
+        return True   # nothing to judge it against — leave it
+    lo, hi = band
+    implied = minutes * 60 / float(declared)
+    return lo * (1 - DISTANCE_BAND_TOLERANCE) <= implied <= hi * (1 + DISTANCE_BAND_TOLERANCE)
+
+
+def enforce_distances(plan_json: dict, pace_model: dict, days=None) -> tuple:
+    """Stamp distance_km on running workouts whose declared figure is missing
+    or implausible for their time and band. Returns (plan_json, corrections)."""
+    if not pace_model:
+        return plan_json, []
+    corrections = []
+    window = list(days) if days is not None else list(VALID_DAYS)
+    for day_name in window:
+        day = (plan_json.get("days") or {}).get(day_name)
+        if not isinstance(day, dict):
+            continue
+        for w in day.get("workouts") or []:
+            if not isinstance(w, dict) or map_sport(w.get("sport") or "") != "running":
+                continue
+            expected, basis = expected_run_km(w, pace_model)
+            if expected is None:
+                continue
+            if basis == "steps":
+                keep = isinstance(w.get("distance_km"), (int, float)) and abs(float(w["distance_km"]) - expected) < 0.15
+            else:
+                keep = declared_km_is_plausible(w, pace_model)
+            if keep:
+                continue
+            corrections.append({"day": day_name, "title": w.get("title"),
+                                "found": w.get("distance_km"), "set": expected, "basis": basis})
+            w["distance_km"] = expected
+    return plan_json, corrections

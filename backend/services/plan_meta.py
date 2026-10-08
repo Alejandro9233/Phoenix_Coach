@@ -207,6 +207,12 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
             active_injuries=active_injuries,
             days=days,
         )
+        # Distances before the audit: the LLM copies the prompt's example
+        # km the way it copies "zone": 1, and the gate must judge the week on
+        # real kilometres (time x pace band), not on the copied figure.
+        from backend.services.pace_enforcer import enforce_distances
+        candidate, _dist_fixes = enforce_distances(
+            candidate, (gate_ctx or {}).get("pace_model"), days=days)
         if not gated:
             break
         report = volume_gate.audit_plan(
@@ -289,6 +295,13 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
     candidate, pace_fixes = enforce_paces(candidate, pace_model, days=days)
     if pace_fixes:
         print(f"🏃 [{source}] Pace targets set on {len(pace_fixes)} workout(s)")
+    # Distances ride the same slot for ungated writes (the gated path stamped
+    # them before the audit; this is idempotent on a stamped plan).
+    from backend.services.pace_enforcer import enforce_distances
+    candidate, dist_fixes = enforce_distances(candidate, pace_model, days=days)
+    if dist_fixes:
+        print(f"📏 [{source}] Distances stamped on {len(dist_fixes)} workout(s): "
+              + ", ".join(f"{f['day']} {f['found']}→{f['set']} ({f['basis']})" for f in dist_fixes))
 
     # Fuel lines ride the same slot: Python-computed carb/fluid bands stamped
     # on qualifying long runs, cleared when a replan shortens one. Workout
