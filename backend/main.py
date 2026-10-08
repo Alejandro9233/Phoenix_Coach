@@ -1521,6 +1521,9 @@ def use_original_today(db: Session = Depends(get_db)):
     plan_record.plan_json = plan_json
     flag_modified(plan_record, "plan_json")
     db.commit()
+    # The watch follows the athlete's override too: today's course goes back
+    # to the original in place (same slot), unless COROS has locked it.
+    _watch_sync_safe(db, plan_json, start_of_week, days=[today_day_name])
     return plan_json["days"][today_day_name]
 
 
