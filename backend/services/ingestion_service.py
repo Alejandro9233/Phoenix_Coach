@@ -165,6 +165,14 @@ class IngestionService:
                     snapshot.sleep_duration_hr = round(float(day["sleepDurationMin"]) / 60, 2)
                 _set("sleep_quality_score", day.get("sleepScore"))
                 _set("stress_level", day.get("stressAvg"), int)
+                # COROS's own HRV normal range. MCP sends it by name; the
+                # scraper's sleepHrvIntervalList carries it at indexes 2 and 3
+                # (verified equal to the MCP "Normal Range" on every day compared).
+                _set("hrv_normal_low", day.get("sleepHrvNormalLow"))
+                _set("hrv_normal_high", day.get("sleepHrvNormalHigh"))
+                iv = day.get("sleepHrvIntervalList")
+                if isinstance(iv, list) and len(iv) >= 4 and iv[2] and iv[3]:
+                    snapshot.hrv_normal_low, snapshot.hrv_normal_high = float(iv[2]), float(iv[3])
 
             # 4. Ingest Detailed HRV Data
             # From dashboard_query -> summaryInfo -> sleepHrvData -> sleepHrvList
@@ -187,6 +195,9 @@ class IngestionService:
                     snapshot.hrv_baseline = float(hrv_entry["sleepHrvBase"])
                 if hrv_entry.get("sleepHrvSd") is not None:
                     snapshot.hrv_sd = float(hrv_entry["sleepHrvSd"])
+                iv = hrv_entry.get("sleepHrvIntervalList")
+                if isinstance(iv, list) and len(iv) >= 4 and iv[2] and iv[3]:
+                    snapshot.hrv_normal_low, snapshot.hrv_normal_high = float(iv[2]), float(iv[3])
 
             # 4b. COROS's own recovery percentage (summaryInfo.recoveryPct)
             # feeds the previously-dead recovery_score column. Advisory prose

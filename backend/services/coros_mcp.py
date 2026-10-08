@@ -863,7 +863,8 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
         for src, dst in (("hrv_ms", "avgSleepHrv"), ("resting_hr", "testRhr"), ("ati", "ati"),
                          ("cti", "cti"), ("tib", "tib"), ("fatigue_pct", "tiredRateNew"),
                          ("fatigue_state", "tiredRateStateNew"), ("load_ratio", "trainingLoadRatio"),
-                         ("load_ratio_state", "trainingLoadRatioState"), ("hrv_baseline", "sleepHrvBase")):
+                         ("load_ratio_state", "trainingLoadRatioState"), ("hrv_baseline", "sleepHrvBase"),
+                         ("hrv_normal_low", "sleepHrvNormalLow"), ("hrv_normal_high", "sleepHrvNormalHigh")):
             if r.get(src) is not None:
                 day[dst] = r[src]
         prev_sunday = d - timedelta(days=d.weekday() + 1)

@@ -383,3 +383,19 @@ def test_mcp_activity_uses_local_start_time_name_calories_source(temp_db_url):
     # the same labelId again is a no-op (dedupe by id), even with a different timestamp
     again = IngestionService(db_url=temp_db_url).ingest_coros_data({"activities": [dict(act, timestamp=1)], "evolab": {}})
     assert again == []
+
+
+def test_hrv_normal_range_lands_from_both_paths(temp_db_url):
+    svc = IngestionService(db_url=temp_db_url)
+    # MCP path: by name
+    svc.ingest_coros_data(_mcp_day(sleepHrvNormalLow=58, sleepHrvNormalHigh=97))
+    snap = _snapshot(temp_db_url, (2026, 3, 8))
+    assert (snap.hrv_normal_low, snap.hrv_normal_high) == (58.0, 97.0)
+    # scraper path: sleepHrvIntervalList [p5, p25, low, high] on another day, in both places
+    svc.ingest_coros_data({"activities": [], "evolab": {
+        "analyse_query": {"dayList": [{"happenDay": 20260309, "avgSleepHrv": 61, "rhr": 50,
+                                       "sleepHrvIntervalList": [5, 40, 59, 96]}]},
+        "dashboard_query": {"summaryInfo": {"sleepHrvData": {"sleepHrvList": [
+            {"happenDay": 20260310, "avgSleepHrv": 64, "sleepHrvBase": 78, "sleepHrvIntervalList": [5, 41, 60, 98]}]}}}}})
+    assert (_snapshot(temp_db_url, (2026, 3, 9)).hrv_normal_low, _snapshot(temp_db_url, (2026, 3, 9)).hrv_normal_high) == (59.0, 96.0)
+    assert (_snapshot(temp_db_url, (2026, 3, 10)).hrv_normal_low, _snapshot(temp_db_url, (2026, 3, 10)).hrv_normal_high) == (60.0, 98.0)

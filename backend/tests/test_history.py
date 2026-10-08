@@ -692,3 +692,49 @@ def test_mcp_partial_today_falls_back_to_the_scraper(db, monkeypatch):
     src = result["event"]["coros_source"]
     assert src["source"] == "scraper" and "parsed partially" in src["fallback_reason"]
     assert src["today_status"] == "partial" and "ati" in src["missing"]
+
+
+# --- hrv_drop uses COROS's own normal range when the row carries it ----------
+
+def _today_snapshot(db, **kw):
+    row = dict(date=get_local_today(), resting_hr=50, tib=14.0, fatigue_state=2, load_ratio=0.7)
+    row.update(kw)
+    db.add(RecoverySnapshot(**row))
+    athlete = db.query(Athlete).first()
+    athlete.hrv_baseline = 95.0
+    db.commit()
+
+
+def _quiet_adapt(monkeypatch):
+    import backend.main as main_mod
+    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(main_mod, "adapt_today_workout", lambda body=None, db=None: None)
+
+
+def test_hrv_inside_coros_band_does_not_fire_despite_baseline(db, monkeypatch):
+    _quiet_adapt(monkeypatch)
+    _today_snapshot(db, hrv_ms=70.0, hrv_baseline=80.0, hrv_normal_low=58.0, hrv_normal_high=97.0)
+    result = asyncio.run(_run_smart_refresh(db))
+    trig = {t["name"]: t for t in result["event"]["triggers"]}
+    assert trig["hrv_drop"] == {"name": "hrv_drop", "fired": False, "value": 70, "threshold": 58}
+    assert result["adaptation"]["needed"] is False
+    assert result["recovery"]["hrv_normal_low"] == 58.0
+
+
+def test_hrv_below_coros_band_fires_with_the_range_in_the_reason(db, monkeypatch):
+    _quiet_adapt(monkeypatch)
+    _today_snapshot(db, hrv_ms=47.0, hrv_baseline=77.0, hrv_normal_low=58.0, hrv_normal_high=97.0)
+    result = asyncio.run(_run_smart_refresh(db))
+    trig = {t["name"]: t for t in result["event"]["triggers"]}
+    assert trig["hrv_drop"]["fired"] is True and trig["hrv_drop"]["value"] == 47 and trig["hrv_drop"]["threshold"] == 58
+    assert result["adaptation"]["reasons"] == ["HRV 47 ms below COROS normal range (58–97 ms)"]
+
+
+def test_hrv_without_a_band_keeps_the_legacy_percentage_rule(db, monkeypatch):
+    _quiet_adapt(monkeypatch)
+    _today_snapshot(db, hrv_ms=70.0, hrv_baseline=80.0)      # athlete baseline 95 → −26%
+    result = asyncio.run(_run_smart_refresh(db))
+    trig = {t["name"]: t for t in result["event"]["triggers"]}
+    assert trig["hrv_drop"]["fired"] is True and trig["hrv_drop"]["threshold"] == -15
+    assert trig["hrv_drop"]["value"] == -26.3
+    assert result["adaptation"]["reasons"] == ["HRV -26% below baseline"]

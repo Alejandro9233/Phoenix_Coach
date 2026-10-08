@@ -207,12 +207,14 @@ reader uses them).
 Each gives a new field a consumer on day one. Playground raw outputs and INSIGHTS.md live in
 `samples/coros_mcp/playground/` (gitignored, personal).
 
-1. **Readiness on COROS's own terms.** Use sleeping HR (`queryDailyHealthData`)
-   and the HRV "Normal range / Below normal" label (`querySleepHrv`) in the
-   readiness checks, and rethink `hrv_drop`: it compares against a fixed
-   `athlete.hrv_baseline`, so a regime change (altitude, illness) fires it most
-   mornings for weeks while COROS's baseline re-centers slowly. Needs a decision:
-   rolling baseline, COROS's label, or a manual "new baseline" reset.
+1. **Readiness on COROS's own terms — shipped 2026-10-07 (HRV part).**
+   `recovery_snapshots.hrv_normal_low/high` hold COROS's "Normal Range" (MCP
+   `querySleepHrv`, or the scraper's `sleepHrvIntervalList[2:4]`). When a row
+   has it, the `hrv_drop` gate, the Today readiness check and the LLM alert all
+   use "below the band" instead of −15% vs the stored baseline, which had fired
+   on 6 of the 7 refreshes after the move. Rows without a band keep the legacy
+   rule. Still to do here: sleeping HR (`queryDailyHealthData`) as the
+   acclimatization marker.
 2. **Weekly volume that shows what disappeared.** Hours per sport per week from
    `querySportRecords` (cycling went to zero after the move with nothing recorded in
    its place; elliptical is never on the watch). Surfaces the gap the engine can't see.

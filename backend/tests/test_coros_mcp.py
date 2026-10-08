@@ -336,6 +336,7 @@ def test_build_scrape_payload_shapes_like_the_scraper():
     assert payload["source"] == "coros_mcp" and payload["today_status"] == "ok" and payload["missing"] == []
     day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
     assert day["avgSleepHrv"] == 52 and day["sleepHrvBase"] == 80 and day["testRhr"] == 54
+    assert day["sleepHrvNormalLow"] == 61 and day["sleepHrvNormalHigh"] == 99   # COROS's own band
     assert day["ati"] == 46 and day["cti"] == 60 and day["tib"] == 14.0 and day["tiredRateNew"] == -14.0
     assert day["tiredRateStateNew"] == 2 and day["trainingLoadRatio"] == 0.76 and day["trainingLoadRatioState"] == 2
     assert day["sleepScore"] == 82 and day["sleepDurationMin"] == 500 and day["stressAvg"] == 30

@@ -279,16 +279,26 @@ class DataAgent:
         if len(snapshots) < 3:
             return alerts
         
-        # HRV dropping trend
+        # HRV dropping trend — COROS's own normal range when the rows carry
+        # it (same rule as the gates), else the legacy −10% vs baseline.
         hrv_values = [s.hrv_ms for s in snapshots[:5] if s.hrv_ms]
         if len(hrv_values) >= 3:
-            baseline = snapshots[0].hrv_baseline if snapshots[0].hrv_baseline else None
-            if baseline and hrv_values[0]:
-                pct_diff = (hrv_values[0] - baseline) / baseline * 100
-                if pct_diff < -10:
-                    consecutive_low = sum(1 for v in hrv_values if v < baseline * 0.9)
-                    if consecutive_low >= 2:
-                        alerts.append(f"HRV {pct_diff:.0f}% below baseline for {consecutive_low} consecutive days")
+            newest = snapshots[0]
+            if newest.hrv_ms and newest.hrv_normal_low:
+                below = [s for s in snapshots[:5]
+                         if s.hrv_ms and s.hrv_normal_low and s.hrv_ms < s.hrv_normal_low]
+                if newest.hrv_ms < newest.hrv_normal_low and len(below) >= 2:
+                    hi = f"–{newest.hrv_normal_high:.0f}" if newest.hrv_normal_high else ""
+                    alerts.append(f"HRV {newest.hrv_ms:.0f} ms below COROS normal range "
+                                  f"({newest.hrv_normal_low:.0f}{hi} ms) on {len(below)} of the last 5 days")
+            else:
+                baseline = newest.hrv_baseline if newest.hrv_baseline else None
+                if baseline and hrv_values[0]:
+                    pct_diff = (hrv_values[0] - baseline) / baseline * 100
+                    if pct_diff < -10:
+                        consecutive_low = sum(1 for v in hrv_values if v < baseline * 0.9)
+                        if consecutive_low >= 2:
+                            alerts.append(f"HRV {pct_diff:.0f}% below baseline for {consecutive_low} consecutive days")
         
         # RHR elevated
         rhr_values = [s.resting_hr for s in snapshots[:7] if s.resting_hr]

@@ -117,6 +117,14 @@ def _ensure_columns():
                 conn.execute(text("ALTER TABLE injury_logs ADD COLUMN expected_recovery_date DATE"))
             print("✅ Migration: added injury_logs.expected_recovery_date")
 
+    if "recovery_snapshots" in tables:
+        existing = {c["name"] for c in inspector.get_columns("recovery_snapshots")}
+        for col in ("hrv_normal_low", "hrv_normal_high"):
+            if col not in existing:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE recovery_snapshots ADD COLUMN {col} FLOAT"))
+                print(f"✅ Migration: added recovery_snapshots.{col}")
+
 
 _ensure_columns()
 
@@ -1723,8 +1731,22 @@ async def _run_smart_refresh(db: Session, progress=None):
 
     if latest and not recovery_data_stale:
         athlete = db.query(Athlete).first()
-        # HRV check
-        if latest.hrv_ms and athlete and athlete.hrv_baseline:
+        # HRV check — COROS's own normal range when the pull carried it
+        # (MCP path, or the scraper's sleepHrvIntervalList), else the legacy
+        # −15% vs the stored baseline. The band re-centers with COROS's
+        # rolling baseline, so a regime change (altitude, illness) stops
+        # firing as the athlete adapts; the fixed baseline fired on 6 of the
+        # 7 refreshes after the 2026-09 move (docs/COROS_MCP.md).
+        if latest.hrv_ms and latest.hrv_normal_low:
+            fired = latest.hrv_ms < latest.hrv_normal_low
+            _trigger("hrv_drop", fired, round(latest.hrv_ms), round(latest.hrv_normal_low))
+            if fired:
+                needs_adaptation = True
+                hi = f"–{latest.hrv_normal_high:.0f}" if latest.hrv_normal_high else ""
+                adaptation_reasons.append(
+                    f"HRV {latest.hrv_ms:.0f} ms below COROS normal range "
+                    f"({latest.hrv_normal_low:.0f}{hi} ms)")
+        elif latest.hrv_ms and athlete and athlete.hrv_baseline:
             hrv_drop_pct = (latest.hrv_ms - athlete.hrv_baseline) / athlete.hrv_baseline * 100
             fired = hrv_drop_pct < -15
             _trigger("hrv_drop", fired, round(hrv_drop_pct, 1), -15)
@@ -1821,6 +1843,8 @@ async def _run_smart_refresh(db: Session, progress=None):
     # 5. Build response
     recovery_summary = {
         "hrv_ms": latest.hrv_ms if latest else None,
+        "hrv_normal_low": latest.hrv_normal_low if latest else None,
+        "hrv_normal_high": latest.hrv_normal_high if latest else None,
         "resting_hr": latest.resting_hr if latest else None,
         "load_ratio": latest.load_ratio if latest else None,
         "load_ratio_label": _load_ratio_label(latest.load_ratio) if latest else None,

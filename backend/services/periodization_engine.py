@@ -2275,13 +2275,33 @@ class PeriodizationEngine:
         latest = snapshots[0]
         concerns = []
 
-        # HRV vs baseline
+        # HRV vs baseline (the % string the Today tile shows)
         hrv_vs_baseline = "unknown"
         if latest.hrv_ms and latest.hrv_baseline and latest.hrv_baseline > 0:
             hrv_pct = ((latest.hrv_ms - latest.hrv_baseline) / latest.hrv_baseline) * 100
             hrv_vs_baseline = f"{hrv_pct:+.0f}%"
 
-            # Check multi-day trend
+        if latest.hrv_ms and latest.hrv_normal_low:
+            # COROS's own normal range, same rule as the hrv_drop gate in
+            # main.py: below the band is a concern, inside it passes, however
+            # far from the stored baseline. The band re-centers as the athlete
+            # adapts to a new altitude or recovers from illness.
+            below_days = 0
+            for s in snapshots[:7]:
+                if s.hrv_ms and s.hrv_normal_low and s.hrv_ms < s.hrv_normal_low:
+                    below_days += 1
+                else:
+                    break
+            if latest.hrv_ms < latest.hrv_normal_low:
+                checks["hrv"] = "concern"
+                hi = f"–{latest.hrv_normal_high:.0f}" if latest.hrv_normal_high else ""
+                streak = f" for {below_days} days" if below_days >= 2 else ""
+                concerns.append(f"HRV {latest.hrv_ms:.0f} ms below your COROS normal range "
+                                f"({latest.hrv_normal_low:.0f}{hi} ms){streak}")
+            else:
+                checks["hrv"] = "pass"
+        elif latest.hrv_ms and latest.hrv_baseline and latest.hrv_baseline > 0:
+            # Legacy: multi-day trend vs the stored baseline (rows without a band)
             recent_hrv = [s.hrv_ms for s in snapshots[:3] if s.hrv_ms]
             if len(recent_hrv) >= 2 and latest.hrv_baseline:
                 avg_recent = sum(recent_hrv) / len(recent_hrv)

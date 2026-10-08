@@ -112,6 +112,10 @@ class RecoverySnapshot(Base):
     training_load = Column(Float, nullable=True)  # COROS proprietary load
     hrv_baseline = Column(Float, nullable=True)
     hrv_sd = Column(Float, nullable=True)
+    # COROS's own "normal range" for sleep HRV (MCP querySleepHrv, or the
+    # scraper's sleepHrvIntervalList[2:4]). The gates use it when present.
+    hrv_normal_low = Column(Float, nullable=True)
+    hrv_normal_high = Column(Float, nullable=True)
     vo2_max = Column(Float, nullable=True)
     ati = Column(Float, nullable=True)
     cti = Column(Float, nullable=True)

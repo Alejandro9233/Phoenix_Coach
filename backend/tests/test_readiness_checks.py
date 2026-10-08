@@ -80,3 +80,30 @@ def test_status_word_and_segments_agree():
     assert r["status"] == "red"
     concerns = [k for k, v in r["checks"].items() if v == "concern"]
     assert set(concerns) == {"load", "form"}
+
+
+# --- COROS's own normal range (docs/COROS_MCP.md) ---------------------------
+# When a row carries hrv_normal_low/high the check follows COROS's band, not the
+# stored baseline: inside the band passes even far below the baseline (a new
+# altitude), below the band is a concern even one day in.
+
+def test_inside_coros_band_passes_despite_low_baseline_pct():
+    db = _db()
+    _snapshots(db, 7, hrv_ms=70.0, hrv_baseline=95.0, hrv_normal_low=58.0, hrv_normal_high=97.0)
+    r = PeriodizationEngine()._get_recovery_status(db)
+    assert r["checks"]["hrv"] == "pass"            # −26% vs baseline would have flagged before
+    assert r["hrv_vs_baseline"] == "-26%"          # the tile still shows the honest percentage
+
+
+def test_below_coros_band_is_a_concern_with_the_range_in_words():
+    db = _db()
+    _snapshots(db, 7, hrv_ms=47.0, hrv_baseline=77.0, hrv_normal_low=58.0, hrv_normal_high=97.0)
+    r = PeriodizationEngine()._get_recovery_status(db)
+    assert r["checks"]["hrv"] == "concern"
+    assert "below your COROS normal range (58–97 ms)" in r["detail"]
+
+
+def test_rows_without_a_band_keep_the_legacy_trend_rule():
+    db = _db()
+    _snapshots(db, 7, hrv_ms=80.0)                 # 3-day avg (80,100,100)=93 vs 95 → −2%: pass
+    assert PeriodizationEngine()._get_recovery_status(db)["checks"]["hrv"] == "pass"
