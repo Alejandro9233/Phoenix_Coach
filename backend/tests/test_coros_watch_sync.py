@@ -237,3 +237,21 @@ def test_watch_status_reports_week_and_last_failure(db, monkeypatch):
     st = ws.watch_status(db, today=MON)
     assert st["enabled"] is False and st["week_start"] == "2026-03-09" and len(st["rows"]) == 2
     assert st["last_failure"] == {"date": "2026-03-11", "name": "Phoenix 1 · x", "error": "HTTP 504"}
+
+
+@pytest.mark.parametrize("text, readable", [
+    ("No training schedule found.", True),                 # the live wording for an empty range
+    ("No workouts scheduled for 2026-03-09 to 2026-03-15.", True),
+    ("Training Schedule\n========================\n\n2026-03-09\nEasy run", True),
+    ("Service exceptions", False),
+    ("", False),
+    ("<html>login</html>", False),
+])
+def test_schedule_readability_matches_live_wordings(text, readable):
+    assert ws.schedule_is_readable(text) is readable
+
+
+def test_empty_range_wording_creates_the_week(db):
+    fake = FakeWatch(text="No training schedule found.")
+    rep = ws.sync_watch(db, _plan(Wednesday=[_run("Wed tempo")]), MON, client=fake, today=MON, force=True)
+    assert rep["status"] == "ok" and [w[0] for w in fake.writes] == ["create"]

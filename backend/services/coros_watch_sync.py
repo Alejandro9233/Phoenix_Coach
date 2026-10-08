@@ -54,8 +54,14 @@ def parse_id_in_plan(text: str) -> str | None:
 
 
 def schedule_is_readable(text: str) -> bool:
+    """A populated calendar starts 'Training Schedule'; an empty range answers
+    'No training schedule found.' (seen live 2026-10-08). Anything else —
+    'Service exceptions', an auth page, a reworded template — is unknown, and
+    unknown must never read as 'nothing scheduled'."""
     t = (text or "").strip().lower()
-    return t.startswith("training schedule") or "no workouts" in t or "no scheduled" in t
+    if t.startswith("training schedule"):
+        return True
+    return t.startswith("no ") and ("schedule" in t or "workout" in t)
 
 
 # --------------------------------------------------------------------------
