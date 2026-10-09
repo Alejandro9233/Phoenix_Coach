@@ -6,6 +6,7 @@ invented). The council's rules under test: a missing or reworded line yields
 None (never 0), write tools are refused, and the MCP path never reaches
 COROS unless explicitly enabled.
 """
+import json
 import os
 from datetime import date
 from datetime import datetime
@@ -427,7 +428,8 @@ def test_compact_laps_keeps_splits_and_computes_drift_and_fade():
 
 def test_compact_laps_refuses_short_or_foreign_input():
     assert mcp.compact_laps("not json") is None
-    assert mcp.compact_laps({"lapGroups": [{"type": 2, "laps": [{"lapIndex": 1, "distance": 100000, "time": 400}]}]}) is None
+    # a type-2 group that isn't whole kilometres is a workout's blocks, not splits
+    assert mcp.compact_laps({"lapGroups": [{"type": 2, "laps": [{"lapIndex": 1, "distance": 130053, "time": 600}]}]}) is None
     short = {"lapGroups": [{"type": 10, "laps": [
         {"lapIndex": i, "distance": 100000, "time": 400.0, "avgPace": 400.0, "avgHr": 150, "avgCadence": 150} for i in (1, 2, 3)]}]}
     lap = mcp.compact_laps(short)
@@ -448,3 +450,96 @@ def test_payload_carries_laps_detail_and_predictions():
     assert acts["900000000000000002"]["laps"] is None and acts["900000000000000002"]["detail"] is None
     day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
     assert day["predHalfS"] == 6210 and day["predMarathonS"] == 13440
+
+
+# ---------------------------------------------------------------- strength log + km groups (2026-10-09)
+
+def test_km_splits_hide_under_type_2_on_shorter_indoor_runs():
+    # No type-10 group: the type-2 laps ARE the km splits (whole km, partial last).
+    only_type_2 = {"lapGroups": [
+        {"type": 2, "lapDistance": 100000, "laps": [
+            {"lapIndex": 1, "distance": 100000, "time": 438.0, "avgPace": 438.0, "avgHr": 140, "avgCadence": 150},
+            {"lapIndex": 2, "distance": 100000, "time": 420.0, "avgPace": 420.0, "avgHr": 148, "avgCadence": 152},
+            {"lapIndex": 3, "distance": 51483, "time": 204.0, "avgPace": 396.0, "avgHr": 152, "avgCadence": 153}]},
+        {"type": -1, "lapDistance": 251483, "laps": [{"lapIndex": 1, "distance": 251483, "time": 1062.0}]}]}
+    lap = mcp.compact_laps(only_type_2)
+    assert lap["full_km"] == 2 and [s["dist_m"] for s in lap["splits"]] == [1000, 1000, 515]
+    # Next to a type 10, the type-2 group is the programmed blocks — not km, not splits.
+    both = json.loads(fixture("coros_mcp_lap_data.json"))
+    both["lapGroups"].append({"type": 2, "lapDistance": 100000, "laps": [
+        {"lapIndex": 1, "distance": 130053, "time": 600.0, "avgPace": 461.0, "avgHr": 130, "avgCadence": 150},
+        {"lapIndex": 2, "distance": 267691, "time": 1200.0, "avgPace": 448.0, "avgHr": 150, "avgCadence": 152}]})
+    assert mcp._km_group(both["lapGroups"])["type"] == 10 and mcp.compact_laps(both)["full_km"] == 6
+    blocks_only = {"lapGroups": [both["lapGroups"][-1]]}
+    assert mcp.compact_laps(blocks_only) is None
+
+
+def test_compact_strength_laps_reads_sets_from_the_summaries_or_the_set_laps():
+    log = mcp.compact_strength_laps(fixture("coros_mcp_strength_laps.json"))
+    assert log["kind"] == "strength" and [e["name"] for e in log["exercises"]] == ["Standing Calf Raises", "Chest", "Core"]
+    calf, chest, core = log["exercises"]
+    # closed by its summary pair: sets/reps/work from the exercise lap, rest from the "Rest" lap
+    assert calf == {"name": "Standing Calf Raises", "sets": 2, "reps": 16, "set_reps": [8, 8],
+                    "work_s": 138, "rest_s": 240, "avg_hr": 87, "max_hr": 119}
+    # a set the watch couldn't count stays a set (reps 0); weight kept only when non-zero
+    assert chest["set_reps"] == [28, 0] and chest["sets"] == 2 and chest["rest_s"] == 235 and chest["weights"] == [20, 20]
+    # never closed by a summary: counted from the alternating set laps
+    assert core == {"name": "Core", "sets": 2, "reps": 31, "set_reps": [11, 20],
+                    "work_s": 298, "rest_s": 9, "avg_hr": 120, "max_hr": 150}
+    assert (log["sets"], log["reps"], log["work_s"], log["rest_s"], log["avg_hr_work"]) == (6, 75, 557, 484, 108)
+    assert mcp.compact_strength_laps("not json") is None
+    assert mcp.compact_strength_laps({"lapGroups": [{"type": 2, "laps": [{"exerciseNameKey": "Rest", "sets": 3, "time": 100}]}]}) is None
+
+
+def test_compact_activity_laps_dispatches_by_sport():
+    strength, run = fixture("coros_mcp_strength_laps.json"), fixture("coros_mcp_lap_data.json")
+    assert mcp.compact_activity_laps(402, strength)["kind"] == "strength"
+    assert mcp.compact_activity_laps(101, run)["full_km"] == 6
+    assert mcp.compact_activity_laps(101, strength) is None      # a strength payload has no km group
+    assert mcp.compact_activity_laps(300, run) is None           # swims: no lap fetch at all
+
+
+class _FakeMcp:
+    """fetch_scrape_shaped's client, answering every tool from the fixtures."""
+    TEXT = {"querySportRecords": "coros_mcp_sport_records.txt", "getActivityDetail": "coros_mcp_activity_detail.txt",
+            "querySleepHrv": "coros_mcp_sleep_hrv.txt", "queryRestingHeartRate": "coros_mcp_resting_hr.txt",
+            "queryTrainingLoadAssessment": "coros_mcp_training_load.txt", "querySleepOverview": "coros_mcp_sleep_overview.txt",
+            "queryStressLevel": "coros_mcp_stress_level.txt", "queryDailyHealthData": "coros_mcp_daily_health.txt",
+            "queryFitnessAssessmentOverview": "coros_mcp_fitness_overview.txt",
+            "queryRecoveryStatus": "coros_mcp_recovery_status.txt", "queryUserInfo": "coros_mcp_user_info.txt"}
+
+    def __init__(self, token=None):
+        self.calls = 0
+        self.lap_calls = []
+
+    def call_text(self, name, arguments=None):
+        self.calls += 1
+        if name == "queryActivityLapData":
+            self.lap_calls.append((arguments["labelId"], arguments["sportType"]))
+            if arguments["labelId"] == "BROKEN":
+                raise mcp.CorosMcpError("boom")
+            if arguments["sportType"] == 402:
+                return fixture("coros_mcp_strength_laps.json")
+            return fixture("coros_mcp_lap_data.json")
+        return fixture(self.TEXT[name])
+
+
+def test_fetch_scrape_shaped_backfills_a_few_lapless_rows_per_pull(monkeypatch):
+    monkeypatch.setattr(mcp, "ensure_token", lambda: "tok")
+    made = []
+    monkeypatch.setattr(mcp, "McpClient", lambda token: made.append(_FakeMcp(token)) or made[-1])
+    records = _parsed_fixtures()["records"]
+    first = records[0]["labelId"]
+    older = [("S1", 402), ("BROKEN", 101), (first, records[0]["sportType"])] + [(f"R{i}", 100) for i in range(10)]
+    payload = mcp.fetch_scrape_shaped(10, known_activity_ids=(), today=date(2026, 3, 8),
+                                      tz_name="America/Mexico_City", lap_backfill=older)
+    client = made[0]
+    back = payload["lap_backfill"]
+    assert back["S1"]["kind"] == "strength" and back["S1"]["sets"] == 6
+    assert "BROKEN" not in back                      # a failed call is skipped, not {}
+    assert first not in back                         # already fetched as a recent activity
+    assert len(back) == mcp.LAP_BACKFILL_PER_PULL - 2 and all(back[k]["full_km"] == 6 for k in back if k.startswith("R"))
+    assert [c[0] for c in client.lap_calls if c[0].startswith("R")] == [f"R{i}" for i in range(mcp.LAP_BACKFILL_PER_PULL - 3)]
+    # recent activities still get their laps inline; a strength one lands as the exercise log
+    acts = {a["labelId"]: a for a in payload["activities"]}
+    assert acts[first]["laps"]["full_km"] == 6

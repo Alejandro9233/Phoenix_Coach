@@ -612,7 +612,7 @@ def test_chat_extras_is_empty_without_the_new_fields(temp_db_session):
     assert DataAgent(temp_db_session).chat_extras() == ""
 
 
-def test_chat_extras_reports_sleep_stress_sleeping_hr_hrv_predictions_and_laps(temp_db_session):
+def test_chat_extras_reports_sleep_stress_sleeping_hr_hrv_predictions_laps_and_strength(temp_db_session):
     from datetime import datetime, timedelta
     from backend.models.database import Activity, RecoverySnapshot
     from backend.utils.timezone import get_local_today
@@ -628,8 +628,22 @@ def test_chat_extras_reports_sleep_stress_sleeping_hr_hrv_predictions_and_laps(t
                                  duration_sec=2619, distance_m=6420,
                                  lap_data={"hr_drift_bpm": 8.0, "first_half_hr": 151, "second_half_hr": 159, "pace_fade_s": 8.0},
                                  detail_data={"aerobic_te": 3.0, "focus": "Base"}))
+    temp_db_session.add(Activity(id="S1", sport="strength", activity_name="calf's and hip",
+                                 start_time=datetime.combine(today - timedelta(days=2), datetime.min.time()),
+                                 duration_sec=4205, distance_m=0, sets=25,
+                                 lap_data={"kind": "strength", "sets": 25, "reps": 238, "work_s": 2432, "rest_s": 1774,
+                                           "avg_hr_work": 101, "exercises": [
+                                               {"name": "Standing Calf Raises", "sets": 4, "reps": 32, "set_reps": [8, 8, 8, 8]},
+                                               {"name": "tibs against wall", "sets": 3, "reps": 21, "set_reps": [7, 9, 5]},
+                                               {"name": "Single Leg Squats", "sets": 3, "reps": 14, "set_reps": [8, 0, 6]}]}))
+    temp_db_session.add(Activity(id="E1", sport="strength", activity_name="Strength",
+                                 start_time=datetime.combine(today - timedelta(days=3), datetime.min.time()),
+                                 duration_sec=1800, distance_m=0, lap_data={}))     # fetched, nothing usable
     temp_db_session.commit()
     text = DataAgent(temp_db_session).chat_extras(today=today)
+    assert "calf's and hip (strength): 25 sets, 41 min work / 30 min rest, HR 101 working — " \
+           "Standing Calf Raises 4×8, tibs against wall 3×(7,9,5), Single Leg Squats 3×(8,0,6)" in text
+    assert "Strength" not in text.replace("(strength)", "")
     assert "Sleep, last 7: 7 nights, avg 7.6 h, avg COROS score 80, shortest 5.5 h on " in text
     assert "Daily stress, last 7: avg 33" in text
     assert "Sleeping HR: min 44 bpm, 11-day median 41 (+3)" in text

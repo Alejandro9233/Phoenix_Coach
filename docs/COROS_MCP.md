@@ -227,8 +227,19 @@ Each gives a new field a consumer on day one. Playground raw outputs and INSIGHT
    the scheduled ones were followed.
 4. **Race predictions on Profile** (`queryFitnessAssessmentOverview`), tracked weekly
    against the goal and the Nov 8 half trial.
-5. **Strength exercise log** from `queryActivityLapData` on strength sessions
-   (exercise name, reps, time, HR per exercise) for injury-prevention tracking.
+5. **Strength exercise log — shipped 2026-10-09.** `queryActivityLapData` on a
+   strength session (sportType 402) lists one lap per set and per rest, then a
+   summary pair per exercise; `coros_mcp.compact_strength_laps` turns that into
+   `activities.lap_data = {kind: "strength", exercises: [{name, sets, reps,
+   set_reps, work_s, rest_s, avg_hr, max_hr}], sets, reps, work_s, rest_s,
+   avg_hr_work}` (~1.4 KB for a 9-exercise session). Chat gets the last three as
+   one line each ("Standing Calf Raises 4×8, tibs against wall 3×(7,9,5)…"); iOS
+   shows the log on the activity screen and a SETS stat on the Recent card.
+   Rows from before this (and any run whose lap fetch failed) are backfilled
+   `LAP_BACKFILL_PER_PULL` (8) per refresh, newest first, 90 days back; `{}` on
+   a row means fetched with nothing usable. Same pass fixed the km splits:
+   shorter indoor runs carry them under lap group type 2 (no type 10), which
+   `compact_laps` used to drop — a third of the 2026 runs had no drift/fade.
 6. Later: nightly HRV curve shape (window by the sleep window first; 18% of raw points
    are awake), outdoor FIT running power/dynamics on demand, real start times after
    timezone conversion.
@@ -300,9 +311,11 @@ Shipped:
   predictions with the 4-week trend, and per-run lap metrics.
 - `recovery_snapshots.pred_half_s` / `pred_marathon_s` stored daily from
   `queryFitnessAssessmentOverview`.
-- One `queryActivityLapData` call per new run/ride at sync; `coros_mcp.compact_laps`
-  keeps the km splits and computes HR drift and pace fade (first vs second half of
-  the full kilometres, km 1 skipped as warmup) → `activities.lap_data`;
+- One `queryActivityLapData` call per new run/ride/strength session at sync;
+  `coros_mcp.compact_laps` keeps the km splits (type 10, or type 2 when the watch
+  wrote no type 10) and computes HR drift and pace fade (first vs second half of
+  the full kilometres, km 1 skipped as warmup); `compact_strength_laps` keeps the
+  exercise log (reader 5 above) → `activities.lap_data`;
   `activities.detail_data` holds aerobic/anaerobic TE, COROS focus, stride, power,
   elevation. Backfilled onto rows ingested earlier when the next pull brings them.
 - Chat history sent to the model capped at `CHAT_HISTORY_MESSAGES` (20).

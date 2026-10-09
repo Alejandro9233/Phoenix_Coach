@@ -1,0 +1,22 @@
+{"source": "activityDetail", "labelId": "900000000000000042", "sportType": 402, "mode": 23, "subMode": 2,
+ "columns": [{"name": "lapIndex"}, {"name": "exerciseNameKey"}, {"name": "sets"}, {"name": "reps"}, {"name": "time"},
+             {"name": "totalLength"}, {"name": "weight"}, {"name": "avgHr"}, {"name": "maxHr"}, {"name": "calories"}],
+ "lapGroups": [
+  {"type": 2, "lapDistance": 100000, "fastLapIndexList": [], "laps": [
+    {"lapIndex": 1, "exerciseNameKey": "Standing Calf Raises", "sets": 0, "reps": 8, "time": 67.0, "totalLength": 67.0, "weight": 0, "avgHr": 88, "maxHr": 119, "calories": 15183},
+    {"lapIndex": 2, "exerciseNameKey": "Standing Calf Raises", "sets": 0, "reps": 0, "time": 120.0, "totalLength": 187.0, "weight": 0, "avgHr": 91, "maxHr": 121, "calories": 0},
+    {"lapIndex": 3, "exerciseNameKey": "Standing Calf Raises", "sets": 0, "reps": 8, "time": 71.0, "totalLength": 258.0, "weight": 0, "avgHr": 87, "maxHr": 117, "calories": 16090},
+    {"lapIndex": 4, "exerciseNameKey": "Standing Calf Raises", "sets": 0, "reps": 0, "time": 120.0, "totalLength": 378.0, "weight": 0, "avgHr": 88, "maxHr": 120, "calories": 0},
+    {"lapIndex": 5, "exerciseNameKey": "Standing Calf Raises", "sets": 2, "reps": 16, "time": 138.0, "totalLength": 378.0, "weight": 0, "avgHr": 88, "maxHr": 119, "calories": 31273},
+    {"lapIndex": 6, "exerciseNameKey": "Rest", "sets": 2, "reps": 0, "time": 240.0, "totalLength": 378.0, "weight": 0, "avgHr": 90, "maxHr": 121, "calories": 0},
+    {"lapIndex": 7, "exerciseNameKey": "Chest", "sets": 0, "reps": 28, "time": 65.0, "totalLength": 443.0, "weight": 20, "avgHr": 101, "maxHr": 120, "calories": 13257},
+    {"lapIndex": 8, "exerciseNameKey": "Chest", "sets": 0, "reps": 0, "time": 175.0, "totalLength": 618.0, "weight": 20, "avgHr": 102, "maxHr": 118, "calories": 0},
+    {"lapIndex": 9, "exerciseNameKey": "Chest", "sets": 0, "reps": 0, "time": 56.0, "totalLength": 674.0, "weight": 20, "avgHr": 105, "maxHr": 118, "calories": 12944},
+    {"lapIndex": 10, "exerciseNameKey": "Chest", "sets": 0, "reps": 0, "time": 60.0, "totalLength": 734.0, "weight": 20, "avgHr": 104, "maxHr": 115, "calories": 0},
+    {"lapIndex": 11, "exerciseNameKey": "Chest", "sets": 2, "reps": 28, "time": 121.0, "totalLength": 734.0, "weight": 20, "avgHr": 103, "maxHr": 120, "calories": 26201},
+    {"lapIndex": 12, "exerciseNameKey": "Rest", "sets": 2, "reps": 0, "time": 235.0, "totalLength": 734.0, "weight": 0, "avgHr": 103, "maxHr": 118, "calories": 0},
+    {"lapIndex": 13, "exerciseNameKey": "Core", "sets": 0, "reps": 11, "time": 127.0, "totalLength": 861.0, "weight": 0, "avgHr": 105, "maxHr": 130, "calories": 22378},
+    {"lapIndex": 14, "exerciseNameKey": "Core", "sets": 0, "reps": 0, "time": 9.0, "totalLength": 870.0, "weight": 0, "avgHr": 101, "maxHr": 110, "calories": 0},
+    {"lapIndex": 15, "exerciseNameKey": "Core", "sets": 0, "reps": 20, "time": 171.0, "totalLength": 1041.0, "weight": 0, "avgHr": 131, "maxHr": 150, "calories": 27537}
+  ]}
+ ]}

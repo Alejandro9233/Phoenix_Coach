@@ -321,6 +321,10 @@ struct ActivityCard: View {
                     statView(label: "TIME", value: activity.durationFormatted, unit: "")
                     Spacer()
                 }
+                if let sets = activity.setCount {
+                    statView(label: "SETS", value: "\(sets)", unit: "")
+                    Spacer()
+                }
                 if let hr = activity.avgHr, hr > 0 {
                     statView(label: "AVG HR", value: "\(hr)", unit: "bpm")
                     Spacer()

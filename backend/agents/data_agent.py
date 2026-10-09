@@ -8,6 +8,26 @@ from backend.models.database import Athlete, Activity, RecoverySnapshot, InjuryL
 from backend.services.constraint_enforcer import get_active_injuries
 from backend.utils.timezone import get_local_today
 
+
+def _strength_line(lap: dict) -> str:
+    """One chat line for a strength session's exercise log (coros_mcp
+    .compact_strength_laps): totals, then each exercise as sets×reps — "4×8"
+    when every set matched, "3×(7,9,5)" when they didn't (a 0 is a set the
+    watch couldn't count)."""
+    parts = []
+    for e in (lap.get("exercises") or [])[:12]:
+        reps = e.get("set_reps") or []
+        if reps and len(set(reps)) == 1 and reps[0]:
+            parts.append(f"{e['name']} {e['sets']}×{reps[0]}")
+        elif reps:
+            parts.append(f"{e['name']} {e['sets']}×({','.join(str(r) for r in reps)})")
+        else:
+            parts.append(f"{e['name']} {e['sets']} sets")
+    head = f"{lap.get('sets')} sets, {round((lap.get('work_s') or 0) / 60)} min work / {round((lap.get('rest_s') or 0) / 60)} min rest"
+    if lap.get("avg_hr_work"):
+        head += f", HR {lap['avg_hr_work']} working"
+    return head + " — " + ", ".join(parts)
+
 # An injury row records how the body part felt on `date_reported`, not today.
 # Past this many days the prompt says so out loud: 2026-09-09 the coach read a
 # 3-day-old "severity 8/10, can't even walk" row as current, told the athlete
@@ -67,12 +87,26 @@ class DataAgent:
                 if len(preds) > 1 and h0 and h1 and (d0 - d1).days >= 7:
                     trend = f"; half was {_t(h1)} on {d1.strftime('%b %d')} ({h0 - h1:+d} s)"
                 lines.append(f"  COROS race predictions: half {_t(h0)}, marathon {_t(m0)}{trend}")
+        # Last 14 days with laps on the row: up to 5 runs (drift, fade, TE)
+        # and up to 3 strength sessions (the exercise log — sets × reps per
+        # exercise, work vs rest minutes, working HR). Strength lines are what
+        # let the coach see whether the calf and hip work actually happened.
         acts = self.db.query(Activity).filter(
             Activity.start_time >= datetime.combine(today - timedelta(days=14), datetime.min.time()),
             Activity.lap_data.isnot(None),
-        ).order_by(Activity.start_time.desc()).limit(5).all()
+        ).order_by(Activity.start_time.desc()).limit(12).all()
+        runs = strength = 0
         for a in acts:
             lap, det = a.lap_data or {}, a.detail_data or {}
+            name = a.activity_name or a.sport
+            if lap.get("kind") == "strength":
+                if strength >= 3 or not lap.get("exercises"):
+                    continue
+                strength += 1
+                lines.append(f"  {a.start_time.strftime('%b %d')} {name} (strength): " + _strength_line(lap))
+                continue
+            if runs >= 5:
+                continue
             bits = []
             if lap.get("hr_drift_bpm") is not None:
                 bits.append(f"HR {lap.get('first_half_hr')}→{lap.get('second_half_hr')} ({lap['hr_drift_bpm']:+.0f} bpm drift)")
@@ -83,7 +117,7 @@ class DataAgent:
             if det.get("focus"):
                 bits.append(f"COROS focus {det['focus']}")
             if bits:
-                name = a.activity_name or a.sport
+                runs += 1
                 lines.append(f"  {a.start_time.strftime('%b %d')} {name}: " + ", ".join(bits))
         return "\n".join(lines)
 

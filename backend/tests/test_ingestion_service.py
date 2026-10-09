@@ -428,3 +428,27 @@ def test_laps_detail_and_predictions_are_stored_and_backfilled(temp_db_url):
     svc.ingest_coros_data(_mcp_day(predHalfS=6210, predMarathonS=13440))
     snap = _snapshot(temp_db_url, (2026, 3, 8))
     assert (snap.pred_half_s, snap.pred_marathon_s) == (6210, 13440)
+
+
+def test_lap_backfill_fills_older_rows_and_marks_empty_fetches(temp_db_url):
+    svc = IngestionService(db_url=temp_db_url)
+    base = {"sportType": 402, "timestamp": 1772996400, "duration": 4205, "distance": 0.0, "avgHeartRate": 101,
+            "avgSpeed": 0, "avgPower": 0, "totalElevation": 0, "trainingLoad": 21, "pitch": None, "sets": 25,
+            "subMode": None, "name": "calf's and hip", "calories": 506, "source": "coros_mcp", "detail": None, "laps": None}
+    acts = [dict(base, labelId="S1", startTimeLocal="2026-03-06T19:00:00"),
+            dict(base, labelId="S2", startTimeLocal="2026-03-07T19:00:00"),
+            dict(base, labelId="S3", startTimeLocal="2026-03-08T19:00:00")]
+    svc.ingest_coros_data({"activities": acts, "evolab": {}})
+    log = {"kind": "strength", "sets": 25, "exercises": [{"name": "Standing Calf Raises", "sets": 4, "reps": 32}]}
+    # a later pull backfills S1 with the log and S2 with "fetched, nothing"; S3 is left alone
+    svc.ingest_coros_data({"activities": [], "evolab": {}, "lap_backfill": {"S1": log, "S2": {}, "NOPE": log}})
+    engine = create_engine(temp_db_url)
+    with sessionmaker(bind=engine)() as s:
+        rows = {r.id: r.lap_data for r in s.query(Activity).all()}
+    assert rows == {"S1": log, "S2": {}, "S3": None}
+    # {} is refillable when a real log arrives through the activities list; a stored log is never overwritten
+    svc.ingest_coros_data({"activities": [dict(acts[1], laps=log), dict(acts[0], laps={"kind": "strength", "sets": 1})],
+                           "evolab": {}})
+    with sessionmaker(bind=engine)() as s:
+        rows = {r.id: r.lap_data for r in s.query(Activity).all()}
+    assert rows["S2"] == log and rows["S1"] == log

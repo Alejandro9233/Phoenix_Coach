@@ -714,26 +714,53 @@ def parse_user_info(text: str) -> dict:
 
 
 LAP_SPORT_TYPES = (100, 101, 102, 103, 200, 201)   # runs and rides get km splits
+STRENGTH_SPORT_TYPES = (402,)                       # strength sessions get the exercise log
+LAP_BACKFILL_PER_PULL = 8   # older lap-less rows fetched per refresh, newest first
+KM_CM = 100000              # COROS lap distances are centimetres
 FULL_KM_CM = 99000          # a km split shorter than this is the partial last one
 LAP_MIN_FULL_SPLITS = 4     # below this, drift/fade are noise
+
+
+def _km_group(groups) -> dict | None:
+    """The per-km lap group. Type 10 is the watch's auto-lap group. Shorter
+    indoor runs (roughly a third of the 2026 sample) have no type 10 and carry
+    the km laps under type 2 instead: every lap exactly 1 km, the last one
+    partial. A type-2 group that sits NEXT TO a type 10 is the programmed
+    workout's blocks (warm-up, work, cool-down) and fails the whole-km test."""
+    for g in groups:
+        if g.get("type") == 10:
+            return g
+    for g in groups:
+        laps = g.get("laps") or []
+        if g.get("type") == 2 and laps \
+                and all((lap.get("distance") or 0) == KM_CM for lap in laps[:-1]) \
+                and 0 < (laps[-1].get("distance") or 0) <= KM_CM:
+            return g
+    return None
+
+
+def _lap_json(lap_json):
+    if isinstance(lap_json, str):
+        try:
+            return json.loads(lap_json)
+        except ValueError:
+            return None
+    return lap_json
 
 
 def compact_laps(lap_json) -> dict | None:
     """queryActivityLapData JSON → the few numbers chat reads, computed once.
 
-    Splits: the type-10 group (per-km laps: distance cm, time s, avgPace s/km,
-    avgHr, avgCadence). Derived from the FULL kilometres, skipping km 1 when
-    there are 5+ (it is the warmup): hr_drift_bpm = second-half mean HR minus
-    first-half, pace_fade_s = second-half mean pace minus first-half (positive
-    = slowing). A finished workout never changes, so this is stored on the
-    activity row (~1 KB) instead of fetched again per question."""
-    if isinstance(lap_json, str):
-        try:
-            lap_json = json.loads(lap_json)
-        except ValueError:
-            return None
+    Splits: the km group (`_km_group`: per-km laps with distance cm, time s,
+    avgPace s/km, avgHr, avgCadence). Derived from the FULL kilometres,
+    skipping km 1 when there are 5+ (it is the warmup): hr_drift_bpm =
+    second-half mean HR minus first-half, pace_fade_s = second-half mean pace
+    minus first-half (positive = slowing). A finished workout never changes,
+    so this is stored on the activity row (~1 KB) instead of fetched again
+    per question."""
+    lap_json = _lap_json(lap_json)
     groups = (lap_json or {}).get("lapGroups") or []
-    km_group = next((g for g in groups if g.get("type") == 10), None)
+    km_group = _km_group(groups)
     if not km_group:
         return None
     splits = []
@@ -764,6 +791,92 @@ def compact_laps(lap_json) -> dict | None:
         out["first_half_hr"] = round(mean([x["hr"] for x in first]))
         out["second_half_hr"] = round(mean([x["hr"] for x in second]))
     return out
+
+
+def compact_strength_laps(lap_json) -> dict | None:
+    """queryActivityLapData JSON for a strength session → the exercise log.
+
+    The watch lists one lap per set and one per rest, alternating inside an
+    exercise block (work first; a set it couldn't count has reps 0 but still
+    burns calories), then closes the block with two summary laps: the
+    exercise's own (sets > 0, with total reps and work time) and a "Rest" lap
+    (sets > 0, total rest time). Totals come from the summaries when present
+    and from the set laps otherwise, so a block the watch never closed still
+    counts. `weight` has been 0 on every session so far (bodyweight and
+    bands); it is kept per set only when something is non-zero. ~100 bytes
+    per exercise on the activity row."""
+    lap_json = _lap_json(lap_json)
+    groups = (lap_json or {}).get("lapGroups") or []
+    laps = [lap for g in groups for lap in (g.get("laps") or [])]
+    exercises, block = [], None
+
+    def close():
+        nonlocal block
+        if block is None:
+            return
+        work = block["work"]
+        if not block["summarized"]:
+            block["sets"], block["reps"] = len(work), sum(w["reps"] for w in work)
+            block["work_s"] = sum(w["s"] for w in work)
+        if block["sets"]:
+            hr = [(w["hr"], w["s"]) for w in work if w["hr"] and w["s"]]
+            ex = {"name": block["name"], "sets": block["sets"], "reps": block["reps"],
+                  "set_reps": [w["reps"] for w in work],
+                  "work_s": round(block["work_s"]), "rest_s": round(block["rest_s"]),
+                  "avg_hr": round(sum(h * s for h, s in hr) / sum(s for _, s in hr)) if hr else None,
+                  "max_hr": max((w["max_hr"] for w in work if w["max_hr"]), default=None)}
+            if any(w["weight"] for w in work):
+                ex["weights"] = [w["weight"] for w in work]
+            exercises.append(ex)
+        block = None
+
+    for lap in laps:
+        name = str(lap.get("exerciseNameKey") or "").strip()
+        try:
+            sets, secs = int(lap.get("sets") or 0), float(lap.get("time") or 0)
+        except (TypeError, ValueError):
+            continue
+        if name.lower() == "rest":
+            if block is not None and sets:        # the block's rest summary closes it
+                block["rest_s"] = secs
+                close()
+            continue
+        if not name:
+            continue
+        if block is None or block["name"] != name:
+            close()
+            block = {"name": name, "work": [], "n": 0, "sets": 0, "reps": 0,
+                     "work_s": 0.0, "rest_s": 0.0, "summarized": False}
+        if sets:                                  # the exercise's summary lap
+            block.update(sets=sets, reps=int(lap.get("reps") or 0), work_s=secs, summarized=True)
+            continue
+        if block["n"] % 2 == 0:                   # work, rest, work, rest …
+            block["work"].append({"reps": int(lap.get("reps") or 0), "s": secs,
+                                  "hr": lap.get("avgHr") or None, "max_hr": lap.get("maxHr") or None,
+                                  "weight": lap.get("weight") or 0})
+        else:
+            block["rest_s"] += secs
+        block["n"] += 1
+    close()
+    if not exercises:
+        return None
+    out = {"kind": "strength", "exercises": exercises,
+           "sets": sum(e["sets"] for e in exercises), "reps": sum(e["reps"] for e in exercises),
+           "work_s": sum(e["work_s"] for e in exercises), "rest_s": sum(e["rest_s"] for e in exercises)}
+    hr = [(e["avg_hr"], e["work_s"]) for e in exercises if e["avg_hr"] and e["work_s"]]
+    if hr:
+        out["avg_hr_work"] = round(sum(h * s for h, s in hr) / sum(s for _, s in hr))
+    return out
+
+
+def compact_activity_laps(sport_type, lap_json) -> dict | None:
+    """One door for lap compaction: km splits for runs and rides, the exercise
+    log for strength, None for sports the sync doesn't fetch laps for."""
+    if sport_type in STRENGTH_SPORT_TYPES:
+        return compact_strength_laps(lap_json)
+    if sport_type in LAP_SPORT_TYPES:
+        return compact_laps(lap_json)
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -1058,10 +1171,17 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
 
 
 def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_days: int = 2,
-                        tz_name: str | None = None, today: date | None = None) -> dict:
+                        tz_name: str | None = None, today: date | None = None,
+                        lap_backfill=()) -> dict:
     """Network side of the live sync. ~10 calls plus one detail call per
     activity that is new or from the last `detail_recent_days` days (so a
-    day's load total is complete once its sessions have synced)."""
+    day's load total is complete once its sessions have synced), plus one lap
+    call per activity in `lap_backfill` — (labelId, sportType) pairs the DB
+    holds without laps, at most LAP_BACKFILL_PER_PULL per refresh so older
+    sessions fill in over a few mornings instead of one long pull. Their
+    results ride the payload as `lap_backfill` {labelId: compact | {}}; {}
+    means fetched and nothing usable, which keeps the row out of the next
+    pull's list."""
     from datetime import timedelta
     from backend.utils.timezone import get_local_today, get_timezone_name
 
@@ -1086,14 +1206,21 @@ def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_day
                 "getActivityDetail", {"labelId": rec["labelId"], "sportType": rec["sportType"]}))
         except CorosMcpError as e:   # detail is enrichment, never a reason to fail the sync
             print(f"  MCP detail {rec['labelId']} skipped: {e}")
-        if rec["sportType"] in LAP_SPORT_TYPES:
+        if rec["sportType"] in LAP_SPORT_TYPES + STRENGTH_SPORT_TYPES:
             try:
-                compact = compact_laps(client.call_text(
-                    "queryActivityLapData", {"labelId": rec["labelId"], "sportType": rec["sportType"]}))
-                if compact:
-                    laps[rec["labelId"]] = compact
+                laps[rec["labelId"]] = compact_activity_laps(rec["sportType"], client.call_text(
+                    "queryActivityLapData", {"labelId": rec["labelId"], "sportType": rec["sportType"]})) or {}
             except CorosMcpError as e:
                 print(f"  MCP laps {rec['labelId']} skipped: {e}")
+    backfill = {}
+    for label_id, sport_type in list(lap_backfill or ())[:LAP_BACKFILL_PER_PULL]:
+        if label_id in laps:
+            continue
+        try:
+            backfill[label_id] = compact_activity_laps(sport_type, client.call_text(
+                "queryActivityLapData", {"labelId": label_id, "sportType": sport_type})) or {}
+        except CorosMcpError as e:
+            print(f"  MCP lap backfill {label_id} skipped: {e}")
 
     span = min(max(days, 7), 30)
     span_start = today - timedelta(days=span - 1)
@@ -1110,6 +1237,7 @@ def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_day
     payload = build_scrape_payload(today, tz_name, records, details, hrv, rhr, load,
                                    sleep=sleep, stress=stress, fitness=fitness,
                                    recovery=recovery, user=user, health=health, laps=laps)
+    payload["lap_backfill"] = backfill
     payload["calls"] = client.calls
     payload["elapsed_ms"] = int((time.monotonic() - started) * 1000)
     return payload

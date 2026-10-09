@@ -441,7 +441,12 @@ struct Activity: Codable, Identifiable {
     let calories: Int?
     let avg_cadence_scraped: Int?
     let calories_scraped: Int?
-    
+    /// COROS's set count for a strength session (0 on rows the old scraper wrote).
+    let sets: Int?
+    /// Laps compacted at sync (`activities.lap_data`); nil until the morning
+    /// pull backfills the row. See ActivityLaps.
+    let lapData: ActivityLaps?
+
     enum CodingKeys: String, CodingKey {
         case id, sport
         case subSport = "sub_sport"
@@ -455,6 +460,8 @@ struct Activity: Codable, Identifiable {
         case totalAscentM = "total_ascent_m"
         case cadence, calories
         case avg_cadence_scraped, calories_scraped
+        case sets
+        case lapData = "lap_data"
     }
     
     var durationFormatted: String {
@@ -486,6 +493,116 @@ struct Activity: Codable, Identifiable {
 
     var sportIcon: String {
         PhoenixCoach.sportIcon(for: sport)
+    }
+
+    /// Sets from the compacted log first (counted per exercise), else COROS's
+    /// record field. Zero means "not a strength session" — callers omit it.
+    var setCount: Int? {
+        if let n = lapData?.sets, n > 0 { return n }
+        if let n = sets, n > 0 { return n }
+        return nil
+    }
+
+    /// The exercise log, only when the row carries one.
+    var strengthLog: ActivityLaps? {
+        guard let laps = lapData, laps.kind == "strength", !(laps.exercises ?? []).isEmpty else { return nil }
+        return laps
+    }
+}
+
+/// `activities.lap_data`, compacted once at sync (backend/services/coros_mcp.py).
+/// Runs carry km splits with HR drift and pace fade; strength sessions carry
+/// the exercise log; `{}` is "fetched, nothing usable". Every field decodes
+/// leniently so a shape this build doesn't know can't take the Recent tab
+/// down with it.
+struct ActivityLaps: Codable {
+    let kind: String?
+    let exercises: [StrengthExercise]?
+    let sets: Int?
+    let reps: Int?
+    let workS: Int?
+    let restS: Int?
+    let avgHrWork: Int?
+    let hrDriftBpm: Double?
+    let paceFadeS: Double?
+    let fullKm: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, exercises, sets, reps
+        case workS = "work_s"
+        case restS = "rest_s"
+        case avgHrWork = "avg_hr_work"
+        case hrDriftBpm = "hr_drift_bpm"
+        case paceFadeS = "pace_fade_s"
+        case fullKm = "full_km"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try? c.decodeIfPresent(String.self, forKey: .kind)
+        exercises = try? c.decodeIfPresent([StrengthExercise].self, forKey: .exercises)
+        sets = Self.int(c, .sets)
+        reps = Self.int(c, .reps)
+        workS = Self.int(c, .workS)
+        restS = Self.int(c, .restS)
+        avgHrWork = Self.int(c, .avgHrWork)
+        hrDriftBpm = try? c.decodeIfPresent(Double.self, forKey: .hrDriftBpm)
+        paceFadeS = try? c.decodeIfPresent(Double.self, forKey: .paceFadeS)
+        fullKm = Self.int(c, .fullKm)
+    }
+
+    /// Python's `round()` writes ints, but a float in the same slot must not
+    /// fail the whole row.
+    static func int(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Int? {
+        (try? c.decodeIfPresent(Double.self, forKey: key)).map { Int($0.rounded()) }
+    }
+}
+
+/// One exercise block of a strength session: the watch's per-set reps, the
+/// block's work and rest seconds, and the working HR.
+struct StrengthExercise: Codable {
+    let name: String
+    let sets: Int?
+    let reps: Int?
+    let setReps: [Int]?
+    let workS: Int?
+    let restS: Int?
+    let avgHr: Int?
+    let maxHr: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case name, sets, reps
+        case setReps = "set_reps"
+        case workS = "work_s"
+        case restS = "rest_s"
+        case avgHr = "avg_hr"
+        case maxHr = "max_hr"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? "Exercise"
+        sets = Self.int(c, .sets)
+        reps = Self.int(c, .reps)
+        setReps = (try? c.decodeIfPresent([Double].self, forKey: .setReps)).map { $0.map { Int($0.rounded()) } }
+        workS = Self.int(c, .workS)
+        restS = Self.int(c, .restS)
+        avgHr = Self.int(c, .avgHr)
+        maxHr = Self.int(c, .maxHr)
+    }
+
+    static func int(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Int? {
+        (try? c.decodeIfPresent(Double.self, forKey: key)).map { Int($0.rounded()) }
+    }
+
+    /// "4 × 8" when every set matched, "3 × 7·9·5" when they didn't (a 0 is a
+    /// set the watch couldn't count), "3 sets" when it counted none.
+    var setsLabel: String {
+        let reps = setReps ?? []
+        let n = sets ?? reps.count
+        if let first = reps.first, first > 0, reps.allSatisfy({ $0 == first }) { return "\(n) × \(first)" }
+        if !reps.isEmpty { return "\(n) × " + reps.map(String.init).joined(separator: "·") }
+        return "\(n) sets"
     }
 }
 

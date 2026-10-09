@@ -1724,8 +1724,17 @@ async def _pull_coros(db: Session, report, backfill_days: int, source: dict):
             days = 90 if backfill_days else 10
             since = datetime.combine(get_local_today() - timedelta(days=days + 1), time_type.min)
             known = {row[0] for row in db.query(Activity.id).filter(Activity.start_time >= since).all()}
+            # Rows from before laps were fetched (or whose fetch failed) get
+            # them a few per morning, newest first — 90 days back, the span
+            # the strength log and chat read. {} marks "fetched, nothing".
+            lap_since = datetime.combine(get_local_today() - timedelta(days=90), time_type.min)
+            lapless = [tuple(row) for row in db.query(Activity.id, Activity.sport_code).filter(
+                Activity.start_time >= lap_since, Activity.lap_data.is_(None),
+                Activity.sport_code.in_(coros_mcp.LAP_SPORT_TYPES + coros_mcp.STRENGTH_SPORT_TYPES),
+            ).order_by(Activity.start_time.desc()).limit(coros_mcp.LAP_BACKFILL_PER_PULL).all()]
             data = await asyncio.wait_for(
-                asyncio.to_thread(coros_mcp.fetch_scrape_shaped, days, known), timeout=120)
+                asyncio.to_thread(coros_mcp.fetch_scrape_shaped, days, known, lap_backfill=lapless),
+                timeout=120)
             source.update(elapsed_ms=data.get("elapsed_ms"), calls=data.get("calls"),
                           today_status=data.get("today_status"), missing=data.get("missing") or [])
             if data.get("today_status") == "partial":

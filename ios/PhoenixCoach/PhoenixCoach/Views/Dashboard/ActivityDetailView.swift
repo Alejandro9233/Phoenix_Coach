@@ -131,7 +131,12 @@ struct ActivityDetailView: View {
                     
                     // Micro Metrics
                     microMetricsSection
-                    
+
+                    // Exercise log (strength sessions with laps on the row)
+                    if let log = activity.strengthLog {
+                        exercisesSection(log)
+                    }
+
                     // Coach Analysis
                     coachAnalysisSection
                     
@@ -209,46 +214,67 @@ struct ActivityDetailView: View {
                 }
                 
                 Spacer()
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("DISTANCE")
-                        .font(.system(size: 10, weight: .medium))
-                        .tracking(2.0)
-                        .foregroundStyle(DS.Colors.outline.opacity(0.4))
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(String(format: "%.1f", (activity.distanceM ?? 0) / 1000.0))
+
+                // A strength session has no distance: it shows its set count
+                // instead of "0.0 km". Nil stats are omitted, never zeroed.
+                if let dist = activity.distanceM, dist > 0 {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("DISTANCE")
+                            .font(.system(size: 10, weight: .medium))
+                            .tracking(2.0)
+                            .foregroundStyle(DS.Colors.outline.opacity(0.4))
+                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                            Text(String(format: "%.1f", dist / 1000.0))
+                                .font(.system(size: 32, weight: .ultraLight))
+                                .tracking(-1.0)
+                                .foregroundStyle(DS.Colors.primaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                            Text("km")
+                                .font(.system(size: 18))
+                                .foregroundStyle(DS.Colors.primaryText.opacity(0.5))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                    }
+                    Spacer()
+                } else if let sets = activity.setCount {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SETS")
+                            .font(.system(size: 10, weight: .medium))
+                            .tracking(2.0)
+                            .foregroundStyle(DS.Colors.outline.opacity(0.4))
+                        Text("\(sets)")
                             .font(.system(size: 32, weight: .ultraLight))
+                            .monospacedDigit()
                             .tracking(-1.0)
                             .foregroundStyle(DS.Colors.primaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                        Text("km")
-                            .font(.system(size: 18))
-                            .foregroundStyle(DS.Colors.primaryText.opacity(0.5))
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     }
+                    Spacer()
                 }
-                
-                Spacer()
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("AVG_HR")
-                        .font(.system(size: 10, weight: .medium))
-                        .tracking(2.0)
-                        .foregroundStyle(DS.Colors.outline.opacity(0.4))
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("\(activity.avgHr ?? 0)")
-                            .font(.system(size: 32, weight: .ultraLight))
-                            .tracking(-1.0)
-                            .foregroundStyle(DS.Colors.primaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                        Text("bpm")
-                            .font(.system(size: 18))
-                            .foregroundStyle(DS.Colors.accent.opacity(0.5))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
+
+                if let hr = activity.avgHr, hr > 0 {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("AVG_HR")
+                            .font(.system(size: 10, weight: .medium))
+                            .tracking(2.0)
+                            .foregroundStyle(DS.Colors.outline.opacity(0.4))
+                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                            Text("\(hr)")
+                                .font(.system(size: 32, weight: .ultraLight))
+                                .monospacedDigit()
+                                .tracking(-1.0)
+                                .foregroundStyle(DS.Colors.primaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                            Text("bpm")
+                                .font(.system(size: 18))
+                                .foregroundStyle(DS.Colors.accent.opacity(0.5))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
                     }
                 }
             }
@@ -256,6 +282,64 @@ struct ActivityDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     
+    /// The exercise log COROS records per set, compacted at sync
+    /// (backend/services/coros_mcp.py, `compact_strength_laps`). Same row
+    /// grammar as the race plan's splits table: mono figures, right-aligned.
+    private func exercisesSection(_ log: ActivityLaps) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+            HStack(alignment: .firstTextBaseline) {
+                DS.SectionLabel(text: "Exercises")
+                Spacer()
+                if let work = log.workS, let rest = log.restS {
+                    DS.MonoLabel(text: "work \(mmss(work)) · rest \(mmss(rest))")
+                }
+            }
+            HStack(spacing: DS.Spacing.s) {
+                Text("Exercise").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Sets × reps").frame(width: 104, alignment: .trailing)
+                Text("Work").frame(width: 48, alignment: .trailing)
+                Text("HR").frame(width: 36, alignment: .trailing)
+            }
+            .font(.system(size: 10, weight: .bold))
+            .textCase(.uppercase)
+            .tracking(DS.Tracking.normal)
+            .foregroundStyle(DS.Colors.outline)
+            ForEach(Array((log.exercises ?? []).enumerated()), id: \.offset) { _, exercise in
+                HStack(spacing: DS.Spacing.s) {
+                    Text(exercise.name)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(exercise.setsLabel)
+                        .foregroundStyle(DS.Colors.onSurface)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(width: 104, alignment: .trailing)
+                    Text(exercise.workS.map(mmss) ?? "—")
+                        .foregroundStyle(DS.Colors.onSurface)
+                        .frame(width: 48, alignment: .trailing)
+                    Text(exercise.avgHr.map { "\($0)" } ?? "—")
+                        .foregroundStyle(DS.Colors.onSurface)
+                        .frame(width: 36, alignment: .trailing)
+                }
+                .font(.system(size: 13, weight: .light))
+                .monospacedDigit()
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(exercise.name), \(exercise.setsLabel)"
+                                    + (exercise.workS.map { ", \(mmss($0)) of work" } ?? "")
+                                    + (exercise.avgHr.map { ", \($0) bpm" } ?? ""))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+    }
+
+    /// Seconds as m:ss, or h:mm:ss past an hour.
+    private func mmss(_ seconds: Int) -> String {
+        let h = seconds / 3600, m = (seconds % 3600) / 60, s = seconds % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+
     private var gaugesSection: some View {
         HStack(spacing: 16) {
             GlowBorderCard {

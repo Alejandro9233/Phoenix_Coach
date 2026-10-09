@@ -68,7 +68,10 @@ class IngestionService:
                         existing.training_load = float(act["trainingLoad"])
                     # Enrichment that arrives a day later (the MCP path fetches
                     # detail/laps for the last 2 days): fill only what's empty.
-                    if existing.lap_data is None and act.get("laps"):
+                    # laps == {} means fetched with nothing usable; stored so
+                    # the row leaves the backfill list, replaced if real laps
+                    # ever arrive.
+                    if not existing.lap_data and act.get("laps") is not None:
                         existing.lap_data = act["laps"]
                     if existing.detail_data is None and act.get("detail"):
                         existing.detail_data = act["detail"]
@@ -123,6 +126,14 @@ class IngestionService:
                 )
                 session.add(new_act)
                 new_activity_ids.append(new_act.id)
+
+            # Older rows whose laps this pull fetched (coros_mcp.fetch_scrape_shaped,
+            # LAP_BACKFILL_PER_PULL per refresh). Same rule as above: fill
+            # what's empty, {} included.
+            for label_id, compact in (data.get("lap_backfill") or {}).items():
+                row = session.query(Activity).filter(Activity.id == str(label_id)).first()
+                if row is not None and not row.lap_data and compact is not None:
+                    row.lap_data = compact
 
             # 3. Ingest Recovery Snapshots (EvoLab Metrics)
             # From analyse_query -> dayList
