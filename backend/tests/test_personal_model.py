@@ -223,3 +223,50 @@ def test_endpoints_carry_model_fields(db):
     finally:
         ResponseAgent.analyze_activity = orig
         app.dependency_overrides.clear()
+
+
+
+def test_profile_carries_coros_predictions_with_trend_and_goal_gap(db):
+    from datetime import date, timedelta
+    from fastapi.testclient import TestClient
+    from backend.main import app, get_db
+    from backend.models.database import RecoverySnapshot
+    from backend.utils.timezone import get_local_today
+
+    db.add(Athlete(name="A", race_distance="Marathon", target_finish_time="3:20:00")); db.commit()
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        client = TestClient(app)
+        assert client.get("/athlete/profile").json()["coros_prediction"] is None   # nothing stored yet
+        today = get_local_today()
+        db.add(RecoverySnapshot(date=today - timedelta(days=14), pred_half_s=6210, pred_marathon_s=13440))
+        db.add(RecoverySnapshot(date=today - timedelta(days=7)))                      # no prediction that day
+        db.add(RecoverySnapshot(date=today, pred_half_s=5974, pred_marathon_s=12907))
+        db.commit()
+        cp = client.get("/athlete/profile").json()["coros_prediction"]
+        assert cp["half"] == "1:39:34" and cp["marathon"] == "3:35:07" and cp["date"] == today.isoformat()
+        assert cp["days_tracked"] == 15 and cp["since_date"] == (today - timedelta(days=14)).isoformat()
+        assert cp["half_delta_sec"] == -236 and cp["marathon_delta_sec"] == -533
+        assert cp["goal_distance"] == "Marathon" and cp["goal_gap_sec"] == 12907 - 12000
+        assert cp["goal_gap_pct"] == 7.6
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_profile_coros_prediction_single_day_has_no_delta(db):
+    from datetime import timedelta
+    from fastapi.testclient import TestClient
+    from backend.main import app, get_db
+    from backend.models.database import RecoverySnapshot
+    from backend.utils.timezone import get_local_today
+
+    db.add(Athlete(name="A", race_distance="Olympic")); db.commit()
+    db.add(RecoverySnapshot(date=get_local_today(), pred_half_s=5974)); db.commit()
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        cp = TestClient(app).get("/athlete/profile").json()["coros_prediction"]
+        assert cp["half"] == "1:39:34" and cp["marathon"] is None
+        assert cp["half_delta_sec"] is None and cp["days_tracked"] == 1
+        assert cp["goal_distance"] is None and cp["goal_gap_sec"] is None   # a triathlon goal has no COROS twin
+    finally:
+        app.dependency_overrides.clear()

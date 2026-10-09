@@ -257,6 +257,55 @@ def _prediction_block(db, athlete):
                            athlete.target_finish_time, bests=model.get("bests"))
 
 
+def _coros_prediction_block(db, athlete):
+    """COROS's own race predictions (stored daily by the MCP sync since
+    2026-10-08): today's half and marathon, the change since the oldest
+    value in the last 90 days, and the gap to the athlete's goal when the goal
+    distance is one of the two. None until a row carries them."""
+    from datetime import timedelta
+    from backend.services.pace_model import fmt_hms
+
+    today = get_local_today()
+    rows = db.query(RecoverySnapshot).filter(
+        RecoverySnapshot.date >= today - timedelta(days=90),
+        (RecoverySnapshot.pred_half_s.isnot(None)) | (RecoverySnapshot.pred_marathon_s.isnot(None)),
+    ).order_by(RecoverySnapshot.date.desc()).all()
+    if not rows:
+        return None
+    latest, oldest = rows[0], rows[-1]
+
+    def _delta(attr):
+        a, b = getattr(latest, attr), getattr(oldest, attr)
+        return int(a - b) if a is not None and b is not None and latest.date != oldest.date else None
+
+    def _parse_hms(text):
+        try:
+            parts = [int(x) for x in str(text).split(":")]
+        except (TypeError, ValueError):
+            return None
+        return parts[0] * 3600 + parts[1] * 60 + (parts[2] if len(parts) > 2 else 0) if len(parts) in (2, 3) else None
+
+    goal_attr = {"Marathon": "pred_marathon_s", "Half Marathon": "pred_half_s", "Half": "pred_half_s"}.get(
+        athlete.race_distance or "")
+    goal_s = _parse_hms(athlete.target_finish_time) if athlete.target_finish_time else None
+    goal_pred = getattr(latest, goal_attr) if goal_attr else None
+    gap_s = int(goal_pred - goal_s) if goal_pred is not None and goal_s else None
+    return {
+        "date": latest.date.isoformat(),
+        "half": fmt_hms(latest.pred_half_s) if latest.pred_half_s else None,
+        "half_sec": latest.pred_half_s,
+        "marathon": fmt_hms(latest.pred_marathon_s) if latest.pred_marathon_s else None,
+        "marathon_sec": latest.pred_marathon_s,
+        "since_date": oldest.date.isoformat(),
+        "days_tracked": (latest.date - oldest.date).days + 1,
+        "half_delta_sec": _delta("pred_half_s"),
+        "marathon_delta_sec": _delta("pred_marathon_s"),
+        "goal_distance": athlete.race_distance if goal_attr else None,
+        "goal_gap_sec": gap_s,
+        "goal_gap_pct": round(gap_s / goal_s * 100, 1) if gap_s is not None and goal_s else None,
+    }
+
+
 def _personal_block(db, athlete):
     """The Recent tab's long-run ledger. None until an LTHR is known."""
     from backend.services.personal_model import get_model, long_run_ledger, _run_activities
@@ -298,6 +347,7 @@ def get_athlete_profile(db: Session = Depends(get_db)):
         "timezone": athlete.timezone,
         "active_timezone": get_timezone_name(),
         "prediction": _prediction_block(db, athlete),
+        "coros_prediction": _coros_prediction_block(db, athlete),
     }
 
 

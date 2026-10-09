@@ -405,9 +405,12 @@ struct AthleteProfile: Codable {
     /// Stamped automatically on save — the backend uses it to decide what "today" is.
     var timezone: String?
     var prediction: RacePrediction?
+    /// COROS's own race clock (its fitness model), stored daily by the sync.
+    var corosPrediction: CorosPrediction?
 
     enum CodingKeys: String, CodingKey {
         case name, age, timezone, prediction
+        case corosPrediction = "coros_prediction"
         case weightKg = "weight_kg"
         case raceName = "race_name"
         case raceType = "race_type"
@@ -586,6 +589,38 @@ struct RacePrediction: Codable {
         case predictedLo = "predicted_lo"
         case predictedHi = "predicted_hi"
         case gapPct = "gap_pct"
+    }
+}
+
+/// Profile: COROS's predicted half and marathon, with the change since the
+/// oldest stored value (the sync stores one per day since 2026-10-08) and the
+/// gap to the goal when the goal distance is one of the two. Every field
+/// optional: a single day has no delta, a triathlon goal has no gap.
+struct CorosPrediction: Codable {
+    let date: String?
+    let half: String?
+    let halfSec: Int?
+    let marathon: String?
+    let marathonSec: Int?
+    let sinceDate: String?
+    let daysTracked: Int?
+    let halfDeltaSec: Int?
+    let marathonDeltaSec: Int?
+    let goalDistance: String?
+    let goalGapSec: Int?
+    let goalGapPct: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case date, half, marathon
+        case halfSec = "half_sec"
+        case marathonSec = "marathon_sec"
+        case sinceDate = "since_date"
+        case daysTracked = "days_tracked"
+        case halfDeltaSec = "half_delta_sec"
+        case marathonDeltaSec = "marathon_delta_sec"
+        case goalDistance = "goal_distance"
+        case goalGapSec = "goal_gap_sec"
+        case goalGapPct = "goal_gap_pct"
     }
 }
 

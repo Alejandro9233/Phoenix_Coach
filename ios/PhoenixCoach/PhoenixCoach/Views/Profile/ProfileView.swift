@@ -632,8 +632,91 @@ struct ProfileView: View {
                     .clipShape(.rect(cornerRadius: DS.Radius.medium))
                     .accessibilityElement(children: .combine)
                 }
+
+                // COROS's own clock for the same goal, stored daily by the
+                // sync. Same panel grammar as Phoenix's prediction above, so
+                // the two sit as peers: Phoenix from race efforts, COROS from
+                // the watch's fitness model.
+                if let c = profile.corosPrediction, let value = corosHeadline(c) {
+                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                        HStack {
+                            Text("COROS predicts \(corosHeadlineDistance(c))")
+                                .font(.system(size: 10, weight: .bold))
+                                .textCase(.uppercase)
+                                .tracking(DS.Tracking.wide)
+                                .foregroundStyle(DS.Colors.outline)
+                            Spacer()
+                            Text(value)
+                                .font(.system(size: 17, weight: .light))
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                        }
+                        Text(corosFootnote(c))
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundStyle(DS.Colors.onSurface)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(DS.Spacing.m)
+                    .background(Color.white.opacity(0.03))
+                    .clipShape(.rect(cornerRadius: DS.Radius.medium))
+                    .accessibilityElement(children: .combine)
+                }
             }
         }
+    }
+
+    /// The goal distance leads when COROS predicts it; otherwise the marathon,
+    /// then the half. Nil when neither number exists.
+    private func corosHeadline(_ c: CorosPrediction) -> String? {
+        switch c.goalDistance {
+        case "Half Marathon", "Half": return c.half ?? c.marathon
+        default: return c.marathon ?? c.half
+        }
+    }
+
+    private func corosHeadlineDistance(_ c: CorosPrediction) -> String {
+        switch c.goalDistance {
+        case "Half Marathon", "Half": return c.half != nil ? "half" : "marathon"
+        default: return c.marathon != nil ? "marathon" : "half"
+        }
+    }
+
+    /// "Half 1:39:34. 7.6% slower than your target. Since Oct 8: −8:53 marathon."
+    private func corosFootnote(_ c: CorosPrediction) -> String {
+        var parts: [String] = []
+        let leadIsMarathon = corosHeadlineDistance(c) == "marathon"
+        if leadIsMarathon, let half = c.half { parts.append("Half \(half).") }
+        if !leadIsMarathon, let marathon = c.marathon { parts.append("Marathon \(marathon).") }
+        if let gap = c.goalGapPct {
+            let pct = String(format: "%.1f%%", abs(gap))
+            parts.append(gap > 0 ? "\(pct) slower than your target." : "\(pct) faster than your target.")
+        }
+        let delta = leadIsMarathon ? c.marathonDeltaSec : c.halfDeltaSec
+        if let d = delta, let since = c.sinceDate, let days = c.daysTracked, days > 1 {
+            parts.append("\(signedMinutes(d)) since \(shortDate(since)).")
+        } else if let date = c.date {
+            parts.append("Tracking since \(shortDate(date)).")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    /// −8:53 for -533 s; +0:12 for 12 s. Minutes and seconds, signed.
+    private func signedMinutes(_ seconds: Int) -> String {
+        let sign = seconds < 0 ? "−" : "+"
+        let s = abs(seconds)
+        return "\(sign)\(s / 60):\(String(format: "%02d", s % 60))"
+    }
+
+    /// "Oct 8" from an ISO date; explicit locale so the month stays English.
+    private func shortDate(_ iso: String) -> String {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: iso) else { return iso }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        out.dateFormat = "MMM d"
+        return out.string(from: date)
     }
 
     /// "2:56:51-3:05:55" when the backend sent a band, nil to fall back to the
