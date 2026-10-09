@@ -603,3 +603,36 @@ def test_no_injury_leaves_the_week_alone(temp_db_session):
     assert ctx["injury_blocked_sports"] == {}
     from backend.agents.response_agent import build_constraint_block
     assert "RUN kilometers are the protected quantity" in build_constraint_block(ctx)
+
+
+
+# --- chat-only extras (council 2026-10-08) -------------------------------------
+
+def test_chat_extras_is_empty_without_the_new_fields(temp_db_session):
+    assert DataAgent(temp_db_session).chat_extras() == ""
+
+
+def test_chat_extras_reports_sleep_stress_sleeping_hr_hrv_predictions_and_laps(temp_db_session):
+    from datetime import datetime, timedelta
+    from backend.models.database import Activity, RecoverySnapshot
+    from backend.utils.timezone import get_local_today
+    today = get_local_today()
+    for i in range(12):
+        temp_db_session.add(RecoverySnapshot(
+            date=today - timedelta(days=i), hrv_ms=47.0 if i == 0 else 70.0,
+            hrv_normal_low=58.0, hrv_normal_high=97.0, sleep_duration_hr=8.0 if i else 5.5,
+            sleep_quality_score=80.0, stress_level=30 + i, sleep_hr_min=44.0 if i == 0 else 41.0,
+            pred_half_s=5970 if i == 0 else 6210, pred_marathon_s=12900 if i == 0 else 13440))
+    temp_db_session.add(Activity(id="L1", sport="running", activity_name="Easy run",
+                                 start_time=datetime.combine(today - timedelta(days=1), datetime.min.time()),
+                                 duration_sec=2619, distance_m=6420,
+                                 lap_data={"hr_drift_bpm": 8.0, "first_half_hr": 151, "second_half_hr": 159, "pace_fade_s": 8.0},
+                                 detail_data={"aerobic_te": 3.0, "focus": "Base"}))
+    temp_db_session.commit()
+    text = DataAgent(temp_db_session).chat_extras(today=today)
+    assert "Sleep, last 7: 7 nights, avg 7.6 h, avg COROS score 80, shortest 5.5 h on " in text
+    assert "Daily stress, last 7: avg 33" in text
+    assert "Sleeping HR: min 44 bpm, 11-day median 41 (+3)" in text
+    assert "HRV 47 ms, below COROS normal range 58-97 ms" in text
+    assert "COROS race predictions: half 1:39:30, marathon 3:35:00; half was 1:43:30 on " in text and "(-240 s)" in text
+    assert "Easy run: HR 151→159 (+8 bpm drift), pace fade +8 s/km, aerobic TE 3.0, COROS focus Base" in text

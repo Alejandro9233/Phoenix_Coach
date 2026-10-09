@@ -285,3 +285,27 @@ Known limits in v1: the id returned by create/update is parsed from prose
 (`idInPlan: N`); if the format differs the row is marked failed and the next run
 adopts the workout by its Phoenix name. The athlete's own hand-scheduled items
 block a push for that day (skip, reason recorded) until he removes them.
+
+## Chat and COROS data — lite council 2026-10-08
+
+Verdict: store at sync, answer from the DB, no live MCP calls from chat (B,
+tool-calling, rejected: no tools path in the client and two Groq admissions per
+message; live fetches rejected for now: synchronous client would block the event
+loop, token refresh has no lock, injected data isn't saved for follow-ups).
+
+Shipped:
+- `DataAgent.chat_extras()` — a chat-only block (plan generation's prompt is not
+  touched): last-7 sleep (nights, avg hours, avg score, shortest), last-7 stress,
+  sleeping HR vs its 30-day median, HRV against COROS's normal range, COROS race
+  predictions with the 4-week trend, and per-run lap metrics.
+- `recovery_snapshots.pred_half_s` / `pred_marathon_s` stored daily from
+  `queryFitnessAssessmentOverview`.
+- One `queryActivityLapData` call per new run/ride at sync; `coros_mcp.compact_laps`
+  keeps the km splits and computes HR drift and pace fade (first vs second half of
+  the full kilometres, km 1 skipped as warmup) → `activities.lap_data`;
+  `activities.detail_data` holds aerobic/anaerobic TE, COROS focus, stride, power,
+  elevation. Backfilled onto rows ingested earlier when the next pull brings them.
+- Chat history sent to the model capped at `CHAT_HISTORY_MESSAGES` (20).
+
+Still unanswerable from chat, by choice until asked for: the nightly HRV curve
+shape and the 5-minute stress curve (parsers live only in the playground scripts).

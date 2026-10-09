@@ -121,6 +121,10 @@ class RecoverySnapshot(Base):
     # settle back as the body adapts.
     sleep_hr_avg = Column(Float, nullable=True)
     sleep_hr_min = Column(Float, nullable=True)
+    # COROS's own race predictions (queryFitnessAssessmentOverview), seconds,
+    # stored daily so chat can show the trend against the goal.
+    pred_half_s = Column(Integer, nullable=True)
+    pred_marathon_s = Column(Integer, nullable=True)
     vo2_max = Column(Float, nullable=True)
     ati = Column(Float, nullable=True)
     cti = Column(Float, nullable=True)

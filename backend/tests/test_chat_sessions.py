@@ -152,3 +152,32 @@ def test_chat_stream_returns_session_id_and_continues(client, test_db_session, m
                  .filter(ChatMessage.session_id == sid,
                          ChatMessage.role == "user").all())
     assert [m.content for m in user_msgs] == ["hello coach", "and my long run?"]
+
+
+
+def test_chat_history_sent_to_the_model_is_capped(client, test_db_session, monkeypatch):
+    """Groq admits prompt + completion cap against 8000 TPM; an unbounded
+    session would eventually 429 the stream, so only the newest
+    CHAT_HISTORY_MESSAGES go to the model (council 2026-10-08)."""
+    import backend.core.llm_client
+    from backend.main import CHAT_HISTORY_MESSAGES
+    seen = {}
+
+    def mock_chat_completion(messages):
+        seen["messages"] = messages
+        return "ok"
+    monkeypatch.setattr(backend.core.llm_client, "chat_completion", mock_chat_completion)
+    monkeypatch.setattr(backend.core.llm_client, "check_llm_available",
+                        lambda: {"status": "connected", "provider": "mock", "model": "mock"})
+    session_id = client.post("/chat/sessions").json()["id"]
+    for i in range(30):
+        test_db_session.add(ChatMessage(session_id=session_id, role="user" if i % 2 == 0 else "assistant",
+                                        content=f"old message {i}"))
+    test_db_session.commit()
+
+    r = client.post("/chat-sync", json={"message": "and the second half?", "session_id": session_id})
+    assert r.status_code == 200
+    convo = [m for m in seen["messages"] if m["role"] in ("user", "assistant")]
+    assert len(convo) == CHAT_HISTORY_MESSAGES
+    assert convo[-1] == {"role": "user", "content": "and the second half?"}   # newest wins
+    assert "old message 0" not in [m["content"] for m in convo]            # oldest dropped

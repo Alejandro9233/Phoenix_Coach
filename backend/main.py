@@ -120,10 +120,12 @@ def _ensure_columns():
 
     if "recovery_snapshots" in tables:
         existing = {c["name"] for c in inspector.get_columns("recovery_snapshots")}
-        for col in ("hrv_normal_low", "hrv_normal_high", "sleep_hr_avg", "sleep_hr_min"):
+        for col, sql_type in (("hrv_normal_low", "FLOAT"), ("hrv_normal_high", "FLOAT"),
+                              ("sleep_hr_avg", "FLOAT"), ("sleep_hr_min", "FLOAT"),
+                              ("pred_half_s", "INTEGER"), ("pred_marathon_s", "INTEGER")):
             if col not in existing:
                 with engine.begin() as conn:
-                    conn.execute(text(f"ALTER TABLE recovery_snapshots ADD COLUMN {col} FLOAT"))
+                    conn.execute(text(f"ALTER TABLE recovery_snapshots ADD COLUMN {col} {sql_type}"))
                 print(f"✅ Migration: added recovery_snapshots.{col}")
 
 
@@ -2040,7 +2042,10 @@ def _strip_think_tags(text: str) -> str:
     return cleaned.strip()
 
 
-def _build_chat_context(db: Session, summary: str, rag_context: str) -> str:
+CHAT_HISTORY_MESSAGES = 20   # newest messages sent to the model
+
+
+def _build_chat_context(db: Session, summary: str, rag_context: str, extras: str = "") -> str:
     from backend.services.periodization_engine import PeriodizationEngine
     from backend.services.plan_normalizer import normalize_plan
     from backend.models.database import WeeklyPlan
@@ -2080,6 +2085,9 @@ def _build_chat_context(db: Session, summary: str, rag_context: str) -> str:
 
 ATHLETE DATA & ZONES:
 {summary}
+
+RECENT DETAIL (COROS, Python-computed):
+{extras or "  (none yet)"}
 
 {context_str}
 
@@ -2204,12 +2212,15 @@ async def chat_with_coach_stream(body: dict, db: Session = Depends(get_db)):
     rag_chunks = kb.query(message, n_results=3)
     rag_context = "\n\n".join(rag_chunks) if rag_chunks else ""
     
-    system_prompt = _build_chat_context(db, summary, rag_context)
+    system_prompt = _build_chat_context(db, summary, rag_context, data_agent.chat_extras())
 
     messages = [{"role": "system", "content": system_prompt}]
 
     # Fetch history
-    history = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
+    # Bounded history: Groq admits a request at prompt + completion cap against
+    # 8000 TPM, so an unbounded session would eventually 429 the stream.
+    history = db.query(ChatMessage).filter(ChatMessage.session_id == session_id)\
+        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc()).limit(CHAT_HISTORY_MESSAGES).all()[::-1]
     for h in history:
         messages.append({"role": h.role, "content": h.content})
 
@@ -2409,12 +2420,15 @@ async def chat_with_coach_sync(body: dict, db: Session = Depends(get_db)):
     rag_chunks = kb.query(message, n_results=3)
     rag_context = "\n\n".join(rag_chunks) if rag_chunks else ""
     
-    system_prompt = _build_chat_context(db, summary, rag_context)
+    system_prompt = _build_chat_context(db, summary, rag_context, data_agent.chat_extras())
 
     messages = [{"role": "system", "content": system_prompt}]
     
     # Fetch history
-    history = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
+    # Bounded history: Groq admits a request at prompt + completion cap against
+    # 8000 TPM, so an unbounded session would eventually 429 the stream.
+    history = db.query(ChatMessage).filter(ChatMessage.session_id == session_id)\
+        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc()).limit(CHAT_HISTORY_MESSAGES).all()[::-1]
     for h in history:
         messages.append({"role": h.role, "content": h.content})
 

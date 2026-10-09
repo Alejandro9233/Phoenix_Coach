@@ -405,3 +405,26 @@ def test_sleeping_hr_lands_from_the_mcp_payload(temp_db_url):
     IngestionService(db_url=temp_db_url).ingest_coros_data(_mcp_day(sleepHrAvg=55, sleepHrMin=44))
     snap = _snapshot(temp_db_url, (2026, 3, 8))
     assert (snap.sleep_hr_avg, snap.sleep_hr_min) == (55.0, 44.0)
+
+
+def test_laps_detail_and_predictions_are_stored_and_backfilled(temp_db_url):
+    svc = IngestionService(db_url=temp_db_url)
+    act = {"labelId": "900000000000000009", "sportType": 101, "timestamp": 1772996400,
+           "startTimeLocal": "2026-03-08T20:30:00", "duration": 2619, "distance": 6420.0,
+           "avgHeartRate": 155, "avgSpeed": 408, "avgPower": 0, "totalElevation": 0, "trainingLoad": 80,
+           "pitch": 154, "sets": None, "subMode": None, "name": "Easy run", "calories": 500, "source": "coros_mcp",
+           "detail": None, "laps": None}
+    svc.ingest_coros_data({"activities": [act], "evolab": {}})
+    engine = create_engine(temp_db_url)
+    with sessionmaker(bind=engine)() as s:
+        row = s.query(Activity).filter_by(id="900000000000000009").first()
+        assert row.lap_data is None and row.detail_data is None
+    # the next morning's pull (last 2 days get detail/laps) fills what was empty
+    later = dict(act, laps={"hr_drift_bpm": 8.0, "splits": []}, detail={"aerobic_te": 3.0, "focus": "Base"})
+    svc.ingest_coros_data({"activities": [later], "evolab": {}})
+    with sessionmaker(bind=engine)() as s:
+        row = s.query(Activity).filter_by(id="900000000000000009").first()
+        assert row.lap_data == {"hr_drift_bpm": 8.0, "splits": []} and row.detail_data["focus"] == "Base"
+    svc.ingest_coros_data(_mcp_day(predHalfS=6210, predMarathonS=13440))
+    snap = _snapshot(temp_db_url, (2026, 3, 8))
+    assert (snap.pred_half_s, snap.pred_marathon_s) == (6210, 13440)

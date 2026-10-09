@@ -1,0 +1,20 @@
+{"source": "activityDetail", "labelId": "900000000000000001", "sportType": 101, "mode": 8, "subMode": 2,
+ "columns": [{"name": "lapIndex"}, {"name": "distance"}, {"name": "time"}, {"name": "avgPace"}, {"name": "avgHr"}, {"name": "avgCadence"}],
+ "lapGroups": [
+  {"type": 10, "lapDistance": 100000, "laps": [
+    {"lapIndex": 1, "distance": 100000, "time": 420.0, "totalLength": 420.0, "avgPace": 420.0, "avgHr": 140, "maxHr": 150, "avgCadence": 150, "avgStrideLength": 88},
+    {"lapIndex": 2, "distance": 100000, "time": 400.0, "totalLength": 820.0, "avgPace": 400.0, "avgHr": 150, "maxHr": 156, "avgCadence": 155, "avgStrideLength": 93},
+    {"lapIndex": 3, "distance": 100000, "time": 402.0, "totalLength": 1222.0, "avgPace": 402.0, "avgHr": 152, "maxHr": 158, "avgCadence": 155, "avgStrideLength": 93},
+    {"lapIndex": 4, "distance": 100000, "time": 405.0, "totalLength": 1627.0, "avgPace": 405.0, "avgHr": 156, "maxHr": 160, "avgCadence": 154, "avgStrideLength": 92},
+    {"lapIndex": 5, "distance": 100000, "time": 410.0, "totalLength": 2037.0, "avgPace": 410.0, "avgHr": 160, "maxHr": 165, "avgCadence": 154, "avgStrideLength": 92},
+    {"lapIndex": 6, "distance": 100000, "time": 412.0, "totalLength": 2449.0, "avgPace": 412.0, "avgHr": 162, "maxHr": 168, "avgCadence": 153, "avgStrideLength": 91},
+    {"lapIndex": 7, "distance": 42000, "time": 170.0, "totalLength": 2619.0, "avgPace": 404.8, "avgHr": 158, "maxHr": 163, "avgCadence": 152, "avgStrideLength": 90}
+  ]},
+  {"type": 2, "lapDistance": 100000, "laps": [
+    {"lapIndex": 1, "distance": 100000, "time": 420.0, "totalLength": 420.0, "avgPace": 420.0, "avgHr": 140, "maxHr": 150, "avgCadence": 150, "avgStrideLength": 88},
+    {"lapIndex": 2, "distance": 542000, "time": 2199.0, "totalLength": 2619.0, "avgPace": 405.7, "avgHr": 157, "maxHr": 168, "avgCadence": 154, "avgStrideLength": 92}
+  ]},
+  {"type": -1, "lapDistance": 642000, "laps": [
+    {"lapIndex": 1, "distance": 642000, "time": 2619.0, "totalLength": 2619.0, "avgPace": null, "avgHr": 155, "maxHr": 168, "avgCadence": 154, "avgStrideLength": 92}
+  ]}
+ ], "sportDataDetails": []}

@@ -713,6 +713,59 @@ def parse_user_info(text: str) -> dict:
             "gender": kv.get("Gender")}
 
 
+LAP_SPORT_TYPES = (100, 101, 102, 103, 200, 201)   # runs and rides get km splits
+FULL_KM_CM = 99000          # a km split shorter than this is the partial last one
+LAP_MIN_FULL_SPLITS = 4     # below this, drift/fade are noise
+
+
+def compact_laps(lap_json) -> dict | None:
+    """queryActivityLapData JSON → the few numbers chat reads, computed once.
+
+    Splits: the type-10 group (per-km laps: distance cm, time s, avgPace s/km,
+    avgHr, avgCadence). Derived from the FULL kilometres, skipping km 1 when
+    there are 5+ (it is the warmup): hr_drift_bpm = second-half mean HR minus
+    first-half, pace_fade_s = second-half mean pace minus first-half (positive
+    = slowing). A finished workout never changes, so this is stored on the
+    activity row (~1 KB) instead of fetched again per question."""
+    if isinstance(lap_json, str):
+        try:
+            lap_json = json.loads(lap_json)
+        except ValueError:
+            return None
+    groups = (lap_json or {}).get("lapGroups") or []
+    km_group = next((g for g in groups if g.get("type") == 10), None)
+    if not km_group:
+        return None
+    splits = []
+    for lap in km_group.get("laps") or []:
+        try:
+            splits.append({
+                "km": int(lap.get("lapIndex") or len(splits) + 1),
+                "dist_m": round((lap.get("distance") or 0) / 100),
+                "s": round(float(lap.get("time") or 0)),
+                "pace_s": round(float(lap["avgPace"])) if lap.get("avgPace") else None,
+                "hr": lap.get("avgHr") or None,
+                "cad": lap.get("avgCadence") or None,
+            })
+        except (TypeError, ValueError):
+            continue
+    if not splits:
+        return None
+    out = {"splits": splits, "hr_drift_bpm": None, "pace_fade_s": None, "full_km": 0}
+    full = [x for x in splits if x["dist_m"] >= FULL_KM_CM / 100 and x["hr"] and x["pace_s"]]
+    out["full_km"] = len(full)
+    if len(full) >= LAP_MIN_FULL_SPLITS:
+        work = full[1:] if len(full) >= 5 else full
+        half = len(work) // 2
+        first, second = work[:half], work[half:]
+        mean = lambda xs: sum(xs) / len(xs)
+        out["hr_drift_bpm"] = round(mean([x["hr"] for x in second]) - mean([x["hr"] for x in first]), 1)
+        out["pace_fade_s"] = round(mean([x["pace_s"] for x in second]) - mean([x["pace_s"] for x in first]), 1)
+        out["first_half_hr"] = round(mean([x["hr"] for x in first]))
+        out["second_half_hr"] = round(mean([x["hr"] for x in second]))
+    return out
+
+
 # --------------------------------------------------------------------------
 # Derivations
 # --------------------------------------------------------------------------
@@ -894,7 +947,8 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
                          sleep_hrv: dict, resting_hr: dict, load: dict,
                          sleep: dict | None = None, stress: dict | None = None,
                          fitness: dict | None = None, recovery: dict | None = None,
-                         user: dict | None = None, health: dict | None = None) -> dict:
+                         user: dict | None = None, health: dict | None = None,
+                         laps: dict | None = None) -> dict:
     """Pure assembly: parsed MCP answers → the dict `ingest_coros_data` eats.
 
     Keys are only present when a value exists; ingestion preserves the column
@@ -943,6 +997,10 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
                 day["staminaLevel"] = fitness["running_level"]
             if fitness.get("threshold_pace_s") is not None:
                 day["ltsp"] = fitness["threshold_pace_s"]
+            if fitness.get("pred_half_s") is not None:
+                day["predHalfS"] = fitness["pred_half_s"]
+            if fitness.get("pred_marathon_s") is not None:
+                day["predMarathonS"] = fitness["pred_marathon_s"]
         day_list.append(day)
 
     hrv_list = [{"happenDay": int(_yyyymmdd(d)), "avgSleepHrv": r["hrv_ms"], "sleepHrvBase": r["hrv_baseline"]}
@@ -955,6 +1013,7 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
         evolab["mcp_user_profile"] = {"weight": user["weight_kg"]}
 
     activities = []
+    laps = laps or {}
     for rec in records:
         if not rec.get("start"):
             continue
@@ -981,6 +1040,11 @@ def build_scrape_payload(today: date, tz_name: str, records: list[dict], details
             "name": rec.get("name"),
             "calories": rec.get("calories") or det.get("calories"),
             "source": "coros_mcp",
+            # Stored once on the activity row; chat reads them (council 2026-10-08).
+            "detail": ({k: det.get(k) for k in ("aerobic_te", "anaerobic_te", "focus",
+                                                 "stride_m", "power_w", "elevation_gain_m")
+                        if det.get(k) is not None} or None) if det else None,
+            "laps": laps.get(rec["labelId"]),
         })
 
     today_row = rows.get(today)
@@ -1012,7 +1076,7 @@ def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_day
         "startDate": _yyyymmdd(start), "endDate": _yyyymmdd(today), "sportTypeCodes": None,
         "minDistanceKm": None, "maxDistanceKm": None, "minDurationMinutes": None,
         "maxDurationMinutes": None, "maxAveragePace": None, "locationKeyword": None, "limit": 200}))
-    details = {}
+    details, laps = {}, {}
     recent_cut = today - timedelta(days=detail_recent_days)
     for rec in records:
         if rec["labelId"] in known and rec["date"] < recent_cut:
@@ -1022,6 +1086,14 @@ def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_day
                 "getActivityDetail", {"labelId": rec["labelId"], "sportType": rec["sportType"]}))
         except CorosMcpError as e:   # detail is enrichment, never a reason to fail the sync
             print(f"  MCP detail {rec['labelId']} skipped: {e}")
+        if rec["sportType"] in LAP_SPORT_TYPES:
+            try:
+                compact = compact_laps(client.call_text(
+                    "queryActivityLapData", {"labelId": rec["labelId"], "sportType": rec["sportType"]}))
+                if compact:
+                    laps[rec["labelId"]] = compact
+            except CorosMcpError as e:
+                print(f"  MCP laps {rec['labelId']} skipped: {e}")
 
     span = min(max(days, 7), 30)
     span_start = today - timedelta(days=span - 1)
@@ -1037,7 +1109,7 @@ def fetch_scrape_shaped(days: int = 10, known_activity_ids=(), detail_recent_day
 
     payload = build_scrape_payload(today, tz_name, records, details, hrv, rhr, load,
                                    sleep=sleep, stress=stress, fitness=fitness,
-                                   recovery=recovery, user=user, health=health)
+                                   recovery=recovery, user=user, health=health, laps=laps)
     payload["calls"] = client.calls
     payload["elapsed_ms"] = int((time.monotonic() - started) * 1000)
     return payload

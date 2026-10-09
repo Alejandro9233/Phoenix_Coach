@@ -66,6 +66,16 @@ class IngestionService:
                     # Update existing with COROS-specific metrics if missing
                     if act.get("trainingLoad"):
                         existing.training_load = float(act["trainingLoad"])
+                    # Enrichment that arrives a day later (the MCP path fetches
+                    # detail/laps for the last 2 days): fill only what's empty.
+                    if existing.lap_data is None and act.get("laps"):
+                        existing.lap_data = act["laps"]
+                    if existing.detail_data is None and act.get("detail"):
+                        existing.detail_data = act["detail"]
+                    if existing.activity_name is None and act.get("name"):
+                        existing.activity_name = act["name"]
+                    if existing.calories is None and act.get("calories"):
+                        existing.calories = act["calories"]
                     continue
                 
                 # Convert pace (sec/km) to speed (m/s)
@@ -108,6 +118,8 @@ class IngestionService:
                     sub_mode=act.get("subMode"),
                     activity_name=act.get("name"),
                     calories=act.get("calories"),
+                    lap_data=act.get("laps"),
+                    detail_data=act.get("detail"),
                 )
                 session.add(new_act)
                 new_activity_ids.append(new_act.id)
@@ -167,6 +179,8 @@ class IngestionService:
                 _set("stress_level", day.get("stressAvg"), int)
                 _set("sleep_hr_avg", day.get("sleepHrAvg"))
                 _set("sleep_hr_min", day.get("sleepHrMin"))
+                _set("pred_half_s", day.get("predHalfS"), int)
+                _set("pred_marathon_s", day.get("predMarathonS"), int)
                 # COROS's own HRV normal range. MCP sends it by name; the
                 # scraper's sleepHrvIntervalList carries it at indexes 2 and 3
                 # (verified equal to the MCP "Normal Range" on every day compared).

@@ -409,3 +409,42 @@ def test_payload_carries_sleeping_hr_by_name():
     day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
     assert day["sleepHrAvg"] == 57 and day["sleepHrMin"] == 44
     assert "sleepHrAvg" not in next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260305)
+
+
+# ---------------------------------------------------------------- laps (chat council 2026-10-08)
+
+def test_compact_laps_keeps_splits_and_computes_drift_and_fade():
+    lap = mcp.compact_laps(fixture("coros_mcp_lap_data.json"))
+    assert lap["full_km"] == 6 and len(lap["splits"]) == 7
+    assert lap["splits"][1] == {"km": 2, "dist_m": 1000, "s": 400, "pace_s": 400, "hr": 150, "cad": 155}
+    assert lap["splits"][6]["dist_m"] == 420      # the partial last km is kept, not counted
+    # 6 full km → km 1 skipped as warmup; work = km 2-6, half = 2:
+    # first = km 2,3 (HR 150,152 → 151; pace 400,402 → 401)
+    # second = km 4,5,6 (HR 156,160,162 → 159.3; pace 405,410,412 → 409)
+    assert lap["first_half_hr"] == 151 and lap["second_half_hr"] == 159
+    assert lap["hr_drift_bpm"] == 8.3 and lap["pace_fade_s"] == 8.0
+
+
+def test_compact_laps_refuses_short_or_foreign_input():
+    assert mcp.compact_laps("not json") is None
+    assert mcp.compact_laps({"lapGroups": [{"type": 2, "laps": [{"lapIndex": 1, "distance": 100000, "time": 400}]}]}) is None
+    short = {"lapGroups": [{"type": 10, "laps": [
+        {"lapIndex": i, "distance": 100000, "time": 400.0, "avgPace": 400.0, "avgHr": 150, "avgCadence": 150} for i in (1, 2, 3)]}]}
+    lap = mcp.compact_laps(short)
+    assert lap["full_km"] == 3 and lap["hr_drift_bpm"] is None and lap["pace_fade_s"] is None
+
+
+def test_payload_carries_laps_detail_and_predictions():
+    f = _parsed_fixtures()
+    records = f["records"]
+    details = {records[0]["labelId"]: mcp.parse_activity_detail(fixture("coros_mcp_activity_detail.txt"))}
+    laps = {records[0]["labelId"]: mcp.compact_laps(fixture("coros_mcp_lap_data.json"))}
+    payload = mcp.build_scrape_payload(date(2026, 3, 8), "America/Mexico_City", records, details, f["sleep_hrv"],
+                                       f["resting_hr"], f["load"], fitness=f["fitness"], laps=laps)
+    acts = {a["labelId"]: a for a in payload["activities"]}
+    run = acts["900000000000000001"]
+    assert run["laps"]["hr_drift_bpm"] == 8.3 and run["detail"] == {
+        "aerobic_te": 4.0, "anaerobic_te": 0, "focus": "Base", "stride_m": 0.95, "power_w": 185, "elevation_gain_m": 6}
+    assert acts["900000000000000002"]["laps"] is None and acts["900000000000000002"]["detail"] is None
+    day = next(d for d in payload["evolab"]["analyse_query"]["dayList"] if d["happenDay"] == 20260308)
+    assert day["predHalfS"] == 6210 and day["predMarathonS"] == 13440

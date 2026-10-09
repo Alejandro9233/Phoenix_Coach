@@ -20,6 +20,73 @@ class DataAgent:
     def __init__(self, db_session: Session):
         self.db = db_session
     
+    def chat_extras(self, today=None) -> str:
+        """Chat-only context (council 2026-10-08): the data the MCP sync now
+        stores daily, compacted in Python. NOT part of summarize(): plan
+        generation shares that prompt and sits ~850 tokens under the Groq cap.
+        Lines only when the rows carry the field; never a 0 for missing."""
+        today = today or get_local_today()
+        snaps = self.db.query(RecoverySnapshot).filter(
+            RecoverySnapshot.date >= today - timedelta(days=30)
+        ).order_by(RecoverySnapshot.date.desc()).all()
+        lines = []
+        if snaps:
+            latest = snaps[0]
+            week = snaps[:7]
+            nights = [(x.date, x.sleep_duration_hr, x.sleep_quality_score) for x in week
+                      if x.sleep_duration_hr is not None or x.sleep_quality_score is not None]
+            if nights:
+                hrs = [h for _, h, _ in nights if h is not None]
+                scores = [sc for _, _, sc in nights if sc is not None]
+                worst = min(nights, key=lambda n: (n[1] if n[1] is not None else 99))
+                parts = [f"{len(nights)} nights"]
+                if hrs: parts.append(f"avg {sum(hrs)/len(hrs):.1f} h")
+                if scores: parts.append(f"avg COROS score {sum(scores)/len(scores):.0f}")
+                if worst[1] is not None: parts.append(f"shortest {worst[1]:.1f} h on {worst[0].strftime('%b %d')}")
+                lines.append("  Sleep, last 7: " + ", ".join(parts))
+            stress = [x.stress_level for x in week if x.stress_level is not None]
+            if stress:
+                lines.append(f"  Daily stress, last 7: avg {sum(stress)/len(stress):.0f} (COROS 0-100)")
+            if latest.sleep_hr_min is not None:
+                hist = [x.sleep_hr_min for x in snaps[1:] if x.sleep_hr_min is not None]
+                norm = sorted(hist)[len(hist) // 2] if len(hist) >= 7 else None
+                lines.append(f"  Sleeping HR: min {latest.sleep_hr_min:.0f} bpm"
+                             + (f", {len(hist)}-day median {norm:.0f} ({latest.sleep_hr_min - norm:+.0f})" if norm is not None else ""))
+            if latest.hrv_ms is not None and latest.hrv_normal_low is not None:
+                hi = f"-{latest.hrv_normal_high:.0f}" if latest.hrv_normal_high else ""
+                verdict = "below" if latest.hrv_ms < latest.hrv_normal_low else "inside"
+                lines.append(f"  HRV {latest.hrv_ms:.0f} ms, {verdict} COROS normal range {latest.hrv_normal_low:.0f}{hi} ms")
+            preds = [(x.date, x.pred_half_s, x.pred_marathon_s) for x in snaps
+                     if x.pred_half_s is not None or x.pred_marathon_s is not None]
+            if preds:
+                d0, h0, m0 = preds[0]
+                d1, h1, m1 = preds[-1]
+                def _t(sec):
+                    return f"{sec // 3600}:{(sec % 3600) // 60:02d}:{sec % 60:02d}" if sec else "?"
+                trend = ""
+                if len(preds) > 1 and h0 and h1 and (d0 - d1).days >= 7:
+                    trend = f"; half was {_t(h1)} on {d1.strftime('%b %d')} ({h0 - h1:+d} s)"
+                lines.append(f"  COROS race predictions: half {_t(h0)}, marathon {_t(m0)}{trend}")
+        acts = self.db.query(Activity).filter(
+            Activity.start_time >= datetime.combine(today - timedelta(days=14), datetime.min.time()),
+            Activity.lap_data.isnot(None),
+        ).order_by(Activity.start_time.desc()).limit(5).all()
+        for a in acts:
+            lap, det = a.lap_data or {}, a.detail_data or {}
+            bits = []
+            if lap.get("hr_drift_bpm") is not None:
+                bits.append(f"HR {lap.get('first_half_hr')}→{lap.get('second_half_hr')} ({lap['hr_drift_bpm']:+.0f} bpm drift)")
+            if lap.get("pace_fade_s") is not None:
+                bits.append(f"pace fade {lap['pace_fade_s']:+.0f} s/km")
+            if det.get("aerobic_te") is not None:
+                bits.append(f"aerobic TE {det['aerobic_te']}")
+            if det.get("focus"):
+                bits.append(f"COROS focus {det['focus']}")
+            if bits:
+                name = a.activity_name or a.sport
+                lines.append(f"  {a.start_time.strftime('%b %d')} {name}: " + ", ".join(bits))
+        return "\n".join(lines)
+
     def summarize(self, lookback_days=14):
         """
         Produce a compact athlete state summary from the database.
@@ -150,10 +217,7 @@ class DataAgent:
                     f"{latest.sleep_duration_hr:.1f} h" if latest.sleep_duration_hr is not None else "",
                     f"COROS score {latest.sleep_quality_score:.0f}" if latest.sleep_quality_score is not None else "") if x))
             if latest.sleep_hr_min is not None:
-                _hist = [x.sleep_hr_min for x in snapshots[1:31] if x.sleep_hr_min is not None]
-                _norm = sorted(_hist)[len(_hist) // 2] if len(_hist) >= 7 else None
-                lines.append(f"  Sleeping HR: min {latest.sleep_hr_min:.0f} bpm"
-                             + (f" (30-day norm {_norm:.0f})" if _norm is not None else ""))
+                lines.append(f"  Sleeping HR: min {latest.sleep_hr_min:.0f} bpm")   # norm: chat_extras
             if latest.stress_level is not None:
                 lines.append(f"  Daily stress (COROS): {latest.stress_level}")
             if latest.t7d_load: lines.append(f"  7-day Load: {latest.t7d_load:.0f}")
