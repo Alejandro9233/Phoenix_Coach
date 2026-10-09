@@ -18,10 +18,16 @@ those limits and writes the coaching notes.
   which flips the date at 5pm Hermosillo time.
 - Don't set `TIMEZONE` in `.env` or on Render. It overrides the phone's reported
   timezone and breaks travel.
-- Commits go straight to `main` on this repo.
-- **Tell Alex what changed before committing.** Summarize the edits in chat
-  first; commit only after he's seen it. A commit is never the first report
-  of work.
+- Commits go straight to `main` on this repo, and a push auto-deploys to the VM.
+- **Commit and push on your own once the tests pass** (decided 2026-10-09: Alex
+  checks in twice a day and wants a project manager, not a gate). The chat
+  message that reports the work carries the summary and the commit hash in the
+  same breath — a commit is never silent, but it no longer waits for a reply.
+  Still wait for Alex on: a code-council verdict (Proceed / Modify / Stop), a
+  /variants pick, anything that writes to his COROS watch calendar beyond what
+  the sync already does, prod-database writes outside the app's own paths, and
+  deleting or disabling a feature. When in doubt, ship the reversible part and
+  ask about the rest.
 - **Never add a `Co-Authored-By:` trailer to commits.** No Claude/AI attribution
   lines, no `Generated with` footers. Commit messages end at the body.
 - The LLM never decides volume. Wrong mileage in a plan = bug in
