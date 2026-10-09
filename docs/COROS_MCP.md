@@ -219,9 +219,14 @@ Each gives a new field a consumer on day one. Playground raw outputs and INSIGHT
    stored daily and reported as `sleep_hr` with the 30-day median — 4 bpm or more
    above it is called out in the detail. The Today arc still draws four segments;
    showing the fifth is an iOS design pass.
-2. **Weekly volume that shows what disappeared.** Hours per sport per week from
-   `querySportRecords` (cycling went to zero after the move with nothing recorded in
-   its place; elliptical is never on the watch). Surfaces the gap the engine can't see.
+2. **Weekly volume that shows what disappeared — shipped 2026-10-09.** Hours per
+   sport per week (cycling went to zero after the move with nothing recorded in
+   its place; elliptical is never on the watch). `backend/services/volume_ledger.py`
+   buckets `activities.duration_sec` into eight Monday weeks, averages the four
+   before the current one, and lists the sports that have hours in the window
+   but none in the last two (`gone`, with what a normal week was). Rides on
+   `GET /dashboard` as `volume`; the Recent tab draws it as `VolumeLedgerCard`
+   (variants round, V2: a ledger row per sport).
 3. **The write path** (`createScheduledWorkout` / `updateScheduledWorkout`), its own
    council. Half of the training days in the sample had nothing on the watch calendar;
    the scheduled ones were followed.

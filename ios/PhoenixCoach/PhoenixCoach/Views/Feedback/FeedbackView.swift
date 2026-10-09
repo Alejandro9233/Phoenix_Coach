@@ -70,6 +70,21 @@ struct FeedbackView: View {
                             }
                         }
 
+                        // Volume by sport (backend/services/volume_ledger.py):
+                        // eight weeks of hours per sport, so a sport that
+                        // stopped (bike after the move) is visible. Hidden
+                        // when the window holds no training.
+                        if let volume = dashboard?.volume {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Volume")
+                                    .font(.system(size: 24, weight: .regular))
+                                    .foregroundStyle(.white)
+                                    .padding(.bottom, 8)
+
+                                VolumeLedgerCard(volume: volume)
+                            }
+                        }
+
                         // Long-run ledger (backend/services/personal_model.py):
                         // easy runs >= 20 km in the last 16 weeks. Hidden until
                         // the backend knows a threshold HR.
@@ -427,6 +442,84 @@ struct ActivityCard: View {
 
 #Preview {
     FeedbackView()
+}
+
+/// Hours per sport per week — the gap the engine can't see. One ledger row
+/// per sport: label, eight-week sparkbars, this week's hours, delta against
+/// the four-week average. Variants round 2026-10-09, V2 ("do number 2").
+struct VolumeLedgerCard: View {
+    let volume: VolumeLedger
+
+    private var sports: [String] { volume.sports ?? [] }
+
+    /// Bars scale to the busiest sport-week in the window so nothing clips.
+    private var scale: Double {
+        max(1, volume.weeks.flatMap { $0.hours.values }.max() ?? 1)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+            HStack(alignment: .firstTextBaseline) {
+                DS.SectionLabel(text: "This week by sport")
+                Spacer()
+                DS.MonoLabel(text: "vs 4 wk")
+            }
+
+            ForEach(sports, id: \.self) { sport in
+                let now = volume.thisWeek?[sport] ?? 0
+                let avg = volume.avg4wk?[sport] ?? 0
+                let delta = volume.delta4wk?[sport] ?? (now - avg)
+                HStack(spacing: DS.Spacing.m) {
+                    Text(sport.capitalized)
+                        .font(.system(size: 13))
+                        .foregroundStyle(now > 0 ? .white : DS.Colors.outline)
+                        .frame(width: 64, alignment: .leading)
+                    HStack(alignment: .bottom, spacing: 3) {
+                        ForEach(volume.weeks) { week in
+                            let h = week.hours[sport] ?? 0
+                            Capsule()
+                                .fill(h > 0 ? DS.Colors.sportShade(sport) : Color.white.opacity(0.08))
+                                .frame(width: 6, height: max(3, CGFloat(h / scale) * 22))
+                        }
+                    }
+                    .frame(height: 22, alignment: .bottom)
+                    Spacer()
+                    Text(hours(now))
+                        .font(.system(size: 13, weight: .light))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .frame(width: 44, alignment: .trailing)
+                    Text(deltaText(delta))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(now == 0 && avg > 0 ? DS.Colors.warning : DS.Colors.outline)
+                        .frame(width: 44, alignment: .trailing)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(sport.capitalized): \(hours(now)) this week, \(deltaText(delta)) against the four-week average")
+            }
+
+            Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
+
+            HStack {
+                DS.SectionLabel(text: "Total")
+                Spacer()
+                Text(hours(volume.thisWeek?["total"] ?? volume.weeks.last?.total ?? 0))
+                    .font(.system(size: 13, weight: .light))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+    }
+
+    private func hours(_ h: Double) -> String {
+        h == 0 ? "—" : String(format: "%.1f h", h)
+    }
+
+    private func deltaText(_ d: Double) -> String {
+        abs(d) < 0.05 ? "±0" : String(format: "%+.1f", d)
+    }
 }
 
 /// The one marathon-readiness number: easy long runs, counted, not graded.

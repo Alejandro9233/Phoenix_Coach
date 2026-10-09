@@ -334,6 +334,51 @@ struct DashboardResponse: Codable {
     var activities: [Activity]
     let recovery: [RecoverySnapshot]
     let personal: PersonalSummary?
+    /// Recent tab's volume ledger (backend/services/volume_ledger.py). Nil
+    /// when the eight-week window holds no training, and decoded leniently:
+    /// a shape this build doesn't know hides the card, not the tab.
+    let volume: VolumeLedger?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        athlete = try c.decodeIfPresent(Athlete.self, forKey: .athlete)
+        activities = try c.decodeIfPresent([Activity].self, forKey: .activities) ?? []
+        recovery = try c.decodeIfPresent([RecoverySnapshot].self, forKey: .recovery) ?? []
+        personal = try c.decodeIfPresent(PersonalSummary.self, forKey: .personal)
+        volume = try? c.decodeIfPresent(VolumeLedger.self, forKey: .volume)
+    }
+}
+
+/// Hours per sport per week, eight weeks, oldest first; the last week is
+/// the current, partial one. `sports` is the row order; keys of the dicts.
+struct VolumeLedger: Codable {
+    let weeks: [VolumeWeek]
+    let sports: [String]?
+    let thisWeek: [String: Double]?
+    let avg4wk: [String: Double]?
+    let delta4wk: [String: Double]?
+    let gone: [VolumeGap]?
+
+    enum CodingKeys: String, CodingKey {
+        case weeks, sports, gone
+        case thisWeek = "this_week"
+        case avg4wk = "avg_4wk"
+        case delta4wk = "delta_4wk"
+    }
+}
+
+struct VolumeWeek: Codable, Identifiable {
+    let start: String
+    let hours: [String: Double]
+    let total: Double?
+    var id: String { start }
+}
+
+/// A sport with hours in the window and none in the last two weeks.
+struct VolumeGap: Codable {
+    let sport: String
+    let weeks: Int?
+    let was: Double?
 }
 
 struct Athlete: Codable {

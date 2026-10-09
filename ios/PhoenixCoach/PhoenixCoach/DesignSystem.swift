@@ -27,8 +27,20 @@ enum DS {
             default: return outline
             }
         }
+
+        /// Sports in monochrome, stepped — one white per sport, never a hue
+        /// (Recent volume round, 2026-10-09). The one place sport shades live;
+        /// a view that needs one calls this, never its own opacity.
+        static func sportShade(_ sport: String) -> Color {
+            switch sport.lowercased() {
+            case "run", "running": return .white
+            case "strength", "gym": return .white.opacity(0.55)
+            case "bike", "cycling": return .white.opacity(0.3)
+            default: return .white.opacity(0.16)
+            }
+        }
     }
-    
+
     // MARK: - Spacing (4/8 grid)
     enum Spacing {
         static let xs: CGFloat = 4

@@ -690,11 +690,16 @@ def get_dashboard_data(db: Session = Depends(get_db)):
     recovery = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).all()
     athlete = db.query(Athlete).first()
     
+    from backend.services.volume_ledger import weekly_volume
+
     return {
         "athlete": athlete,
         "activities": activities,
         "recovery": recovery,
         "personal": _personal_block(db, athlete),
+        # Recent tab's volume ledger: hours per sport per week, 8 weeks,
+        # with the sports that went to zero (docs/COROS_MCP.md, reader 2).
+        "volume": weekly_volume(db),
     }
 
 
