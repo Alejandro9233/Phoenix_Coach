@@ -603,142 +603,20 @@ struct ProfileView: View {
                     .padding(.top, 4)
                 }
 
-                // Predicted finish from the athlete's own race efforts
-                // (backend/services/personal_model.py). Read-only: the
-                // target stays whatever Alex set.
-                if let p = profile.prediction, let predicted = p.predicted {
-                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
-                        HStack {
-                            Text("Predicted \(p.distance ?? "race")")
-                                .font(.system(size: 10, weight: .bold))
-                                .textCase(.uppercase)
-                                .tracking(DS.Tracking.wide)
-                                .foregroundStyle(DS.Colors.outline)
-                            Spacer()
-                            // A range, not a point: "3:25:59" to the second
-                            // reads as a promise the formula cannot make.
-                            Text(predictionRange(p) ?? predicted)
-                                .font(.system(size: 17, weight: .light))
-                                .monospacedDigit()
-                                .foregroundStyle(.white)
-                        }
-                        Text(predictionFootnote(p))
-                            .font(.system(size: 13, weight: .light))
-                            .foregroundStyle(DS.Colors.onSurface)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(DS.Spacing.m)
-                    .background(Color.white.opacity(0.03))
-                    .clipShape(.rect(cornerRadius: DS.Radius.medium))
-                    .accessibilityElement(children: .combine)
-                }
-
-                // COROS's own clock for the same goal, stored daily by the
-                // sync. Same panel grammar as Phoenix's prediction above, so
-                // the two sit as peers: Phoenix from race efforts, COROS from
-                // the watch's fitness model.
-                if let c = profile.corosPrediction, let value = corosHeadline(c) {
-                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
-                        HStack {
-                            Text("COROS predicts \(corosHeadlineDistance(c))")
-                                .font(.system(size: 10, weight: .bold))
-                                .textCase(.uppercase)
-                                .tracking(DS.Tracking.wide)
-                                .foregroundStyle(DS.Colors.outline)
-                            Spacer()
-                            Text(value)
-                                .font(.system(size: 17, weight: .light))
-                                .monospacedDigit()
-                                .foregroundStyle(.white)
-                        }
-                        Text(corosFootnote(c))
-                            .font(.system(size: 13, weight: .light))
-                            .foregroundStyle(DS.Colors.onSurface)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(DS.Spacing.m)
-                    .background(Color.white.opacity(0.03))
-                    .clipShape(.rect(cornerRadius: DS.Radius.medium))
-                    .accessibilityElement(children: .combine)
-                }
+                // Predicted finish: the target as a line, Phoenix (from the
+                // athlete's race efforts) and COROS (the watch's model) as
+                // ticks on it — RacePredictionPanel, /variants 2026-10-09 V4.
+                // Read-only: the target stays whatever Alex set.
+                RacePredictionPanel(
+                    prediction: profile.prediction,
+                    coros: profile.corosPrediction,
+                    raceDistance: profile.raceDistance,
+                    targetFinishTime: profile.targetFinishTime
+                )
             }
         }
     }
 
-    /// The goal distance leads when COROS predicts it; otherwise the marathon,
-    /// then the half. Nil when neither number exists.
-    private func corosHeadline(_ c: CorosPrediction) -> String? {
-        switch c.goalDistance {
-        case "Half Marathon", "Half": return c.half ?? c.marathon
-        default: return c.marathon ?? c.half
-        }
-    }
-
-    private func corosHeadlineDistance(_ c: CorosPrediction) -> String {
-        switch c.goalDistance {
-        case "Half Marathon", "Half": return c.half != nil ? "half" : "marathon"
-        default: return c.marathon != nil ? "marathon" : "half"
-        }
-    }
-
-    /// "Half 1:39:34. 7.6% slower than your target. Since Oct 8: −8:53 marathon."
-    private func corosFootnote(_ c: CorosPrediction) -> String {
-        var parts: [String] = []
-        let leadIsMarathon = corosHeadlineDistance(c) == "marathon"
-        if leadIsMarathon, let half = c.half { parts.append("Half \(half).") }
-        if !leadIsMarathon, let marathon = c.marathon { parts.append("Marathon \(marathon).") }
-        if let gap = c.goalGapPct {
-            let pct = String(format: "%.1f%%", abs(gap))
-            parts.append(gap > 0 ? "\(pct) slower than your target." : "\(pct) faster than your target.")
-        }
-        let delta = leadIsMarathon ? c.marathonDeltaSec : c.halfDeltaSec
-        if let d = delta, let since = c.sinceDate, let days = c.daysTracked, days > 1 {
-            parts.append("\(signedMinutes(d)) since \(shortDate(since)).")
-        } else if let date = c.date {
-            parts.append("Tracking since \(shortDate(date)).")
-        }
-        return parts.joined(separator: " ")
-    }
-
-    /// −8:53 for -533 s; +0:12 for 12 s. Minutes and seconds, signed.
-    private func signedMinutes(_ seconds: Int) -> String {
-        let sign = seconds < 0 ? "−" : "+"
-        let s = abs(seconds)
-        return "\(sign)\(s / 60):\(String(format: "%02d", s % 60))"
-    }
-
-    /// "Oct 8" from an ISO date; explicit locale so the month stays English.
-    private func shortDate(_ iso: String) -> String {
-        let parser = DateFormatter()
-        parser.locale = Locale(identifier: "en_US_POSIX")
-        parser.dateFormat = "yyyy-MM-dd"
-        guard let date = parser.date(from: iso) else { return iso }
-        let out = DateFormatter()
-        out.locale = Locale(identifier: "en_US_POSIX")
-        out.dateFormat = "MMM d"
-        return out.string(from: date)
-    }
-
-    /// "2:56:51-3:05:55" when the backend sent a band, nil to fall back to the
-    /// midpoint (older responses, or a prediction built before the band).
-    private func predictionRange(_ p: RacePrediction) -> String? {
-        guard let lo = p.predictedLo, let hi = p.predictedHi else { return nil }
-        return "\(lo)–\(hi)"
-    }
-
-    private func predictionFootnote(_ p: RacePrediction) -> String {
-        let km = p.basisKm.map { String(format: $0.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f km" : "%.1f km", $0) } ?? "a race"
-        var text = "From \(km) in \(p.basisTime ?? "—") on \(p.basisDate ?? "—")."
-        if let gap = p.gapPct {
-            let pct = String(format: "%.0f%%", abs(gap))
-            text += gap > 0 ? " \(pct) slower than your target." : " \(pct) faster than your target."
-        }
-        if p.predictedLo != nil, let mid = p.predicted {
-            text += " Midpoint \(mid); assumes race-distance training."
-        }
-        return text
-    }
-    
     // WEEKLY CONSTRAINTS schedule matrix
     private var weeklyConstraintsSection: some View {
         GlassPanelCard {
