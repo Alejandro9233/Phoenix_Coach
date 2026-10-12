@@ -475,7 +475,12 @@ class NetworkManager: ObservableObject {
         }
         do {
             var request = URLRequest(url: url)
-            request.timeoutInterval = 10
+            // Monday's first fetch generates the week server-side: two Groq
+            // calls plus a possible volume-gate retry, ~2 min on 2026-10-12.
+            // The 10s that sat here timed out every Monday refresh, and the
+            // fallback below then showed last week's cached plan as if it
+            // were the new one. The session's own ceiling is 180s.
+            request.timeoutInterval = 180
             let (data, response) = try await session.data(for: request)
             // 409 = no race configured yet; the backend refuses to generate.
             // It must bypass the cached-plan fallback below, or a stale week
@@ -486,23 +491,40 @@ class NetworkManager: ObservableObject {
                 throw NetworkError.profileIncomplete
             }
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                throw NetworkError.serverError
+                // The server answered and said no — 502 is "generation failed,
+                // nothing persisted". That is an answer, not an outage: carry
+                // its reason up instead of standing last week's plan in for it.
+                let status = (response as? HTTPURLResponse)?.statusCode
+                throw NetworkError.backendError(Self.backendDetail(data, status: status))
             }
             let plan = try decoder.decode(WeeklyPlanResponse.self, from: data)
             // Cache only after a successful decode — a raw 5xx body written
             // here would poison the fallback below and shadow the last good plan.
             UserDefaults.standard.set(data, forKey: "cached_weekly_plan")
             return plan
-        } catch NetworkError.profileIncomplete {
-            throw NetworkError.profileIncomplete
+        } catch let error as NetworkError {
+            // profileIncomplete and backendError are answers from the server;
+            // the cached week must not stand in for either.
+            throw error
         } catch {
-            // Transport errors (Render cold start) still serve the cached plan.
+            // Transport errors (offline, a sleeping server) still serve the cached plan.
             if let cachedData = UserDefaults.standard.data(forKey: "cached_weekly_plan"),
                let cachedResponse = try? decoder.decode(WeeklyPlanResponse.self, from: cachedData) {
                 return cachedResponse
             }
             throw error
         }
+    }
+
+    /// The `detail` of a FastAPI error body as one sentence for the UI —
+    /// a string, or an object's `message` (the 409 shape).
+    private static func backendDetail(_ data: Data, status: Int?) -> String {
+        let fallback = "Server error" + (status.map { " (\($0))" } ?? "")
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let detail = json["detail"] else { return fallback }
+        if let text = detail as? String, !text.isEmpty { return text }
+        if let dict = detail as? [String: Any], let message = dict["message"] as? String { return message }
+        return fallback
     }
     
     func adaptTodayWorkout() async throws -> DayPlan {
@@ -714,6 +736,10 @@ enum NetworkError: LocalizedError {
     case ollamaOffline
     /// Backend 409: no race_date/race_distance yet, so no plan can be generated.
     case profileIncomplete
+    /// The backend answered with an error body; the string is its `detail`
+    /// (e.g. "Plan generation failed; no plan persisted: ..."), kept verbatim
+    /// so a failed Monday is diagnosable from the phone.
+    case backendError(String)
 
     var errorDescription: String? {
         switch self {
@@ -722,6 +748,7 @@ enum NetworkError: LocalizedError {
         case .decodingError: return "Failed to parse response"
         case .ollamaOffline: return "Ollama is not running on your Mac"
         case .profileIncomplete: return "Set your race in Profile to get your first plan"
+        case .backendError(let detail): return detail
         }
     }
 }

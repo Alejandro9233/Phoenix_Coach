@@ -119,6 +119,10 @@ struct TodayView: View {
     /// Backend 409 profile_incomplete: no race configured, so no plan exists
     /// yet. A setup card, not an error — fresh installs land here by design.
     @State private var needsRaceSetup = false
+    /// The backend's own reason when this week's plan failed to generate
+    /// (a 502 from /weekly-plan, nothing persisted). Shown in place of the
+    /// session card; the cached week never stands in for it.
+    @State private var planError: String?
     
     @State private var showScraperError = false
     @State private var scraperErrorMessage = ""
@@ -261,6 +265,8 @@ struct TodayView: View {
 
                             if needsRaceSetup {
                                 raceSetupCard
+                            } else if let planError {
+                                planErrorCard(planError)
                             } else if let todayPlan = todayDayPlan, !(todayPlan.workouts ?? []).isEmpty {
                                 TodaySessionCard(
                                     plan: todayPlan,
@@ -787,11 +793,41 @@ struct TodayView: View {
                 NotificationCenter.default.post(name: NSNotification.Name("OpenProfileTab"), object: nil)
             }
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
+            .foregroundStyle(DS.Colors.onAccent)
+            .padding(.horizontal, DS.Spacing.xl)
+            .padding(.vertical, DS.Spacing.s)
             .background(DS.Colors.accent.opacity(0.8))
             .clipShape(Capsule())
+        }
+    }
+
+    /// Shown in place of the plan when /weekly-plan answered 502: the week
+    /// failed to generate and nothing was persisted. The message is the
+    /// backend's own reason, so a failed Monday is diagnosable from the phone.
+    private func planErrorCard(_ reason: String) -> some View {
+        statusCard(
+            icon: "exclamationmark.triangle",
+            iconColor: DS.Colors.warning,
+            title: "No plan this week",
+            message: reason,
+            messagePadding: .horizontal
+        ) {
+            Button {
+                Task {
+                    await fetchWeeklyPlan()
+                    await fetchPlanStatus()
+                }
+            } label: {
+                Text("Try Again")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DS.Colors.onAccent)
+                    .padding(.horizontal, DS.Spacing.xl)
+                    .padding(.vertical, DS.Spacing.s)
+                    .background(DS.Colors.accent.opacity(0.8))
+                    .clipShape(Capsule())
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
         }
     }
 
@@ -858,12 +894,24 @@ struct TodayView: View {
             await MainActor.run {
                 self.weeklyPlan = plan
                 self.needsRaceSetup = false
+                self.planError = nil
                 self.isLoading = false
             }
         } catch NetworkError.profileIncomplete {
             await MainActor.run {
                 self.needsRaceSetup = true
                 self.weeklyPlan = nil
+                self.planError = nil
+                self.isLoading = false
+            }
+        } catch NetworkError.backendError(let detail) {
+            // Generation failed server-side and nothing was persisted. Drop
+            // the week on screen too: last week's plan standing in is what
+            // made every failed Monday read as "no new plan" (2026-10-12).
+            await MainActor.run {
+                self.planError = detail
+                self.weeklyPlan = nil
+                self.errorMessage = detail
                 self.isLoading = false
             }
         } catch {
