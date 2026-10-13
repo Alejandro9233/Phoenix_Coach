@@ -166,6 +166,21 @@ def finalize_plan_write(db, plan_json: dict, *, source: str, days_written,
     return plan_json
 
 
+def _zone_anchors(db):
+    """The athlete's COROS zone table and LTHR for the zone stamp;
+    (None, None) without a session or an athlete — the stamp then no-ops."""
+    if db is None:
+        return None, None
+    try:
+        from backend.models.database import Athlete
+        athlete = db.query(Athlete).first()
+    except Exception:
+        return None, None
+    if athlete is None:
+        return None, None
+    return athlete.hr_zones, athlete.lthr
+
+
 def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
                             availability: dict, active_injuries, days=None,
                             reason: str = None, before: dict = None,
@@ -213,6 +228,13 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
         from backend.services.pace_enforcer import enforce_distances
         candidate, _dist_fixes = enforce_distances(
             candidate, (gate_ctx or {}).get("pace_model"), days=days)
+        # Step zones ride the same stamp: the LLM copies "zone": 1 onto every
+        # step, and the Today card, the watch's non-main sections and the
+        # course description all read it (zone_enforcer docstring).
+        from backend.services.zone_enforcer import enforce_zones
+        hr_zones, lthr = _zone_anchors(db)
+        candidate, _zone_fixes = enforce_zones(
+            candidate, hr_zones=hr_zones, lthr=lthr, days=days)
         if not gated:
             break
         report = volume_gate.audit_plan(
