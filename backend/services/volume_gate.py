@@ -183,9 +183,15 @@ def parse_minutes(val) -> float | None:
     s = str(val).strip().lower()
     if not s:
         return None
-    m = re.match(r"^(\d+(?:\.\d+)?)\s*(?:min|minutes|m)?$", s)
+    m = re.match(r"^(\d+(?:\.\d+)?)\s*(?:min|mins|minutes|m)?$", s)
     if m:
         return float(m.group(1))
+    # "1 hr 15 min", "1h15m", "1 hour", "1.5 h" — the LLM writes long runs
+    # this way (2026-10-12: "1 hr 15 min" parsed as None, so the gate counted
+    # the week's long run as 0 minutes and compliance scored 75 min as 125%).
+    m = re.match(r"^(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\.?(?:\s*(\d+(?:\.\d+)?)\s*(?:min|mins|minutes|m)?\.?)?$", s)
+    if m:
+        return float(m.group(1)) * 60 + float(m.group(2) or 0)
     parts = s.split(":")
     try:
         nums = [float(p) for p in parts]

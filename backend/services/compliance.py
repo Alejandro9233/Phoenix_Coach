@@ -37,28 +37,14 @@ def _normalize_sport(sport: str) -> str:
 
 
 def _parse_duration_to_minutes(duration_str: str) -> Optional[float]:
-    """Parse duration strings like '45 min', '1h 30m', '30:00' to minutes."""
+    """Planned total_time -> minutes. One parser for the whole backend
+    (volume_gate.parse_minutes): "45 min", "1 hr 15 min", "1h30m", "30:00",
+    "1:15:00". The old local parser read "1 hr 15 min" as 60 and scored a
+    75-minute long run as 125% over (2026-10-18)."""
     if not duration_str or duration_str == "--":
         return None
-
-    # "45 min" or "45min"
-    m = re.match(r"(\d+)\s*min", duration_str, re.IGNORECASE)
-    if m:
-        return float(m.group(1))
-
-    # "1h 30m" or "1h30m"
-    m = re.match(r"(\d+)\s*h\s*(\d+)?\s*m?", duration_str, re.IGNORECASE)
-    if m:
-        hours = int(m.group(1))
-        mins = int(m.group(2)) if m.group(2) else 0
-        return hours * 60 + mins
-
-    # "MM:SS" format used in workout steps
-    m = re.match(r"(\d+):(\d+)", duration_str)
-    if m:
-        return int(m.group(1)) + int(m.group(2)) / 60
-
-    return None
+    from backend.services.volume_gate import parse_minutes
+    return parse_minutes(duration_str)
 
 
 def _parse_hr_target(hr_str: str) -> Optional[tuple]:

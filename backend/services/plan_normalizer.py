@@ -66,6 +66,26 @@ def parse_duration_to_string(dur: Any) -> str:
         
     return dur_str
 
+_HOUR_FORM_RE = re.compile(r"\d\s*(?:h|hr|hrs|hour|hours)\b", re.I)
+
+
+def canonical_total_time(value: str) -> str:
+    """"1 hr 15 min" -> "75 min". Only hour forms are rewritten: every other
+    spelling the backend and the app already read ("45 min", "45:00",
+    "1:15:00", "00:00") passes through untouched. The LLM writes long runs
+    with hours; the gate, compliance and the iOS minutes hero all expect
+    minutes, and the stored week is normalized on every read, so a week
+    persisted with "1 hr 15 min" heals here too."""
+    text = value.strip()
+    if not _HOUR_FORM_RE.search(text):
+        return text
+    from backend.services.volume_gate import parse_minutes
+    minutes = parse_minutes(text)
+    if minutes is None:
+        return text
+    return f"{int(round(minutes))} min"
+
+
 def parse_zone_to_int(zone: Any) -> Optional[int]:
     """Extract a clean integer zone (e.g. from '1-2', 'Zone 2', or 2)."""
     if zone is None:
@@ -120,7 +140,7 @@ def normalize_workout(workout: dict) -> dict:
         if isinstance(total_time, (int, float)):
             total_time = f"{int(total_time)} min"
         else:
-            total_time = str(total_time)
+            total_time = canonical_total_time(str(total_time))
     else:
         total_time = "30 min"
 
