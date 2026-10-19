@@ -264,3 +264,31 @@ def test_block_calendar_projects_the_comeback(db):
     assert this_week["is_recovery_week"] is False
     assert this_week["expected_run_km"] == "25.2"
     assert next_week["expected_run_km"] == "31"
+
+
+# --- The long run outranks the single-run cap (Alex, 2026-10-19) -------------
+
+def test_km_for_minutes_matches_the_stamp():
+    from backend.services.pace_enforcer import expected_run_km, km_for_minutes
+    from backend.services.pace_model import compute_pace_model
+    pm = compute_pace_model(4.45, "3:20:00", "Marathon")
+    assert km_for_minutes(87, pm) == expected_run_km(
+        {"sport": "running", "title": "Long Run", "total_time": "87 min", "steps": []}, pm)[0]
+    assert km_for_minutes(0, pm) is None
+    assert km_for_minutes(87, None) is None
+
+
+def test_context_cap_never_sits_below_the_long_run(db):
+    from backend.services.pace_enforcer import km_for_minutes
+    _seed_comeback_athlete(db)
+    athlete = db.query(Athlete).first()
+    athlete.threshold_pace_min_km = 4.45
+    athlete.target_finish_time = "03:20:00"
+    db.commit()
+    ctx = PeriodizationEngine().compute_context(db)
+    vt = ctx["volume_targets"]
+    lr_km = km_for_minutes(vt["long_run_minutes"], ctx["pace_model"])
+    assert vt["single_run_cap_km"] >= lr_km
+    if vt.get("single_run_cap_source") == "long_run":
+        assert vt["single_run_cap_km"] == lr_km
+    assert ctx["long_run_day"] == "Sunday"

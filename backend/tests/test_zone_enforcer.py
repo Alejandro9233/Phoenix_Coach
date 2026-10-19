@@ -120,4 +120,6 @@ def test_pipeline_stamps_from_the_athlete_row(db):
     plan, violations = run_plan_write_pipeline(
         db, _plan({"Tuesday": [run]}), source="test", availability={}, active_injuries=[])
     assert violations == []
-    assert [s["zone"] for s in plan["days"]["Tuesday"]["workouts"][0]["steps"]] == [1, 2, 3, 1]
+    # The week's only run is its long run, so the pipeline moved it to Sunday
+    # (long_run_day.py); the zones travel with it.
+    assert [s["zone"] for s in plan["days"]["Sunday"]["workouts"][0]["steps"]] == [1, 2, 3, 1]

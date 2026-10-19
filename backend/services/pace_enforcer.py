@@ -320,6 +320,17 @@ def _band_seconds(pace_model: dict, band_key: str):
     return float(lo), float(hi)
 
 
+def km_for_minutes(minutes, pace_model: dict, band_key: str = "long_run"):
+    """km a run of `minutes` covers at the band's midpoint — the arithmetic
+    expected_run_km stamps, exposed so the engine's single-run cap and the
+    stamp agree to the decimal (see periodization_engine, the comeback cap)."""
+    band = _band_seconds(pace_model, band_key)
+    if not minutes or not band:
+        return None
+    lo, hi = band
+    return round(float(minutes) * 60 / ((lo + hi) / 2), 1)
+
+
 def expected_run_km(workout: dict, pace_model: dict):
     """(km, basis) a running workout should declare, or (None, None).
     basis: 'steps' when every step names its km, else 'pace'."""

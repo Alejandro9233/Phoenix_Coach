@@ -51,6 +51,8 @@ from backend.services.constraint_enforcer import (
     SPORT_TO_AVAILABILITY_KEY, _injury_blocked_sports, get_active_injuries,
     get_travel_day_names, parse_day_list,
 )
+from backend.services.long_run_day import LONG_RUN_DAY
+from backend.services.pace_enforcer import km_for_minutes
 from backend.services.pace_model import RACE_KM, compute_pace_model
 from backend.utils.timezone import get_local_today
 
@@ -1359,6 +1361,18 @@ class PeriodizationEngine:
             athlete.threshold_pace_min_km, athlete.target_finish_time,
             race_distance,
         )
+        # The long run outranks the comeback cap (Alex, 2026-10-19: "I think
+        # we can do 87 min"). The cap stays the ceiling on every other run.
+        # Converted the way pace_enforcer stamps distance — minutes at the
+        # long-run band's midpoint — so the prompt, the stamp and the gate
+        # hold the same number. Before this the +12-min step and the 10%
+        # cap contradicted each other through the stamp and the week failed
+        # to generate (2026-10-12 twice, 2026-10-19).
+        if (volume_targets or {}).get("single_run_cap_km") and pace_model:
+            lr_km = km_for_minutes(volume_targets.get("long_run_minutes"), pace_model)
+            if lr_km and lr_km > volume_targets["single_run_cap_km"]:
+                volume_targets["single_run_cap_km"] = lr_km
+                volume_targets["single_run_cap_source"] = "long_run"
 
         # Recovery status
         recovery = self._get_recovery_status(db)
@@ -1443,6 +1457,9 @@ class PeriodizationEngine:
 
             # Training paces computed from measured threshold (pace_model.py).
             "pace_model": pace_model,
+            # The long run's fixed day; the write pipeline moves it there
+            # (long_run_day.py). Alex, 2026-10-19.
+            "long_run_day": LONG_RUN_DAY,
         }
 
     def compute_block_calendar(self, db: Session) -> dict:

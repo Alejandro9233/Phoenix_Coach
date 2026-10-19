@@ -222,6 +222,15 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
             active_injuries=active_injuries,
             days=days,
         )
+        # The long run lands on its fixed day, by swapping whole days, after
+        # the enforcer (so it never moves a run onto a stripped day) and
+        # before the stamps and the audit (so they judge the final layout).
+        from backend.services.long_run_day import LONG_RUN_DAY, enforce_long_run_day
+        candidate, _moves = enforce_long_run_day(
+            candidate, day=(gate_ctx or {}).get("long_run_day") or LONG_RUN_DAY,
+            availability=availability, days=days)
+        if _moves:
+            print(f"↔️ [{source}] Long run moved: {_moves}")
         # Distances before the audit: the LLM copies the prompt's example
         # km the way it copies "zone": 1, and the gate must judge the week on
         # real kilometres (time x pace band), not on the copied figure.

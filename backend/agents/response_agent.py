@@ -193,13 +193,23 @@ def _format_training_context(ctx: dict) -> str:
             lines.append("  COMEBACK: easy running only (strides allowed) — no "
                          "tempo, intervals or marathon-pace work until the "
                          "athlete is back to the pre-break week.")
+        if ctx.get("long_run_day"):
+            lines.append(f"  Long run day: {ctx['long_run_day']} — the system "
+                         f"moves it there if it lands elsewhere.")
         if vt.get("single_run_cap_km"):
-            lines.append(
-                f"  No single run over {vt['single_run_cap_km']} km (10% over "
-                f"the longest run of the last 30 days) — reach the week's km "
-                f"by adding runs, never by lengthening one. The system rejects "
-                f"any longer run."
-            )
+            if vt.get("single_run_cap_source") == "long_run":
+                lines.append(
+                    f"  No single run over {vt['single_run_cap_km']} km — that "
+                    f"is the long run; every other run stays well under it. "
+                    f"The system rejects any longer run."
+                )
+            else:
+                lines.append(
+                    f"  No single run over {vt['single_run_cap_km']} km (10% over "
+                    f"the longest run of the last 30 days) — reach the week's km "
+                    f"by adding runs, never by lengthening one. The system rejects "
+                    f"any longer run."
+                )
         lines.append(f"  Derivation: {vt['basis']}")
         lines.append(f"\nVolume References:")
     else:
