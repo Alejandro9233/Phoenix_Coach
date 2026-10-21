@@ -737,19 +737,44 @@ def get_nutrition_today(db: Session = Depends(get_db)):
     the stored week only — never generates one — so a missing or failed plan
     falls back to the calendar instead of failing. A bad package is a 503 for
     this card, not a backend that won't boot."""
-    from datetime import timedelta
-    from backend.models.database import WeeklyPlan
     from backend.services import nutrition
     from backend.utils.timezone import get_local_now
 
     now = get_local_now()
-    today = now.date()
-    week_start = today - timedelta(days=today.weekday())
-    record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == week_start).order_by(WeeklyPlan.id.desc()).first()
     try:
-        return nutrition.today_menu(today, now, record.plan_json if record else None)
+        return nutrition.today_menu(now.date(), now, _stored_week_plan(db, now.date()))
     except nutrition.NutritionPackageError as e:
         raise HTTPException(status_code=503, detail=f"Nutrition package: {e}")
+
+
+@app.get("/nutrition/days")
+def get_nutrition_days(count: int = 3, db: Session = Depends(get_db)):
+    """Today plus the next days' menus, for the phone's 11 AM breakfast
+    reminders — one non-repeating notification per date, rescheduled on every
+    app open (the repeating ones deleted on 2026-08-16 outlived their code and
+    kept announcing a bike ride). A day whose week has no stored plan yet is
+    the calendar's estimate, labelled in `source`/`reason`."""
+    from datetime import timedelta
+    from backend.services import nutrition
+    from backend.utils.timezone import get_local_now
+
+    now = get_local_now()
+    days = [now.date() + timedelta(days=i) for i in range(max(1, min(count, 7)))]
+    try:
+        return [nutrition.today_menu(d, now, _stored_week_plan(db, d)) for d in days]
+    except nutrition.NutritionPackageError as e:
+        raise HTTPException(status_code=503, detail=f"Nutrition package: {e}")
+
+
+def _stored_week_plan(db, day):
+    """The stored plan_json for the week holding `day`, or None. Read-only:
+    nutrition never triggers a generation."""
+    from datetime import timedelta
+    from backend.models.database import WeeklyPlan
+
+    week_start = day - timedelta(days=day.weekday())
+    record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == week_start).order_by(WeeklyPlan.id.desc()).first()
+    return record.plan_json if record else None
 
 
 @app.get("/block-calendar")

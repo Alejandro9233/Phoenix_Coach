@@ -59,9 +59,13 @@ those limits and writes the coaching notes.
 - **Local notifications** (`NotificationManager.swift`, Profile > Notifications
   toggles), deleted 2026-08-16. Two of the four fired on a 5-second timer from
   `TodayView` right after a refresh *you* triggered — a banner about work you were
-  already watching. The app has no push infrastructure and no notification
-  permission prompt, by choice. Anything worth telling the athlete belongs in the
-  UI they already have open.
+  already watching. The app has no push infrastructure, by choice. Anything worth
+  telling the athlete belongs in the UI they already have open. **One exception,
+  Alex 2026-10-21:** the 11 AM breakfast reminder (`BreakfastReminder.swift`) —
+  it fires when the app is closed. Never repeating: one request per date, ≤3
+  days out, rebuilt on every app open. The old repeating requests outlived their
+  code and kept firing a months-stale "bike ride"; the reminder also deletes
+  those by identifier. Don't add a second notification without asking.
 - **`_fallback_weekly_plan`** (`response_agent.py`), deleted 2026-08-18. A
   rule-based template week that shipped as the athlete's real plan whenever the
   LLM failed (2026-08-17: retired Groq model → silent "Base Building" template

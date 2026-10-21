@@ -712,6 +712,18 @@ class NetworkManager: ObservableObject {
 
     // MARK: - Training Context
 
+    /// Today plus the next days' menus, for the breakfast reminders.
+    func fetchNutritionDays(count: Int) async throws -> [NutritionDay] {
+        guard let url = URL(string: "\(baseURL)/nutrition/days?count=\(count)") else {
+            throw NetworkError.invalidURL
+        }
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+        return try decoder.decode([NutritionDay].self, from: data)
+    }
+
     func fetchTrainingContext() async throws -> TrainingContext {
         guard let url = URL(string: "\(baseURL)/training-context") else {
             throw NetworkError.invalidURL

@@ -1264,3 +1264,59 @@ struct BlockWeek: Codable, Identifiable {
         case workouts
     }
 }
+
+// MARK: - Nutrition (GET /nutrition/today, /nutrition/days)
+
+/// One day of the nutrition package. The day type comes from the stored plan
+/// (backend/services/nutrition.py); `source` is "calendar" when the week has
+/// no plan yet or the date is one of the package's fixed days.
+struct NutritionDay: Codable {
+    let date: String
+    let dayType: String?
+    let dayName: String?
+    let source: String?
+    let reason: String?
+    let meals: [NutritionMeal]?
+    let nextMealIndex: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case date, source, reason, meals
+        case dayType = "day_type"
+        case dayName = "day_name"
+        case nextMealIndex = "next_meal_index"
+    }
+}
+
+struct NutritionMeal: Codable {
+    let time: String
+    let name: String
+    let items: [NutritionItem]
+    let totals: NutritionTotals
+}
+
+struct NutritionItem: Codable {
+    let foodId: String
+    let name: String
+    let amount: Double
+    let unit: String
+    let pieces: Double?
+    let pieceName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, amount, unit, pieces
+        case foodId = "food_id"
+        case pieceName = "piece_name"
+    }
+}
+
+struct NutritionTotals: Codable {
+    let kcal: Double?
+    let proteinG: Double?
+    let carbsG: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case kcal
+        case proteinG = "protein_g"
+        case carbsG = "carbs_g"
+    }
+}

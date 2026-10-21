@@ -230,3 +230,27 @@ def test_bad_package_is_503(client):
         r = client.get("/nutrition/today")
     assert r.status_code == 503
     assert "calendario.json" in r.json()["detail"]
+
+
+def test_days_endpoint_crosses_into_unplanned_week(client, db):
+    # This week's plan is stored; a later week isn't — those days fall back
+    # to the calendar (or come back empty outside it), never generate.
+    today = get_local_today()
+    week_start = today - timedelta(days=today.weekday())
+    db.add(WeeklyPlan(week_start=week_start, athlete_id=1,
+                      plan_json={"week_summary": {}, "days": {}}))
+    db.commit()
+    with patch("backend.main._generate_weekly_plan") as gen:
+        r = client.get("/nutrition/days?count=7")
+    assert r.status_code == 200
+    assert gen.call_count == 0
+    body = r.json()
+    assert [d["date"] for d in body] == [(today + timedelta(days=i)).isoformat() for i in range(7)]
+    for d in body:
+        if d["day_type"] is not None and d["date"] >= (week_start + timedelta(days=7)).isoformat():
+            assert d["source"] == "calendar"
+
+
+def test_days_endpoint_clamps_count(client):
+    assert len(client.get("/nutrition/days?count=50").json()) == 7
+    assert len(client.get("/nutrition/days?count=0").json()) == 1

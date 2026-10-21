@@ -15,6 +15,7 @@ struct PhoenixCoachApp: App {
                     .preferredColorScheme(.dark)
                     .task {
                         await NetworkManager.shared.syncDeviceTimezone()
+                        await BreakfastReminder.refresh()
                         #if DEBUG
                         // `--sync-demo`: fake deep-sync stages for screenshotting
                         // the Live Activity without scraping production.
@@ -29,7 +30,12 @@ struct PhoenixCoachApp: App {
             if newPhase == .active {
                 // Catches travel: returning to the app from a new timezone
                 // re-points the backend's idea of "today".
-                Task { await NetworkManager.shared.syncDeviceTimezone() }
+                // The breakfast reminders are rebuilt from the plan as it
+                // stands now, so a swapped session can't leave a stale menu.
+                Task {
+                    await NetworkManager.shared.syncDeviceTimezone()
+                    await BreakfastReminder.refresh()
+                }
             }
         }
     }
