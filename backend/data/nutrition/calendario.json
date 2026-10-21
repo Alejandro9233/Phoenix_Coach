@@ -1,0 +1,411 @@
+{
+  "version": "2026-10-21",
+  "dias": [
+    {
+      "fecha": "2026-10-19",
+      "dia_semana": "lun",
+      "fase": "Regreso, todo suave",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-20",
+      "dia_semana": "mar",
+      "fase": "Regreso, todo suave",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-21",
+      "dia_semana": "mié",
+      "fase": "Regreso, todo suave",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-22",
+      "dia_semana": "jue",
+      "fase": "Regreso, todo suave",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-23",
+      "dia_semana": "vie",
+      "fase": "Regreso, todo suave",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-24",
+      "dia_semana": "sáb",
+      "fase": "Regreso, todo suave",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-25",
+      "dia_semana": "dom",
+      "fase": "Regreso, todo suave",
+      "tipo_dia": "C",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-26",
+      "dia_semana": "lun",
+      "fase": "Construcción",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-27",
+      "dia_semana": "mar",
+      "fase": "Construcción",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-28",
+      "dia_semana": "mié",
+      "fase": "Construcción",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-29",
+      "dia_semana": "jue",
+      "fase": "Construcción",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-30",
+      "dia_semana": "vie",
+      "fase": "Construcción",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-10-31",
+      "dia_semana": "sáb",
+      "fase": "Construcción",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-01",
+      "dia_semana": "dom",
+      "fase": "Construcción",
+      "tipo_dia": "C",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-02",
+      "dia_semana": "lun",
+      "fase": "Pico + medio maratón",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-03",
+      "dia_semana": "mar",
+      "fase": "Pico + medio maratón",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-04",
+      "dia_semana": "mié",
+      "fase": "Pico + medio maratón",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-05",
+      "dia_semana": "jue",
+      "fase": "Pico + medio maratón",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-06",
+      "dia_semana": "vie",
+      "fase": "Pico + medio maratón",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-07",
+      "dia_semana": "sáb",
+      "fase": "Pico + medio maratón",
+      "tipo_dia": "C",
+      "sin_deficit": true,
+      "nota": "Víspera del medio maratón: comer como día C completo, sin recortar."
+    },
+    {
+      "fecha": "2026-11-08",
+      "dia_semana": "dom",
+      "fase": "Pico + medio maratón",
+      "tipo_dia": "C",
+      "sin_deficit": true,
+      "evento": "Medio maratón de prueba (meta 1:37:30)",
+      "nota": "Menú del día de carrera pendiente; usar C sin recortar."
+    },
+    {
+      "fecha": "2026-11-09",
+      "dia_semana": "lun",
+      "fase": "Pico",
+      "tipo_dia": "A",
+      "sin_deficit": false,
+      "nota": "Recuperación después del medio maratón."
+    },
+    {
+      "fecha": "2026-11-10",
+      "dia_semana": "mar",
+      "fase": "Pico",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-11",
+      "dia_semana": "mié",
+      "fase": "Pico",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-12",
+      "dia_semana": "jue",
+      "fase": "Pico",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-13",
+      "dia_semana": "vie",
+      "fase": "Pico",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-14",
+      "dia_semana": "sáb",
+      "fase": "Pico",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-15",
+      "dia_semana": "dom",
+      "fase": "Pico",
+      "tipo_dia": "C",
+      "sin_deficit": true,
+      "evento": "Tirada larga de 27 km",
+      "nota": "C ampliado pendiente (~9 g/kg de carbohidrato, gel cada 30–40 min). Mientras, C sin recortar."
+    },
+    {
+      "fecha": "2026-11-16",
+      "dia_semana": "lun",
+      "fase": "Pico",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-17",
+      "dia_semana": "mar",
+      "fase": "Pico",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-18",
+      "dia_semana": "mié",
+      "fase": "Pico",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-19",
+      "dia_semana": "jue",
+      "fase": "Pico",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-20",
+      "dia_semana": "vie",
+      "fase": "Pico",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-21",
+      "dia_semana": "sáb",
+      "fase": "Pico",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-22",
+      "dia_semana": "dom",
+      "fase": "Pico",
+      "tipo_dia": "C",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-23",
+      "dia_semana": "lun",
+      "fase": "Afinamiento",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-24",
+      "dia_semana": "mar",
+      "fase": "Afinamiento",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-25",
+      "dia_semana": "mié",
+      "fase": "Afinamiento",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-26",
+      "dia_semana": "jue",
+      "fase": "Afinamiento",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-27",
+      "dia_semana": "vie",
+      "fase": "Afinamiento",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-28",
+      "dia_semana": "sáb",
+      "fase": "Afinamiento",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-29",
+      "dia_semana": "dom",
+      "fase": "Afinamiento",
+      "tipo_dia": "C",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-11-30",
+      "dia_semana": "lun",
+      "fase": "Afinamiento",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-01",
+      "dia_semana": "mar",
+      "fase": "Afinamiento",
+      "tipo_dia": "D",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-02",
+      "dia_semana": "mié",
+      "fase": "Afinamiento",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-03",
+      "dia_semana": "jue",
+      "fase": "Afinamiento",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-04",
+      "dia_semana": "vie",
+      "fase": "Afinamiento",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-05",
+      "dia_semana": "sáb",
+      "fase": "Afinamiento",
+      "tipo_dia": "A",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-06",
+      "dia_semana": "dom",
+      "fase": "Afinamiento",
+      "tipo_dia": "C",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-07",
+      "dia_semana": "lun",
+      "fase": "Semana de carrera",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-08",
+      "dia_semana": "mar",
+      "fase": "Semana de carrera",
+      "tipo_dia": "D",
+      "sin_deficit": false,
+      "nota": "Sesión de calidad corta."
+    },
+    {
+      "fecha": "2026-12-09",
+      "dia_semana": "mié",
+      "fase": "Semana de carrera",
+      "tipo_dia": "B",
+      "sin_deficit": false
+    },
+    {
+      "fecha": "2026-12-10",
+      "dia_semana": "jue",
+      "fase": "Semana de carrera",
+      "tipo_dia": "A",
+      "sin_deficit": true,
+      "nota": "A sin déficit (3 días antes del maratón)."
+    },
+    {
+      "fecha": "2026-12-11",
+      "dia_semana": "vie",
+      "fase": "Semana de carrera",
+      "tipo_dia": "PENDIENTE",
+      "sin_deficit": true,
+      "evento": "Carga de carbohidrato",
+      "nota": "Menú de carga pendiente (10–12 g/kg)."
+    },
+    {
+      "fecha": "2026-12-12",
+      "dia_semana": "sáb",
+      "fase": "Semana de carrera",
+      "tipo_dia": "PENDIENTE",
+      "sin_deficit": true,
+      "evento": "Carga de carbohidrato",
+      "nota": "Menú de carga pendiente (10–12 g/kg)."
+    },
+    {
+      "fecha": "2026-12-13",
+      "dia_semana": "dom",
+      "fase": "Semana de carrera",
+      "tipo_dia": "PENDIENTE",
+      "sin_deficit": true,
+      "evento": "Maratón de Monterrey",
+      "nota": "Menú del día de carrera pendiente."
+    }
+  ]
+}

@@ -1,0 +1,2391 @@
+{
+  "version": "2026-10-21",
+  "tipos_de_dia": [
+    {
+      "codigo": "B",
+      "nombre": "Carrera suave o fuerza pesada",
+      "gasto_estimado_kcal": 2500,
+      "deficit_kcal": 301.0,
+      "comidas": [
+        {
+          "hora": "12:30 PM",
+          "nombre": "Desayuno: overnight oats + kéfir + shake",
+          "items": [
+            {
+              "food_id": "avena",
+              "cantidad": 40,
+              "unidad": "g",
+              "macros": {
+                "kcal": 152.0,
+                "proteina_g": 5.3,
+                "carbohidrato_g": 23.0,
+                "grasa_g": 2.6,
+                "grasa_saturada_g": 0.4,
+                "fibra_g": 4.0,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "chia",
+              "cantidad": 10,
+              "unidad": "g",
+              "macros": {
+                "kcal": 49.0,
+                "proteina_g": 1.7,
+                "carbohidrato_g": 0.8,
+                "grasa_g": 3.1,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 3.4,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "moras",
+              "cantidad": 126,
+              "unidad": "g",
+              "macros": {
+                "kcal": 40.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 8.8,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 6.3,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 120,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 53.0,
+                "proteina_g": 6.5,
+                "carbohidrato_g": 4.1,
+                "grasa_g": 1.2,
+                "grasa_saturada_g": 0.7,
+                "fibra_g": 0.0,
+                "sodio_mg": 40.0
+              }
+            },
+            {
+              "food_id": "kefir",
+              "cantidad": 150,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 57.0,
+                "proteina_g": 5.8,
+                "carbohidrato_g": 5.6,
+                "grasa_g": 1.3,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 77.0
+              }
+            },
+            {
+              "food_id": "whey",
+              "cantidad": 31,
+              "unidad": "g",
+              "macros": {
+                "kcal": 110.0,
+                "proteina_g": 25.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.5,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 190.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 510.0,
+            "proteina_g": 51.0,
+            "carbohidrato_g": 46.7,
+            "grasa_g": 9.8,
+            "grasa_saturada_g": 3.1,
+            "fibra_g": 13.8,
+            "sodio_mg": 353.0
+          }
+        },
+        {
+          "hora": "3:30 PM",
+          "nombre": "Pre-entreno",
+          "items": [
+            {
+              "food_id": "pan",
+              "cantidad": 54,
+              "unidad": "g",
+              "macros": {
+                "kcal": 140.0,
+                "proteina_g": 4.6,
+                "carbohidrato_g": 27.3,
+                "grasa_g": 1.4,
+                "grasa_saturada_g": 0.5,
+                "fibra_g": 1.3,
+                "sodio_mg": 239.0
+              }
+            },
+            {
+              "food_id": "mermelada",
+              "cantidad": 35,
+              "unidad": "g",
+              "macros": {
+                "kcal": 89.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 22.2,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 278.0,
+            "proteina_g": 10.1,
+            "carbohidrato_g": 53.9,
+            "grasa_g": 2.5,
+            "grasa_saturada_g": 1.2,
+            "fibra_g": 1.3,
+            "sodio_mg": 286.0
+          }
+        },
+        {
+          "hora": "5:15 PM",
+          "nombre": "Al terminar de correr",
+          "items": [
+            {
+              "food_id": "multilyte",
+              "cantidad": 1,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 3.0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0.7,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0.3,
+                "sodio_mg": 210
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 3.0,
+            "proteina_g": 0,
+            "carbohidrato_g": 0.7,
+            "grasa_g": 0,
+            "grasa_saturada_g": 0,
+            "fibra_g": 0.3,
+            "sodio_mg": 210
+          }
+        },
+        {
+          "hora": "6:00 PM",
+          "nombre": "Comida de recuperación: spaghetti con carne",
+          "items": [
+            {
+              "food_id": "pasta",
+              "cantidad": 180,
+              "unidad": "g",
+              "macros": {
+                "kcal": 308.0,
+                "proteina_g": 11.7,
+                "carbohidrato_g": 63.2,
+                "grasa_g": 0.9,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 3.8,
+                "sodio_mg": 4.0
+              }
+            },
+            {
+              "food_id": "carne",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 259.0,
+                "proteina_g": 23.4,
+                "carbohidrato_g": 0.1,
+                "grasa_g": 18.4,
+                "grasa_saturada_g": 8.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 61.0
+              }
+            },
+            {
+              "food_id": "pure",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 25.0,
+                "proteina_g": 0.9,
+                "carbohidrato_g": 5.2,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 1.0,
+                "sodio_mg": 308.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 601.0,
+            "proteina_g": 36.0,
+            "carbohidrato_g": 68.5,
+            "grasa_g": 20.4,
+            "grasa_saturada_g": 9.7,
+            "fibra_g": 4.8,
+            "sodio_mg": 373.0
+          }
+        },
+        {
+          "hora": "10:00 PM",
+          "nombre": "Cena: tostadas de pollo",
+          "items": [
+            {
+              "food_id": "tostada",
+              "cantidad": 36,
+              "unidad": "g",
+              "macros": {
+                "kcal": 133.0,
+                "proteina_g": 2.7,
+                "carbohidrato_g": 26.6,
+                "grasa_g": 1.8,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 2.9,
+                "sodio_mg": 107.0
+              }
+            },
+            {
+              "food_id": "pollo",
+              "cantidad": 133,
+              "unidad": "g",
+              "macros": {
+                "kcal": 129.0,
+                "proteina_g": 29.3,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 239.0
+              }
+            },
+            {
+              "food_id": "aguacate",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 192.0,
+                "proteina_g": 2.4,
+                "carbohidrato_g": 2.2,
+                "grasa_g": 17.6,
+                "grasa_saturada_g": 2.6,
+                "fibra_g": 8.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "frijol",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 60.0,
+                "proteina_g": 5.0,
+                "carbohidrato_g": 10.0,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 3.0,
+                "sodio_mg": 570.0
+              }
+            },
+            {
+              "food_id": "lechuga",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 17.0,
+                "proteina_g": 1.2,
+                "carbohidrato_g": 1.2,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 2.1,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 540.0,
+            "proteina_g": 40.6,
+            "carbohidrato_g": 39.9,
+            "grasa_g": 22.0,
+            "grasa_saturada_g": 3.8,
+            "fibra_g": 16.0,
+            "sodio_mg": 933.0
+          }
+        },
+        {
+          "hora": "11:59 PM",
+          "nombre": "Antes de dormir",
+          "items": [
+            {
+              "food_id": "lucky",
+              "cantidad": 30,
+              "unidad": "g",
+              "macros": {
+                "kcal": 120.0,
+                "proteina_g": 2.4,
+                "carbohidrato_g": 24.9,
+                "grasa_g": 1.2,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 1.8,
+                "sodio_mg": 186.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 300,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 132.0,
+                "proteina_g": 16.2,
+                "carbohidrato_g": 10.2,
+                "grasa_g": 3.0,
+                "grasa_saturada_g": 1.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 99.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 252.0,
+            "proteina_g": 18.6,
+            "carbohidrato_g": 35.1,
+            "grasa_g": 4.2,
+            "grasa_saturada_g": 2.1,
+            "fibra_g": 1.8,
+            "sodio_mg": 285.0
+          }
+        },
+        {
+          "hora": "Diario",
+          "nombre": "Suplementos",
+          "items": [
+            {
+              "food_id": "salmon",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 16.0,
+                "proteina_g": 0.5,
+                "carbohidrato_g": 0.2,
+                "grasa_g": 1.4,
+                "grasa_saturada_g": 0.2,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            },
+            {
+              "food_id": "vitc",
+              "cantidad": 0.5,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "magnesio",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 16.0,
+            "proteina_g": 0.5,
+            "carbohidrato_g": 0.2,
+            "grasa_g": 1.4,
+            "grasa_saturada_g": 0.2,
+            "fibra_g": 0.0,
+            "sodio_mg": 0.0
+          }
+        }
+      ],
+      "totales": {
+        "kcal": 2199.0,
+        "proteina_g": 156.7,
+        "carbohidrato_g": 245.0,
+        "grasa_g": 60.3,
+        "grasa_saturada_g": 20.1,
+        "fibra_g": 38.0,
+        "sodio_mg": 2440.0
+      },
+      "proteina_g_por_kg": 2.11,
+      "carbohidrato_g_por_kg": 3.3,
+      "grasa_pct_kcal": 24.7,
+      "micros_totales": {
+        "vitA_ug": 1575.17,
+        "vitC_mg": 1173.37,
+        "vitD_ug": 21.27,
+        "vitE_mg": 11.96,
+        "vitK_ug": 157.71,
+        "tiamina_mg": 2.5,
+        "riboflavina_mg": 3.16,
+        "niacina_mg": 36.0,
+        "b6_mg": 3.52,
+        "folato_ug": 976.43,
+        "b12_ug": 9.22,
+        "colina_mg": 403.47,
+        "calcio_mg": 2182.15,
+        "hierro_mg": 18.12,
+        "magnesio_mg": 758.8,
+        "fosforo_mg": 2248.93,
+        "potasio_mg": 4321.6,
+        "zinc_mg": 23.75,
+        "cobre_mg": 2.05,
+        "selenio_ug": 177.49,
+        "manganeso_mg": 4.83,
+        "ala_g": 2.49,
+        "epa_g": 0.61,
+        "dha_g": 0.41,
+        "epa_dha_g": 1.01
+      }
+    },
+    {
+      "codigo": "A",
+      "nombre": "Descanso o fuerza ligera",
+      "gasto_estimado_kcal": 2350,
+      "deficit_kcal": 255.0,
+      "comidas": [
+        {
+          "hora": "12:30 PM",
+          "nombre": "Desayuno: bagel de huevo",
+          "items": [
+            {
+              "food_id": "bagel",
+              "cantidad": 95,
+              "unidad": "g",
+              "macros": {
+                "kcal": 251.0,
+                "proteina_g": 10.0,
+                "carbohidrato_g": 48.2,
+                "grasa_g": 1.3,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 1.5,
+                "sodio_mg": 401.0
+              }
+            },
+            {
+              "food_id": "huevo",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 143.0,
+                "proteina_g": 12.6,
+                "carbohidrato_g": 0.7,
+                "grasa_g": 9.5,
+                "grasa_saturada_g": 3.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 142.0
+              }
+            },
+            {
+              "food_id": "claras",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 42.0,
+                "proteina_g": 10.0,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 150.0
+              }
+            },
+            {
+              "food_id": "tocino",
+              "cantidad": 8,
+              "unidad": "g",
+              "macros": {
+                "kcal": 37.0,
+                "proteina_g": 2.7,
+                "carbohidrato_g": 0.1,
+                "grasa_g": 2.8,
+                "grasa_saturada_g": 1.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 135.0
+              }
+            },
+            {
+              "food_id": "lechuga",
+              "cantidad": 30,
+              "unidad": "g",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.4,
+                "carbohidrato_g": 0.4,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.6,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "aderezo",
+              "cantidad": 7,
+              "unidad": "g",
+              "macros": {
+                "kcal": 48.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 5.2,
+                "grasa_saturada_g": 0.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 44.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 584.0,
+            "proteina_g": 41.2,
+            "carbohidrato_g": 54.9,
+            "grasa_g": 21.0,
+            "grasa_saturada_g": 6.8,
+            "fibra_g": 2.1,
+            "sodio_mg": 915.0
+          }
+        },
+        {
+          "hora": "3:30 PM",
+          "nombre": "Merienda (sábado: 1 h antes del gimnasio)",
+          "items": [
+            {
+              "food_id": "avena",
+              "cantidad": 30,
+              "unidad": "g",
+              "macros": {
+                "kcal": 114.0,
+                "proteina_g": 4.0,
+                "carbohidrato_g": 17.3,
+                "grasa_g": 2.0,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 3.0,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "chia",
+              "cantidad": 10,
+              "unidad": "g",
+              "macros": {
+                "kcal": 49.0,
+                "proteina_g": 1.7,
+                "carbohidrato_g": 0.8,
+                "grasa_g": 3.1,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 3.4,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "moras",
+              "cantidad": 126,
+              "unidad": "g",
+              "macros": {
+                "kcal": 40.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 8.8,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 6.3,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            },
+            {
+              "food_id": "kefir",
+              "cantidad": 150,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 57.0,
+                "proteina_g": 5.8,
+                "carbohidrato_g": 5.6,
+                "grasa_g": 1.3,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 77.0
+              }
+            },
+            {
+              "food_id": "whey",
+              "cantidad": 15,
+              "unidad": "g",
+              "macros": {
+                "kcal": 53.0,
+                "proteina_g": 12.1,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.2,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 92.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 513.0,
+            "proteina_g": 37.0,
+            "carbohidrato_g": 64.5,
+            "grasa_g": 9.1,
+            "grasa_saturada_g": 3.0,
+            "fibra_g": 15.9,
+            "sodio_mg": 249.0
+          }
+        },
+        {
+          "hora": "6:00 PM",
+          "nombre": "Comida: pollo con arroz",
+          "items": [
+            {
+              "food_id": "pollo",
+              "cantidad": 133,
+              "unidad": "g",
+              "macros": {
+                "kcal": 129.0,
+                "proteina_g": 29.3,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 239.0
+              }
+            },
+            {
+              "food_id": "arroz",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 156.0,
+                "proteina_g": 3.2,
+                "carbohidrato_g": 33.4,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.5,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "aguacate",
+              "cantidad": 50,
+              "unidad": "g",
+              "macros": {
+                "kcal": 80.0,
+                "proteina_g": 1.0,
+                "carbohidrato_g": 0.9,
+                "grasa_g": 7.3,
+                "grasa_saturada_g": 1.1,
+                "fibra_g": 3.4,
+                "sodio_mg": 4.0
+              }
+            },
+            {
+              "food_id": "lechuga",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 17.0,
+                "proteina_g": 1.2,
+                "carbohidrato_g": 1.2,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 2.1,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "aderezo",
+              "cantidad": 7,
+              "unidad": "g",
+              "macros": {
+                "kcal": 48.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 5.2,
+                "grasa_saturada_g": 0.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 44.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 439.0,
+            "proteina_g": 34.8,
+            "carbohidrato_g": 35.5,
+            "grasa_g": 15.6,
+            "grasa_saturada_g": 2.9,
+            "fibra_g": 5.9,
+            "sodio_mg": 297.0
+          }
+        },
+        {
+          "hora": "10:00 PM",
+          "nombre": "Cena: tostadas de atún",
+          "items": [
+            {
+              "food_id": "tostada",
+              "cantidad": 36,
+              "unidad": "g",
+              "macros": {
+                "kcal": 133.0,
+                "proteina_g": 2.7,
+                "carbohidrato_g": 26.6,
+                "grasa_g": 1.8,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 2.9,
+                "sodio_mg": 107.0
+              }
+            },
+            {
+              "food_id": "atun",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 93.0,
+                "proteina_g": 21.4,
+                "carbohidrato_g": 1.3,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 229.0
+              }
+            },
+            {
+              "food_id": "aguacate",
+              "cantidad": 30,
+              "unidad": "g",
+              "macros": {
+                "kcal": 48.0,
+                "proteina_g": 0.6,
+                "carbohidrato_g": 0.5,
+                "grasa_g": 4.4,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 2.0,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "lechuga",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 17.0,
+                "proteina_g": 1.2,
+                "carbohidrato_g": 1.2,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 2.1,
+                "sodio_mg": 8.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 291.0,
+            "proteina_g": 25.9,
+            "carbohidrato_g": 29.6,
+            "grasa_g": 6.8,
+            "grasa_saturada_g": 1.1,
+            "fibra_g": 7.0,
+            "sodio_mg": 346.0
+          }
+        },
+        {
+          "hora": "11:59 PM",
+          "nombre": "Antes de dormir",
+          "items": [
+            {
+              "food_id": "lucky",
+              "cantidad": 30,
+              "unidad": "g",
+              "macros": {
+                "kcal": 120.0,
+                "proteina_g": 2.4,
+                "carbohidrato_g": 24.9,
+                "grasa_g": 1.2,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 1.8,
+                "sodio_mg": 186.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 300,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 132.0,
+                "proteina_g": 16.2,
+                "carbohidrato_g": 10.2,
+                "grasa_g": 3.0,
+                "grasa_saturada_g": 1.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 99.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 252.0,
+            "proteina_g": 18.6,
+            "carbohidrato_g": 35.1,
+            "grasa_g": 4.2,
+            "grasa_saturada_g": 2.1,
+            "fibra_g": 1.8,
+            "sodio_mg": 285.0
+          }
+        },
+        {
+          "hora": "Diario",
+          "nombre": "Suplementos",
+          "items": [
+            {
+              "food_id": "salmon",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 16.0,
+                "proteina_g": 0.5,
+                "carbohidrato_g": 0.2,
+                "grasa_g": 1.4,
+                "grasa_saturada_g": 0.2,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            },
+            {
+              "food_id": "vitc",
+              "cantidad": 0.5,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "magnesio",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 16.0,
+            "proteina_g": 0.5,
+            "carbohidrato_g": 0.2,
+            "grasa_g": 1.4,
+            "grasa_saturada_g": 0.2,
+            "fibra_g": 0.0,
+            "sodio_mg": 0.0
+          }
+        }
+      ],
+      "totales": {
+        "kcal": 2095.0,
+        "proteina_g": 158.0,
+        "carbohidrato_g": 219.8,
+        "grasa_g": 58.0,
+        "grasa_saturada_g": 16.1,
+        "fibra_g": 32.8,
+        "sodio_mg": 2092.0
+      },
+      "proteina_g_por_kg": 2.13,
+      "carbohidrato_g_por_kg": 2.96,
+      "grasa_pct_kcal": 24.9,
+      "micros_totales": {
+        "vitA_ug": 2169.16,
+        "vitC_mg": 1066.8,
+        "vitD_ug": 13.76,
+        "vitE_mg": 16.55,
+        "vitK_ug": 300.29,
+        "tiamina_mg": 2.34,
+        "riboflavina_mg": 3.68,
+        "niacina_mg": 35.78,
+        "b6_mg": 3.61,
+        "folato_ug": 1011.54,
+        "b12_ug": 8.45,
+        "colina_mg": 696.96,
+        "calcio_mg": 2162.46,
+        "hierro_mg": 17.94,
+        "magnesio_mg": 702.74,
+        "fosforo_mg": 2250.01,
+        "potasio_mg": 4108.28,
+        "zinc_mg": 16.52,
+        "cobre_mg": 1.62,
+        "selenio_ug": 225.31,
+        "manganeso_mg": 4.59,
+        "ala_g": 3.22,
+        "epa_g": 0.69,
+        "dha_g": 0.63,
+        "epa_dha_g": 1.32
+      }
+    },
+    {
+      "codigo": "C",
+      "nombre": "Tirada larga",
+      "gasto_estimado_kcal": 3300,
+      "deficit_kcal": 99.0,
+      "comidas": [
+        {
+          "hora": "12:30 PM",
+          "nombre": "Desayuno: overnight oats grandes + kéfir + shake",
+          "items": [
+            {
+              "food_id": "avena",
+              "cantidad": 70,
+              "unidad": "g",
+              "macros": {
+                "kcal": 265.0,
+                "proteina_g": 9.2,
+                "carbohidrato_g": 40.3,
+                "grasa_g": 4.6,
+                "grasa_saturada_g": 0.8,
+                "fibra_g": 7.1,
+                "sodio_mg": 4.0
+              }
+            },
+            {
+              "food_id": "chia",
+              "cantidad": 10,
+              "unidad": "g",
+              "macros": {
+                "kcal": 49.0,
+                "proteina_g": 1.7,
+                "carbohidrato_g": 0.8,
+                "grasa_g": 3.1,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 3.4,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "moras",
+              "cantidad": 126,
+              "unidad": "g",
+              "macros": {
+                "kcal": 40.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 8.8,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 6.3,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 175,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 77.0,
+                "proteina_g": 9.5,
+                "carbohidrato_g": 6.0,
+                "grasa_g": 1.8,
+                "grasa_saturada_g": 1.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 58.0
+              }
+            },
+            {
+              "food_id": "kefir",
+              "cantidad": 150,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 57.0,
+                "proteina_g": 5.8,
+                "carbohidrato_g": 5.6,
+                "grasa_g": 1.3,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 77.0
+              }
+            },
+            {
+              "food_id": "whey",
+              "cantidad": 31,
+              "unidad": "g",
+              "macros": {
+                "kcal": 110.0,
+                "proteina_g": 25.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.5,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 190.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 754.0,
+            "proteina_g": 59.2,
+            "carbohidrato_g": 90.1,
+            "grasa_g": 12.7,
+            "grasa_saturada_g": 3.9,
+            "fibra_g": 20.0,
+            "sodio_mg": 374.0
+          }
+        },
+        {
+          "hora": "3:00 PM",
+          "nombre": "Pre-entreno",
+          "items": [
+            {
+              "food_id": "pan",
+              "cantidad": 54,
+              "unidad": "g",
+              "macros": {
+                "kcal": 140.0,
+                "proteina_g": 4.6,
+                "carbohidrato_g": 27.3,
+                "grasa_g": 1.4,
+                "grasa_saturada_g": 0.5,
+                "fibra_g": 1.3,
+                "sodio_mg": 239.0
+              }
+            },
+            {
+              "food_id": "mermelada",
+              "cantidad": 40,
+              "unidad": "g",
+              "macros": {
+                "kcal": 101.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 25.3,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 397.0,
+            "proteina_g": 11.4,
+            "carbohidrato_g": 81.3,
+            "grasa_g": 2.9,
+            "grasa_saturada_g": 1.3,
+            "fibra_g": 4.4,
+            "sodio_mg": 288.0
+          }
+        },
+        {
+          "hora": "4:00 PM",
+          "nombre": "Durante la tirada",
+          "items": [
+            {
+              "food_id": "gel",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 200,
+                "proteina_g": 0,
+                "carbohidrato_g": 50,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            },
+            {
+              "food_id": "multilyte",
+              "cantidad": 1,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 3.0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0.7,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0.3,
+                "sodio_mg": 210
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 203.0,
+            "proteina_g": 0,
+            "carbohidrato_g": 50.7,
+            "grasa_g": 0,
+            "grasa_saturada_g": 0,
+            "fibra_g": 0.3,
+            "sodio_mg": 210
+          }
+        },
+        {
+          "hora": "5:45 PM",
+          "nombre": "Licuado de recuperación",
+          "items": [
+            {
+              "food_id": "leche",
+              "cantidad": 200,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 88.0,
+                "proteina_g": 10.8,
+                "carbohidrato_g": 6.8,
+                "grasa_g": 2.0,
+                "grasa_saturada_g": 1.2,
+                "fibra_g": 0.0,
+                "sodio_mg": 66.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "miel",
+              "cantidad": 42,
+              "unidad": "g",
+              "macros": {
+                "kcal": 134.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 33.6,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 329.0,
+            "proteina_g": 12.1,
+            "carbohidrato_g": 64.6,
+            "grasa_g": 2.4,
+            "grasa_saturada_g": 1.3,
+            "fibra_g": 3.1,
+            "sodio_mg": 67.0
+          }
+        },
+        {
+          "hora": "7:30 PM",
+          "nombre": "Comida: ramen de atún y camarón",
+          "items": [
+            {
+              "food_id": "maruchan",
+              "cantidad": 585,
+              "unidad": "g",
+              "macros": {
+                "kcal": 366.0,
+                "proteina_g": 8.2,
+                "carbohidrato_g": 50.3,
+                "grasa_g": 14.6,
+                "grasa_saturada_g": 7.0,
+                "fibra_g": 2.9,
+                "sodio_mg": 1620.0
+              }
+            },
+            {
+              "food_id": "atun",
+              "cantidad": 200,
+              "unidad": "g",
+              "macros": {
+                "kcal": 186.0,
+                "proteina_g": 42.7,
+                "carbohidrato_g": 2.6,
+                "grasa_g": 0.6,
+                "grasa_saturada_g": 0.2,
+                "fibra_g": 0.0,
+                "sodio_mg": 457.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 552.0,
+            "proteina_g": 50.9,
+            "carbohidrato_g": 52.9,
+            "grasa_g": 15.2,
+            "grasa_saturada_g": 7.2,
+            "fibra_g": 2.9,
+            "sodio_mg": 2078.0
+          }
+        },
+        {
+          "hora": "10:30 PM",
+          "nombre": "Cena: spaghetti con carne + ensalada de lechuga y aguacate",
+          "items": [
+            {
+              "food_id": "pasta",
+              "cantidad": 200,
+              "unidad": "g",
+              "macros": {
+                "kcal": 342.0,
+                "proteina_g": 13.0,
+                "carbohidrato_g": 70.2,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 4.2,
+                "sodio_mg": 4.0
+              }
+            },
+            {
+              "food_id": "carne",
+              "cantidad": 80,
+              "unidad": "g",
+              "macros": {
+                "kcal": 173.0,
+                "proteina_g": 15.6,
+                "carbohidrato_g": 0.1,
+                "grasa_g": 12.2,
+                "grasa_saturada_g": 5.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 41.0
+              }
+            },
+            {
+              "food_id": "pure",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 25.0,
+                "proteina_g": 0.9,
+                "carbohidrato_g": 5.2,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 1.0,
+                "sodio_mg": 308.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "lechuga",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 17.0,
+                "proteina_g": 1.2,
+                "carbohidrato_g": 1.2,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 2.1,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "aguacate",
+              "cantidad": 80,
+              "unidad": "g",
+              "macros": {
+                "kcal": 128.0,
+                "proteina_g": 1.6,
+                "carbohidrato_g": 1.4,
+                "grasa_g": 11.8,
+                "grasa_saturada_g": 1.7,
+                "fibra_g": 5.4,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "aderezo",
+              "cantidad": 7,
+              "unidad": "g",
+              "macros": {
+                "kcal": 48.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 5.2,
+                "grasa_saturada_g": 0.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 44.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 742.0,
+            "proteina_g": 32.4,
+            "carbohidrato_g": 78.1,
+            "grasa_g": 31.6,
+            "grasa_saturada_g": 9.3,
+            "fibra_g": 12.7,
+            "sodio_mg": 411.0
+          }
+        },
+        {
+          "hora": "11:59 PM",
+          "nombre": "Antes de dormir",
+          "items": [
+            {
+              "food_id": "lucky",
+              "cantidad": 30,
+              "unidad": "g",
+              "macros": {
+                "kcal": 120.0,
+                "proteina_g": 2.4,
+                "carbohidrato_g": 24.9,
+                "grasa_g": 1.2,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 1.8,
+                "sodio_mg": 186.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 200,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 88.0,
+                "proteina_g": 10.8,
+                "carbohidrato_g": 6.8,
+                "grasa_g": 2.0,
+                "grasa_saturada_g": 1.2,
+                "fibra_g": 0.0,
+                "sodio_mg": 66.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 208.0,
+            "proteina_g": 13.2,
+            "carbohidrato_g": 31.7,
+            "grasa_g": 3.2,
+            "grasa_saturada_g": 1.5,
+            "fibra_g": 1.8,
+            "sodio_mg": 252.0
+          }
+        },
+        {
+          "hora": "Diario",
+          "nombre": "Suplementos",
+          "items": [
+            {
+              "food_id": "salmon",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 16.0,
+                "proteina_g": 0.5,
+                "carbohidrato_g": 0.2,
+                "grasa_g": 1.4,
+                "grasa_saturada_g": 0.2,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            },
+            {
+              "food_id": "vitc",
+              "cantidad": 0.5,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "magnesio",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 16.0,
+            "proteina_g": 0.5,
+            "carbohidrato_g": 0.2,
+            "grasa_g": 1.4,
+            "grasa_saturada_g": 0.2,
+            "fibra_g": 0.0,
+            "sodio_mg": 0.0
+          }
+        }
+      ],
+      "totales": {
+        "kcal": 3201.0,
+        "proteina_g": 179.7,
+        "carbohidrato_g": 449.7,
+        "grasa_g": 69.4,
+        "grasa_saturada_g": 24.8,
+        "fibra_g": 45.2,
+        "sodio_mg": 3680.0
+      },
+      "proteina_g_por_kg": 2.42,
+      "carbohidrato_g_por_kg": 6.05,
+      "grasa_pct_kcal": 19.5,
+      "micros_totales": {
+        "vitA_ug": 1782.45,
+        "vitC_mg": 1201.26,
+        "vitD_ug": 23.32,
+        "vitE_mg": 15.16,
+        "vitK_ug": 169.4,
+        "tiamina_mg": 2.94,
+        "riboflavina_mg": 3.73,
+        "niacina_mg": 41.35,
+        "b6_mg": 4.02,
+        "folato_ug": 1086.54,
+        "b12_ug": 13.3,
+        "colina_mg": 496.14,
+        "calcio_mg": 2423.96,
+        "hierro_mg": 22.88,
+        "magnesio_mg": 882.99,
+        "fosforo_mg": 2655.96,
+        "potasio_mg": 5483.81,
+        "zinc_mg": 24.28,
+        "cobre_mg": 2.6,
+        "selenio_ug": 299.93,
+        "manganeso_mg": 7.15,
+        "ala_g": 2.9,
+        "epa_g": 0.77,
+        "dha_g": 0.74,
+        "epa_dha_g": 1.5
+      }
+    },
+    {
+      "codigo": "D",
+      "nombre": "Calidad (tempo o ritmo de maratón)",
+      "gasto_estimado_kcal": 2800,
+      "deficit_kcal": 8.0,
+      "comidas": [
+        {
+          "hora": "12:30 PM",
+          "nombre": "Desayuno: overnight oats + kéfir + shake",
+          "items": [
+            {
+              "food_id": "avena",
+              "cantidad": 60,
+              "unidad": "g",
+              "macros": {
+                "kcal": 227.0,
+                "proteina_g": 7.9,
+                "carbohidrato_g": 34.6,
+                "grasa_g": 3.9,
+                "grasa_saturada_g": 0.7,
+                "fibra_g": 6.1,
+                "sodio_mg": 4.0
+              }
+            },
+            {
+              "food_id": "chia",
+              "cantidad": 10,
+              "unidad": "g",
+              "macros": {
+                "kcal": 49.0,
+                "proteina_g": 1.7,
+                "carbohidrato_g": 0.8,
+                "grasa_g": 3.1,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 3.4,
+                "sodio_mg": 2.0
+              }
+            },
+            {
+              "food_id": "moras",
+              "cantidad": 126,
+              "unidad": "g",
+              "macros": {
+                "kcal": 40.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 8.8,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 6.3,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "miel",
+              "cantidad": 21,
+              "unidad": "g",
+              "macros": {
+                "kcal": 67.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 16.8,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 150,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 66.0,
+                "proteina_g": 8.1,
+                "carbohidrato_g": 5.1,
+                "grasa_g": 1.5,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 50.0
+              }
+            },
+            {
+              "food_id": "kefir",
+              "cantidad": 150,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 57.0,
+                "proteina_g": 5.8,
+                "carbohidrato_g": 5.6,
+                "grasa_g": 1.3,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 77.0
+              }
+            },
+            {
+              "food_id": "whey",
+              "cantidad": 31,
+              "unidad": "g",
+              "macros": {
+                "kcal": 110.0,
+                "proteina_g": 25.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.5,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 190.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 773.0,
+            "proteina_g": 56.5,
+            "carbohidrato_g": 100.3,
+            "grasa_g": 11.8,
+            "grasa_saturada_g": 3.6,
+            "fibra_g": 19.0,
+            "sodio_mg": 365.0
+          }
+        },
+        {
+          "hora": "3:00 PM",
+          "nombre": "Pre-entreno (1.5 h antes)",
+          "items": [
+            {
+              "food_id": "pan",
+              "cantidad": 54,
+              "unidad": "g",
+              "macros": {
+                "kcal": 140.0,
+                "proteina_g": 4.6,
+                "carbohidrato_g": 27.3,
+                "grasa_g": 1.4,
+                "grasa_saturada_g": 0.5,
+                "fibra_g": 1.3,
+                "sodio_mg": 239.0
+              }
+            },
+            {
+              "food_id": "mermelada",
+              "cantidad": 40,
+              "unidad": "g",
+              "macros": {
+                "kcal": 101.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 25.3,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 397.0,
+            "proteina_g": 11.4,
+            "carbohidrato_g": 81.3,
+            "grasa_g": 2.9,
+            "grasa_saturada_g": 1.3,
+            "fibra_g": 4.4,
+            "sodio_mg": 288.0
+          }
+        },
+        {
+          "hora": "4:30 PM",
+          "nombre": "Durante la sesión",
+          "items": [
+            {
+              "food_id": "multilyte",
+              "cantidad": 1,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 3.0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0.7,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0.3,
+                "sodio_mg": 210
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 3.0,
+            "proteina_g": 0,
+            "carbohidrato_g": 0.7,
+            "grasa_g": 0,
+            "grasa_saturada_g": 0,
+            "fibra_g": 0.3,
+            "sodio_mg": 210
+          }
+        },
+        {
+          "hora": "6:00 PM",
+          "nombre": "Comida de recuperación: spaghetti con carne",
+          "items": [
+            {
+              "food_id": "pasta",
+              "cantidad": 230,
+              "unidad": "g",
+              "macros": {
+                "kcal": 393.0,
+                "proteina_g": 14.9,
+                "carbohidrato_g": 80.7,
+                "grasa_g": 1.1,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 4.8,
+                "sodio_mg": 5.0
+              }
+            },
+            {
+              "food_id": "carne",
+              "cantidad": 90,
+              "unidad": "g",
+              "macros": {
+                "kcal": 194.0,
+                "proteina_g": 17.6,
+                "carbohidrato_g": 0.1,
+                "grasa_g": 13.8,
+                "grasa_saturada_g": 6.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 46.0
+              }
+            },
+            {
+              "food_id": "pure",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 25.0,
+                "proteina_g": 0.9,
+                "carbohidrato_g": 5.2,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 1.0,
+                "sodio_mg": 308.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 622.0,
+            "proteina_g": 33.4,
+            "carbohidrato_g": 86.0,
+            "grasa_g": 16.0,
+            "grasa_saturada_g": 7.5,
+            "fibra_g": 5.8,
+            "sodio_mg": 359.0
+          }
+        },
+        {
+          "hora": "10:00 PM",
+          "nombre": "Cena: tostadas de pollo con arroz",
+          "items": [
+            {
+              "food_id": "tostada",
+              "cantidad": 48,
+              "unidad": "g",
+              "macros": {
+                "kcal": 177.0,
+                "proteina_g": 3.6,
+                "carbohidrato_g": 35.4,
+                "grasa_g": 2.4,
+                "grasa_saturada_g": 0.4,
+                "fibra_g": 3.8,
+                "sodio_mg": 143.0
+              }
+            },
+            {
+              "food_id": "pollo",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 97.0,
+                "proteina_g": 22.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 180.0
+              }
+            },
+            {
+              "food_id": "arroz",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 130.0,
+                "proteina_g": 2.7,
+                "carbohidrato_g": 27.8,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.4,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "aguacate",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 192.0,
+                "proteina_g": 2.4,
+                "carbohidrato_g": 2.2,
+                "grasa_g": 17.6,
+                "grasa_saturada_g": 2.6,
+                "fibra_g": 8.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "frijol",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 60.0,
+                "proteina_g": 5.0,
+                "carbohidrato_g": 10.0,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 3.0,
+                "sodio_mg": 570.0
+              }
+            },
+            {
+              "food_id": "lechuga",
+              "cantidad": 100,
+              "unidad": "g",
+              "macros": {
+                "kcal": 17.0,
+                "proteina_g": 1.2,
+                "carbohidrato_g": 1.2,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 2.1,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "aderezo",
+              "cantidad": 7,
+              "unidad": "g",
+              "macros": {
+                "kcal": 48.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 5.2,
+                "grasa_saturada_g": 0.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 44.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 730.0,
+            "proteina_g": 36.9,
+            "carbohidrato_g": 76.6,
+            "grasa_g": 27.8,
+            "grasa_saturada_g": 4.8,
+            "fibra_g": 17.4,
+            "sodio_mg": 954.0
+          }
+        },
+        {
+          "hora": "11:59 PM",
+          "nombre": "Antes de dormir",
+          "items": [
+            {
+              "food_id": "lucky",
+              "cantidad": 30,
+              "unidad": "g",
+              "macros": {
+                "kcal": 120.0,
+                "proteina_g": 2.4,
+                "carbohidrato_g": 24.9,
+                "grasa_g": 1.2,
+                "grasa_saturada_g": 0.3,
+                "fibra_g": 1.8,
+                "sodio_mg": 186.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 300,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 132.0,
+                "proteina_g": 16.2,
+                "carbohidrato_g": 10.2,
+                "grasa_g": 3.0,
+                "grasa_saturada_g": 1.8,
+                "fibra_g": 0.0,
+                "sodio_mg": 99.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 252.0,
+            "proteina_g": 18.6,
+            "carbohidrato_g": 35.1,
+            "grasa_g": 4.2,
+            "grasa_saturada_g": 2.1,
+            "fibra_g": 1.8,
+            "sodio_mg": 285.0
+          }
+        },
+        {
+          "hora": "Diario",
+          "nombre": "Suplementos",
+          "items": [
+            {
+              "food_id": "salmon",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 16.0,
+                "proteina_g": 0.5,
+                "carbohidrato_g": 0.2,
+                "grasa_g": 1.4,
+                "grasa_saturada_g": 0.2,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            },
+            {
+              "food_id": "vitc",
+              "cantidad": 0.5,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "magnesio",
+              "cantidad": 2,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0,
+                "sodio_mg": 0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 16.0,
+            "proteina_g": 0.5,
+            "carbohidrato_g": 0.2,
+            "grasa_g": 1.4,
+            "grasa_saturada_g": 0.2,
+            "fibra_g": 0.0,
+            "sodio_mg": 0.0
+          }
+        }
+      ],
+      "totales": {
+        "kcal": 2792.0,
+        "proteina_g": 157.4,
+        "carbohidrato_g": 380.2,
+        "grasa_g": 64.1,
+        "grasa_saturada_g": 19.5,
+        "fibra_g": 48.6,
+        "sodio_mg": 2461.0
+      },
+      "proteina_g_por_kg": 2.12,
+      "carbohidrato_g_por_kg": 5.12,
+      "grasa_pct_kcal": 20.7,
+      "micros_totales": {
+        "vitA_ug": 1599.48,
+        "vitC_mg": 1194.8,
+        "vitD_ug": 21.41,
+        "vitE_mg": 12.43,
+        "vitK_ug": 170.6,
+        "tiamina_mg": 3.0,
+        "riboflavina_mg": 3.44,
+        "niacina_mg": 36.26,
+        "b6_mg": 4.27,
+        "folato_ug": 1209.47,
+        "b12_ug": 8.66,
+        "colina_mg": 408.08,
+        "calcio_mg": 2308.13,
+        "hierro_mg": 21.13,
+        "magnesio_mg": 877.58,
+        "fosforo_mg": 2408.9,
+        "potasio_mg": 5222.67,
+        "zinc_mg": 24.74,
+        "cobre_mg": 2.46,
+        "selenio_ug": 198.38,
+        "manganeso_mg": 6.93,
+        "ala_g": 2.97,
+        "epa_g": 0.61,
+        "dha_g": 0.4,
+        "epa_dha_g": 1.01
+      }
+    }
+  ]
+}

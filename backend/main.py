@@ -731,6 +731,27 @@ def get_training_context(db: Session = Depends(get_db)):
     return engine.compute_context(db)
 
 
+@app.get("/nutrition/today")
+def get_nutrition_today(db: Session = Depends(get_db)):
+    """Today's menu from the nutrition package (services/nutrition.py). Reads
+    the stored week only — never generates one — so a missing or failed plan
+    falls back to the calendar instead of failing. A bad package is a 503 for
+    this card, not a backend that won't boot."""
+    from datetime import timedelta
+    from backend.models.database import WeeklyPlan
+    from backend.services import nutrition
+    from backend.utils.timezone import get_local_now
+
+    now = get_local_now()
+    today = now.date()
+    week_start = today - timedelta(days=today.weekday())
+    record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == week_start).order_by(WeeklyPlan.id.desc()).first()
+    try:
+        return nutrition.today_menu(today, now, record.plan_json if record else None)
+    except nutrition.NutritionPackageError as e:
+        raise HTTPException(status_code=503, detail=f"Nutrition package: {e}")
+
+
 @app.get("/block-calendar")
 def get_block_calendar(db: Session = Depends(get_db)):
     """Return the full training block calendar from start to race."""

@@ -1,0 +1,267 @@
+{
+  "version": "2026-10-21",
+  "metas": {
+    "perfil": {
+      "edad": 22,
+      "sexo": "masculino",
+      "estatura_cm": 170,
+      "peso_kg": 74.3,
+      "masa_magra_kg_supuesta": 61,
+      "objetivo": "Perder grasa con déficit ligero (~300 kcal/día en promedio) mientras prepara el Maratón de Monterrey (13 dic 2026, meta sub-3:20)"
+    },
+    "macros": {
+      "proteina_g_por_kg_min": 2.0,
+      "grasa_pct_kcal_min": 20,
+      "fibra_g": 38,
+      "carbohidrato_g_por_kg": {
+        "A": [
+          3,
+          5
+        ],
+        "B": [
+          3,
+          5
+        ],
+        "D": [
+          5,
+          7
+        ],
+        "C": [
+          6,
+          10
+        ],
+        "carga": [
+          10,
+          12
+        ]
+      }
+    },
+    "micros": {
+      "vitA_ug": {
+        "meta": 900,
+        "limite_superior": null
+      },
+      "vitC_mg": {
+        "meta": 90,
+        "limite_superior": 2000
+      },
+      "vitD_ug": {
+        "meta": 15,
+        "limite_superior": 100
+      },
+      "vitE_mg": {
+        "meta": 15,
+        "limite_superior": null
+      },
+      "vitK_ug": {
+        "meta": 120,
+        "limite_superior": null
+      },
+      "tiamina_mg": {
+        "meta": 1.2,
+        "limite_superior": null
+      },
+      "riboflavina_mg": {
+        "meta": 1.3,
+        "limite_superior": null
+      },
+      "niacina_mg": {
+        "meta": 16,
+        "limite_superior": null
+      },
+      "b6_mg": {
+        "meta": 1.3,
+        "limite_superior": 100
+      },
+      "folato_ug": {
+        "meta": 400,
+        "limite_superior": null
+      },
+      "b12_ug": {
+        "meta": 2.4,
+        "limite_superior": null
+      },
+      "colina_mg": {
+        "meta": 550,
+        "limite_superior": 3500
+      },
+      "calcio_mg": {
+        "meta": 1000,
+        "limite_superior": 2500
+      },
+      "hierro_mg": {
+        "meta": 8,
+        "limite_superior": 45
+      },
+      "magnesio_mg": {
+        "meta": 400,
+        "limite_superior": null
+      },
+      "fosforo_mg": {
+        "meta": 700,
+        "limite_superior": 4000
+      },
+      "potasio_mg": {
+        "meta": 3400,
+        "limite_superior": null
+      },
+      "zinc_mg": {
+        "meta": 11,
+        "limite_superior": 40
+      },
+      "cobre_mg": {
+        "meta": 0.9,
+        "limite_superior": 10
+      },
+      "selenio_ug": {
+        "meta": 55,
+        "limite_superior": 400
+      },
+      "manganeso_mg": {
+        "meta": 2.3,
+        "limite_superior": 11
+      },
+      "ala_g": {
+        "meta": 1.6,
+        "limite_superior": null
+      },
+      "epa_dha_g": {
+        "meta": 0.5,
+        "limite_superior": null
+      }
+    },
+    "notas_limites": {
+      "magnesio_mg": "El límite de 350 mg aplica solo a magnesio de suplementos y fortificados (glicinato B Life + óxido de Isopure + carbonato de Multilyte); el de los alimentos no cuenta.",
+      "folato_ug": "El límite de 1,000 µg aplica solo al ácido fólico añadido.",
+      "niacina_mg": "El límite de 35 mg aplica solo a la niacina añadida.",
+      "vitA_ug": "El límite de 3,000 µg aplica solo a la vitamina A preformada.",
+      "colina_mg": "Bajo la meta los días B, C y D por falta de huevo; aceptado por el usuario por ahora."
+    },
+    "fuentes": [
+      "DRI de NASEM publicadas por Health Canada (vitaminas, minerales, macronutrientes)",
+      "Postura conjunta AND/DC/ACSM 2016, Nutrition and Athletic Performance",
+      "ISSN: proteína y ejercicio (2017), tiempos de nutrientes (2017), cafeína (2021)",
+      "USDA SR Legacy (valores de alimentos sin etiqueta)",
+      "NOM-051-SCFI/SSA1-2010, Tabla 2 de VNR (conversión de %VNR de etiquetas)"
+    ]
+  },
+  "suplementos": [
+    {
+      "id": "salmon",
+      "nombre": "Aceite de salmón noruego AllNature",
+      "dosis": "2 cápsulas al día",
+      "aporta": "1.0 g EPA + DHA"
+    },
+    {
+      "id": "vitc",
+      "nombre": "Vitamina C efervescente Kirkland",
+      "dosis": "½ comprimido al día (1,000 mg)",
+      "aporta": "1,000 mg vitamina C"
+    },
+    {
+      "id": "magnesio",
+      "nombre": "Glicinato de magnesio B Life",
+      "dosis": "2 cápsulas con la cena (204 mg elemental)",
+      "aporta": "204 mg magnesio"
+    },
+    {
+      "id": "creatina",
+      "nombre": "Creatina monohidratada",
+      "dosis": "5 g al día",
+      "aporta": "Sin calorías"
+    },
+    {
+      "id": "ashwagandha",
+      "nombre": "Ashwagandha Youtheory (KSM-66)",
+      "dosis": "1 cápsula al día (½ porción de etiqueta)",
+      "aporta": "300 mg extracto KSM-66"
+    },
+    {
+      "id": "multilyte",
+      "nombre": "Multilyte (electrolitos)",
+      "dosis": "1 tableta en días con sesión (B, C, D); al sudar mucho",
+      "aporta": "210 mg sodio, 303 mg potasio, 10 µg vitamina D"
+    },
+    {
+      "id": "whey",
+      "nombre": "Proteína Isopure Zero Carb",
+      "dosis": "Máximo 1 scoop al día (por el límite de magnesio)",
+      "aporta": "25 g proteína por scoop"
+    }
+  ],
+  "reglas": [
+    {
+      "id": "pesaje",
+      "regla": "Pesarse cada lunes en ayunas. Meta: bajar 0.25–0.4 kg por semana."
+    },
+    {
+      "id": "sin_bajar",
+      "regla": "Si no baja en 3 semanas: arroz cocido de los días A a 80 g."
+    },
+    {
+      "id": "baja_rapido",
+      "regla": "Si baja más de 0.5 kg por semana dos semanas seguidas: regresar plátano 120 g al desayuno de los días B."
+    },
+    {
+      "id": "intocables",
+      "regla": "En cualquier ajuste no se recortan el pre-entreno, la comida de recuperación ni los geles."
+    },
+    {
+      "id": "freno",
+      "regla": "Si la HRV o la FC durmiendo empeoran dos semanas seguidas: una semana casi a mantenimiento (agregar plátano 120 g al desayuno y miel 42 g a la toma de la noche)."
+    },
+    {
+      "id": "sin_deficit",
+      "regla": "Los días marcados sin_deficit se comen completos, sin recortar."
+    },
+    {
+      "id": "calcio_domingo",
+      "regla": "El día C queda en 2,424 de 2,500 mg de calcio: no agregar lácteos ese día."
+    },
+    {
+      "id": "cafeina",
+      "regla": "Espresso: 4 shots al día, todos antes de las 5 PM (2 en el desayuno y 2 en el pre-entreno)."
+    },
+    {
+      "id": "pesar",
+      "regla": "Carne y pollo se pesan crudos; arroz y pasta, ya cocidos."
+    }
+  ],
+  "meal_prep": {
+    "sesiones": [
+      {
+        "dia": "domingo",
+        "cubre": [
+          "dom",
+          "lun",
+          "mar",
+          "mié"
+        ],
+        "pollo_crudo_g": 366,
+        "carne_molida_cruda_g": 410,
+        "arroz_cocido_g": 100,
+        "pasta_cocida_g": 790
+      },
+      {
+        "dia": "miércoles",
+        "cubre": [
+          "jue",
+          "vie",
+          "sáb"
+        ],
+        "pollo_crudo_g": 366,
+        "carne_molida_cruda_g": 90,
+        "arroz_cocido_g": 340,
+        "pasta_cocida_g": 230
+      }
+    ],
+    "nota": "Cantidades para una semana con calidad martes y jueves. Lo cocido dura 3–4 días en refrigeración. Overnight oats: avena, chía, moras y leche en frasco la noche anterior; plátano y miel al servir."
+  },
+  "pendientes": [
+    "Menú del C ampliado (tirada de 27 km, 15 nov), de carga (11–12 dic) y de los días de carrera (8 nov y 13 dic).",
+    "Confirmar qué días son de calidad (supuesto: martes y jueves desde el 26 oct).",
+    "Proporción real de atún y camarón en el atún Dolores (afecta solo micronutrientes).",
+    "Disponibilidad de energía (~28–33 kcal por kg de masa magra con el déficit); alternativa en discusión: sacar parte del déficit con pasos.",
+    "Masa magra medida (hoy supuesta en 61 kg) y análisis de sangre (ferritina, hemoglobina, vitamina D)."
+  ]
+}
