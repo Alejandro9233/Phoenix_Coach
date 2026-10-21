@@ -117,7 +117,7 @@ struct FuelSheet: View {
                     if let k = t.kcal { DS.HeroNumeral(value: FuelFormat.kcal(k), unit: "kcal", size: 22) }
                     Spacer(minLength: 0)
                     DS.MonoLabel(text: [("P", t.proteinG), ("C", t.carbsG), ("F", t.fatG)]
-                        .compactMap { l, v in v.map { "\(l) \(FuelFormat.amount($0)) g" } }
+                        .compactMap { l, v in v.map { "\(l) \(FuelFormat.kcal($0)) g" } }
                         .joined(separator: " · "))
                 }
             }
