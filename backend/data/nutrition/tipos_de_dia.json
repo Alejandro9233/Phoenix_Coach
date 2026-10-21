@@ -694,7 +694,7 @@
         },
         {
           "hora": "3:30 PM",
-          "nombre": "Merienda (sábado: 1 h antes del gimnasio)",
+          "nombre": "Merienda (si hay gimnasio, 1 h antes)",
           "items": [
             {
               "food_id": "avena",
