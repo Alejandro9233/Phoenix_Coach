@@ -57,23 +57,39 @@ struct FuelRow: View {
     }
 }
 
-/// The whole day's menu: meals in time order, grams, raw/cooked tags.
+/// The whole day's menu as a timeline rail (fuel-sheet round 1, V1): time,
+/// dot, meal. One meal open at a time, the next one to start (round 2: V4's
+/// chevron + blur-in, with V2's accordion). Supplements close the day.
 struct FuelSheet: View {
     let day: NutritionDay
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var open: Int?
+
+    private var meals: [NutritionMeal] { day.meals ?? [] }
+
+    init(day: NutritionDay) {
+        self.day = day
+        _open = State(initialValue: day.nextMealIndex)
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 DS.Colors.background.ignoresSafeArea()
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: DS.Spacing.section) {
+                    VStack(alignment: .leading, spacing: DS.Spacing.xxl) {
                         header
-                        ForEach(Array((day.meals ?? []).enumerated()), id: \.offset) { i, meal in
-                            mealCard(meal, isNext: i == day.nextMealIndex)
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(meals.enumerated()), id: \.offset) { i, meal in
+                                railRow(i, meal)
+                            }
                         }
                         if let sups = day.supplements, !sups.isEmpty {
-                            itemsCard(label: "Supplements", items: sups)
+                            VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                                DS.SectionLabel(text: "Supplements")
+                                ForEach(Array(sups.enumerated()), id: \.offset) { _, item in itemLine(item) }
+                            }
                         }
                     }
                     .padding(.horizontal, DS.Spacing.page)
@@ -100,83 +116,121 @@ struct FuelSheet: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.m) {
-                Text(day.dayType ?? "")
-                    .font(.system(size: 36, weight: .ultraLight))
-                    .foregroundStyle(.white)
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.m) {
+            Text(day.dayType ?? "")
+                .font(.system(size: 36, weight: .ultraLight))
+                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                 Text(day.dayName ?? "")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
-            }
-            if let reason = day.reason {
-                DS.MonoLabel(text: day.source == "plan" ? "From today's plan · \(reason)" : reason)
-            }
-            if let t = day.totals {
-                HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.m) {
-                    if let k = t.kcal { DS.HeroNumeral(value: FuelFormat.kcal(k), unit: "kcal", size: 22) }
-                    Spacer(minLength: 0)
-                    DS.MonoLabel(text: [("P", t.proteinG), ("C", t.carbsG), ("F", t.fatG)]
-                        .compactMap { l, v in v.map { "\(l) \(FuelFormat.kcal($0)) g" } }
-                        .joined(separator: " · "))
+                DS.MonoLabel(text: totalsLine)
+                if let reason = day.reason {
+                    DS.MonoLabel(text: day.source == "plan" ? "From today's plan · \(reason)" : reason)
                 }
-            }
-            if let note = day.note {
-                Text(note)
-                    .font(.footnote)
-                    .foregroundStyle(DS.Colors.onSurface)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
-    }
-
-    private func mealCard(_ meal: NutritionMeal, isNext: Bool) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
-                DS.MonoLabel(text: meal.time, color: .white)
-                if isNext { DS.MonoLabel(text: "Next") }
-                Spacer(minLength: 0)
-                if let k = meal.totals.kcal { DS.MonoLabel(text: "\(FuelFormat.kcal(k)) kcal") }
-            }
-            Text(meal.name)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
-            itemRows(meal.items)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
-        .accessibilityElement(children: .combine)
-    }
-
-    private func itemsCard(label: String, items: [NutritionItem]) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.m) {
-            DS.SectionLabel(text: label)
-            itemRows(items)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
-    }
-
-    private func itemRows(_ items: [NutritionItem]) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.s) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
-                    Text(item.name)
-                        .font(.system(size: 13))
+                if let note = day.note {
+                    Text(note)
+                        .font(.footnote)
                         .foregroundStyle(DS.Colors.onSurface)
                         .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: DS.Spacing.s)
-                    if let w = item.weigh { DS.MonoLabel(text: w) }
-                    Text("\(FuelFormat.amount(item.amount)) \(item.unit)")
-                        .font(.system(size: 13))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
                 }
             }
         }
+    }
+
+    private var totalsLine: String {
+        guard let t = day.totals else { return "" }
+        var parts: [String] = []
+        if let k = t.kcal { parts.append("\(FuelFormat.kcal(k)) kcal") }
+        for (label, value) in [("P", t.proteinG), ("C", t.carbsG), ("F", t.fatG)] {
+            if let v = value { parts.append("\(label) \(FuelFormat.kcal(v)) g") }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func toggle(_ i: Int) {
+        withAnimation(DS.Animation.normal) { open = open == i ? nil : i }
+    }
+
+    private func railRow(_ i: Int, _ meal: NutritionMeal) -> some View {
+        let isOpen = open == i
+        let next = day.nextMealIndex
+        let isPast = next.map { i < $0 } ?? true
+        return HStack(alignment: .top, spacing: DS.Spacing.m) {
+            DS.MonoLabel(text: meal.time, color: i == next ? .white : DS.Colors.outline)
+                .frame(width: 64, alignment: .leading)
+                .padding(.top, headerInset + 3)
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(i == next ? Color.white : (isPast ? Color.white.opacity(0.5) : DS.Colors.background))
+                    .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
+                    .frame(width: 8, height: 8)
+                    .padding(.top, headerInset + 6)
+                if i < meals.count - 1 {
+                    Rectangle().fill(Color.white.opacity(0.12)).frame(width: 1)
+                }
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Button { toggle(i) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
+                        Text(meal.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(isPast ? DS.Colors.onSurface : .white)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: DS.Spacing.s)
+                        if let k = meal.totals.kcal { DS.MonoLabel(text: FuelFormat.kcal(k)) }
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(DS.Colors.outline)
+                            .rotationEffect(.degrees(isOpen ? 180 : 0))
+                    }
+                    // The 44pt target is padding around the name, not
+                    // space under it, so an open meal's foods sit close.
+                    .padding(.vertical, headerInset)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(meal.time), \(meal.name)\(i == next ? ", next" : "")")
+                .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
+                if isOpen {
+                    VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                        ForEach(Array(meal.items.enumerated()), id: \.offset) { _, item in itemLine(item) }
+                    }
+                    .transition(reduceMotion
+                        ? .opacity
+                        : .modifier(active: BlurIn(radius: 6), identity: BlurIn(radius: 0)))
+                }
+            }
+            .padding(.bottom, isOpen ? DS.Spacing.l : 0)
+        }
+        .clipped()
+    }
+
+    private let headerInset = DS.Spacing.m
+
+    private func itemLine(_ item: NutritionItem) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
+            Text(item.name)
+                .font(.system(size: 13))
+                .foregroundStyle(DS.Colors.onSurface)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: DS.Spacing.s)
+            if let w = item.weigh { DS.MonoLabel(text: w) }
+            Text("\(FuelFormat.amount(item.amount)) \(item.unit)")
+                .font(.system(size: 13))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Arrives blurred and clear-faded, sharpens in place (fuel-sheet round 2, V4).
+private struct BlurIn: ViewModifier {
+    let radius: CGFloat
+    func body(content: Content) -> some View {
+        content.blur(radius: radius).opacity(radius == 0 ? 1 : 0)
     }
 }
 

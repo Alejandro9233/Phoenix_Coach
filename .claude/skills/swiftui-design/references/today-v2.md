@@ -79,9 +79,12 @@ of this session's working tree; the pieces are reusable as-is.
 - Hairline row under the session card, no card: `Fuel · B` label · next meal
   `3:30 PM · Pre-entreno` 13 semibold · mono `278 kcal · day 2,199` (+ `estimate`
   when the week has no plan) · chevron. "Day done" after the last meal.
-- Tap → `FuelSheet` (sheet scaffold): day letter + name, where the type came
-  from, day kcal + P/C/F, then one glass card per meal (time, Next, kcal,
-  items with grams and a raw/cooked tag), supplements last.
+- Tap → `FuelSheet` (sheet scaffold, fuel-sheet rounds 1–2): day letter + name,
+  day kcal + P/C/F, where the type came from; then a **timeline rail**, no cards —
+  time · dot (next filled white, past half, future hollow) · meal name + kcal +
+  chevron. **One meal open at a time**, the next one by default; foods arrive
+  blurred and sharpen (opacity only under Reduce Motion), grams right-aligned,
+  raw/cooked tag. Supplements close the sheet.
 - Hidden when /nutrition/today has no day type or fails. Data and rules:
   backend/services/nutrition.py.
 
