@@ -15,6 +15,8 @@ struct TodayView: View {
     /// /training-context: the engine's recovery check (the readiness ring)
     /// and where we are in the block (the timeline row).
     @State private var trainingContext: TrainingContext?
+    @State private var nutrition: NutritionDay?
+    @Environment(\.scenePhase) private var scenePhase
     
     @State private var isLoading = false
     @State private var isSyncing = false
@@ -278,6 +280,11 @@ struct TodayView: View {
                                 RestDayCard(note: todayDayPlan?.coachNote, onAskCoach: askCoach)
                             }
 
+                            if let nutrition, nutrition.dayType != nil {
+                                FuelRow(day: nutrition)
+                                    .transition(.opacity)
+                            }
+
                             if let progress = planStatus?.weekProgress {
                                 WeekCard(progress: progress)
                             }
@@ -381,6 +388,13 @@ struct TodayView: View {
                 DeepSyncActivity.shared.endStale()
                 if weeklyPlan == nil {
                     await loadInitialData()
+                }
+            }
+            // The next meal moves with the clock; back from the background,
+            // re-read it (one cheap GET, no plan generation).
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active, weeklyPlan != nil {
+                    Task { await fetchNutrition() }
                 }
             }
             // Posted when another tab rewrites the plan — confirming an injury
@@ -869,7 +883,23 @@ struct TodayView: View {
         async let statusTask: () = fetchPlanStatus()
         async let ctxTask: () = fetchTrainingContext()
         _ = await (dashTask, planTask, statusTask, ctxTask)
+        // After the plan: on Monday the week may have just been generated,
+        // and the fuel day type is read from it.
+        await fetchNutrition()
         endSync()
+    }
+
+    /// Today's menu for the fuel row. Read-only and never generates a plan;
+    /// any failure (bad package, offline) just leaves the row out.
+    private func fetchNutrition() async {
+        let day = try? await network.fetchNutritionToday()
+        await MainActor.run {
+            if (nutrition == nil) != (day == nil) {
+                withAnimation(DS.Animation.normal) { nutrition = day }
+            } else {
+                nutrition = day
+            }
+        }
     }
 
     /// The readiness ring and the timeline row. Cheap on the server (DB and
@@ -1093,6 +1123,7 @@ struct TodayView: View {
         async let statusTask: () = fetchPlanStatus()
         async let ctxTask: () = fetchTrainingContext()
         _ = await (dashTask, planTask, statusTask, ctxTask)
+        await fetchNutrition()
     }
     
     private func errorView(_ error: String) -> some View {

@@ -253,6 +253,13 @@ extension DS {
         }
     }
 
+    /// 1pt rule at white 0.08: the hairline rows on Today (timeline, fuel).
+    struct Hairline: View {
+        var body: some View {
+            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+        }
+    }
+
     /// Thin progress bar: 3pt capsule, white on white 0.08.
     struct ThinBar: View {
         let fraction: Double

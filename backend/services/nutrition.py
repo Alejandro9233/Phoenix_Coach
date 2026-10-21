@@ -136,6 +136,20 @@ def day_type_from_plan(plan_day: dict | None) -> tuple:
     return best, why
 
 
+def weigh_state(note: str | None) -> str | None:
+    """How the package's grams are meant: "raw", "cooked" or "prepared".
+    The notes are long Spanish provenance text ("Valores por 100 g CRUDA...");
+    the sheet shows only this tag, never the note."""
+    n = (note or "").upper()
+    if "CRUD" in n:
+        return "raw"
+    if "COCID" in n:
+        return "cooked"
+    if "PREPARAD" in n:
+        return "prepared"
+    return None
+
+
 def _item_view(item: dict, foods: dict) -> dict:
     food = foods[item["food_id"]]
     pieza = food.get("pieza") or None
@@ -146,6 +160,7 @@ def _item_view(item: dict, foods: dict) -> dict:
         "amount": amount,
         "unit": food.get("unidad") if item.get("unidad") == "unidad" else item.get("unidad"),
         "note": food.get("nota"),
+        "weigh": weigh_state(food.get("nota")),
     }
     if pieza and pieza.get("peso") and isinstance(amount, (int, float)):
         out["pieces"] = round(amount / pieza["peso"], 1)

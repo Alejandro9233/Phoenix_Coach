@@ -47,7 +47,7 @@ enum BreakfastReminder {
         var body = breakfast.items
             .map { "\($0.name) \(amount($0.amount)) \($0.unit)" }
             .joined(separator: ", ")
-        if day.source == "calendar", day.reason?.hasPrefix("No plan") == true {
+        if day.isEstimate {
             body += "\nCalendar estimate: this week has no plan yet."
         }
         content.body = body

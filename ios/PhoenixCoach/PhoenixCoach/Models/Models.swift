@@ -1276,11 +1276,18 @@ struct NutritionDay: Codable {
     let dayName: String?
     let source: String?
     let reason: String?
+    let event: String?
+    let note: String?
+    let totals: NutritionTotals?
     let meals: [NutritionMeal]?
+    let supplements: [NutritionItem]?
     let nextMealIndex: Int?
 
+    /// No stored plan for the week: the calendar's guess, shown as such.
+    var isEstimate: Bool { source == "calendar" && reason?.hasPrefix("No plan") == true }
+
     enum CodingKeys: String, CodingKey {
-        case date, source, reason, meals
+        case date, source, reason, event, note, totals, meals, supplements
         case dayType = "day_type"
         case dayName = "day_name"
         case nextMealIndex = "next_meal_index"
@@ -1301,9 +1308,11 @@ struct NutritionItem: Codable {
     let unit: String
     let pieces: Double?
     let pieceName: String?
+    /// "raw" / "cooked" / "prepared": how the grams are weighed.
+    let weigh: String?
 
     enum CodingKeys: String, CodingKey {
-        case name, amount, unit, pieces
+        case name, amount, unit, pieces, weigh
         case foodId = "food_id"
         case pieceName = "piece_name"
     }
@@ -1313,10 +1322,12 @@ struct NutritionTotals: Codable {
     let kcal: Double?
     let proteinG: Double?
     let carbsG: Double?
+    let fatG: Double?
 
     enum CodingKeys: String, CodingKey {
         case kcal
         case proteinG = "protein_g"
         case carbsG = "carbs_g"
+        case fatG = "fat_g"
     }
 }

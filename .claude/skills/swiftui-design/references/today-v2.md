@@ -75,6 +75,16 @@ of this session's working tree; the pieces are reusable as-is.
 - `Sessions` label + six segments (done white, rest white 0.10) + `4 / 6`.
 - **Run km keeper row**: label · 3pt bar · `18.4 / 32` mono. (keepers.md)
 
+## 3b. Fuel (nutrition round, 2026-10-21, V3)
+- Hairline row under the session card, no card: `Fuel · B` label · next meal
+  `3:30 PM · Pre-entreno` 13 semibold · mono `278 kcal · day 2,199` (+ `estimate`
+  when the week has no plan) · chevron. "Day done" after the last meal.
+- Tap → `FuelSheet` (sheet scaffold): day letter + name, where the type came
+  from, day kcal + P/C/F, then one glass card per meal (time, Next, kcal,
+  items with grams and a raw/cooked tag), supplements last.
+- Hidden when /nutrition/today has no day type or fails. Data and rules:
+  backend/services/nutrition.py.
+
 ## 4. Training timeline
 - Hairline row: label + 14-tick week strip (done ticks white, current tick
   taller) + chevron; beneath, `Build · week 6 of 14 · race in 8 wk` mono.

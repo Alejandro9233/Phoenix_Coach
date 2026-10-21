@@ -153,6 +153,8 @@ def test_menu_shape():
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     pollo = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "pollo")
     assert "CRUDA" in pollo["note"]
+    weigh = {i["food_id"]: i["weigh"] for m in menu["meals"] for i in m["items"]}
+    assert (weigh["pollo"], weigh["carne"], weigh["pasta"], weigh["avena"]) == ("raw", "raw", "cooked", None)
     assert {s["food_id"] for s in menu["supplements"]} == {"salmon", "vitc", "magnesio"}
 
 

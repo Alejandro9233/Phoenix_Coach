@@ -29,7 +29,7 @@ struct TimelineRow: View {
     var body: some View {
         NavigationLink(destination: BlockCalendarView()) {
             VStack(spacing: DS.Spacing.m) {
-                hairline
+                DS.Hairline()
                 VStack(alignment: .leading, spacing: DS.Spacing.s) {
                     HStack(spacing: DS.Spacing.m) {
                         DS.SectionLabel(text: "Training timeline")
@@ -50,15 +50,11 @@ struct TimelineRow: View {
                     }
                     DS.MonoLabel(text: line, color: .white)
                 }
-                hairline
+                DS.Hairline()
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Training timeline. \(line)")
-    }
-
-    private var hairline: some View {
-        Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
     }
 }
