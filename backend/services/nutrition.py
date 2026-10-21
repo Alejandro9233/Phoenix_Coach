@@ -76,6 +76,7 @@ def load_package(data_dir: Path = DATA_DIR) -> dict:
     types = {t["codigo"]: t for t in _read("tipos_de_dia.json", data_dir).get("tipos_de_dia") or []}
     calendar_doc = _read("calendario.json", data_dir)
     calendar = {d["fecha"]: d for d in calendar_doc.get("dias") or []}
+    supplements = _read("metas_y_reglas.json", data_dir).get("suplementos") or []
 
     missing = [c for c in DAY_TYPES if c not in types]
     if missing:
@@ -99,8 +100,17 @@ def load_package(data_dir: Path = DATA_DIR) -> dict:
     for fecha, d in calendar.items():
         if d.get("tipo_dia") not in types and d.get("tipo_dia") != PENDING:
             raise NutritionPackageError(f"calendar {fecha}: unknown day type {d.get('tipo_dia')!r}")
+    # The daily list: every supplement in metas_y_reglas except those the
+    # menus already schedule inside a meal (Isopure at breakfast, Multilyte
+    # after a session). The day types' own "Diario" block only carries the
+    # ones with nutrients to count, so creatine and ashwagandha were never
+    # shown (Alex, 2026-10-21).
+    in_meals = {i.get("food_id") for t in types.values() for m in t.get("comidas") or []
+                if m.get("hora") != "Diario" for i in m.get("items") or []}
+    daily = [{"id": s.get("id"), "name": s.get("nombre"), "dose": s.get("dosis")}
+             for s in supplements if s.get("id") not in in_meals]
     return {"foods": foods, "types": types, "calendar": calendar,
-            "version": calendar_doc.get("version")}
+            "daily_supplements": daily, "version": calendar_doc.get("version")}
 
 
 def package() -> dict:
@@ -240,5 +250,6 @@ def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | Non
         "meals": meals,
         "next_meal_index": next_index,
         "supplements": [_item_view(i, pkg["foods"]) for m in daily for i in m.get("items") or []],
+        "daily_supplements": pkg.get("daily_supplements") or [],
         "package_version": pkg.get("version"),
     }

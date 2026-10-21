@@ -158,6 +158,15 @@ def test_menu_shape():
     assert {s["food_id"] for s in menu["supplements"]} == {"salmon", "vitc", "magnesio"}
 
 
+def test_daily_supplements_list_every_one_not_already_in_a_meal():
+    # Creatine and ashwagandha carry no nutrients, so no menu lists them;
+    # Isopure and Multilyte are scheduled inside meals already.
+    menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
+    daily = {s["id"]: s for s in menu["daily_supplements"]}
+    assert set(daily) == {"salmon", "vitc", "magnesio", "creatina", "ashwagandha"}
+    assert daily["ashwagandha"]["dose"].startswith("1 cápsula")
+
+
 # --- package checks ---------------------------------------------------------
 
 def _broken_copy(tmp_path, mutate):
