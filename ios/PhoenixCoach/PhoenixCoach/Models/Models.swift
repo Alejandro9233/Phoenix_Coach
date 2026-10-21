@@ -1281,6 +1281,9 @@ struct NutritionDay: Codable {
     let totals: NutritionTotals?
     let meals: [NutritionMeal]?
     let supplements: [NutritionItem]?
+    /// Every daily supplement with its dose, creatine and ashwagandha
+    /// included (the menus only carry the ones with nutrients).
+    let dailySupplements: [NutritionSupplement]?
     let nextMealIndex: Int?
 
     /// No stored plan for the week: the calendar's guess, shown as such.
@@ -1291,7 +1294,14 @@ struct NutritionDay: Codable {
         case dayType = "day_type"
         case dayName = "day_name"
         case nextMealIndex = "next_meal_index"
+        case dailySupplements = "daily_supplements"
     }
+}
+
+struct NutritionSupplement: Codable {
+    let id: String
+    let name: String
+    let dose: String?
 }
 
 struct NutritionMeal: Codable {

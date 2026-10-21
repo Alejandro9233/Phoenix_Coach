@@ -85,10 +85,10 @@ struct FuelSheet: View {
                                 railRow(i, meal)
                             }
                         }
-                        if let sups = day.supplements, !sups.isEmpty {
-                            VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                        if let sups = day.dailySupplements, !sups.isEmpty {
+                            VStack(alignment: .leading, spacing: DS.Spacing.m) {
                                 DS.SectionLabel(text: "Supplements")
-                                ForEach(Array(sups.enumerated()), id: \.offset) { _, item in itemLine(item) }
+                                ForEach(sups, id: \.id) { sup in supplementLine(sup) }
                             }
                         }
                     }
@@ -208,6 +208,21 @@ struct FuelSheet: View {
     }
 
     private let headerInset = DS.Spacing.m
+
+    private func supplementLine(_ sup: NutritionSupplement) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(sup.name)
+                .font(.system(size: 13))
+                .foregroundStyle(.white)
+            if let dose = sup.dose {
+                Text(dose)
+                    .font(.system(size: 11))
+                    .foregroundStyle(DS.Colors.outline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
 
     private func itemLine(_ item: NutritionItem) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
