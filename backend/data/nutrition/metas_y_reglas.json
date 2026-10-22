@@ -215,6 +215,14 @@
       "regla": "Los días marcados sin_deficit se comen completos, sin recortar."
     },
     {
+      "id": "vispera_tirada",
+      "regla": "La víspera de una tirada larga de 2 h o más se come menú D (no A). Primera vez: sábado 14 nov, antes de los 27 km."
+    },
+    {
+      "id": "estrategia",
+      "regla": "Rendimiento primero hasta el medio maratón del 8 nov: déficit solo en días A y B (~170 kcal/día en semanas de Construcción). Sin recortes extra; el freno es la regla sin_bajar."
+    },
+    {
       "id": "calcio_domingo",
       "regla": "El día C queda en 2,426 de 2,500 mg de calcio: no agregar lácteos ese día."
     },

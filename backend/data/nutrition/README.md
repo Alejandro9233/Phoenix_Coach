@@ -56,6 +56,7 @@ Están en `metas_y_reglas.json → reglas`. Las que se pueden automatizar:
 - **Freno por recuperación:** si la HRV o la frecuencia cardíaca durmiendo empeoran dos semanas seguidas, una semana casi a mantenimiento: +plátano 120 g en el desayuno y +miel 42 g en la noche. El usuario usa reloj COROS; si la app ya recibe esos datos, este es el disparador.
 - **Lo que no se recorta nunca:** el pre-entreno, la comida de recuperación y los geles.
 - **Días `sin_deficit: true`:** se comen completos.
+- **Víspera de tirada larga de 2 h o más:** menú D aunque el plan diga descanso o gimnasio (la app lo aplica sola desde el plan).
 - **Límites que no conviene romper al editar:**
   - Calcio del día C (está en 2,426 de 2,500 mg).
   - Magnesio de suplementos: máximo 350 mg al día. Hoy son 204 mg del glicinato, 115 mg por scoop de Isopure y 12.3 mg por tableta de Multilyte; por eso hay **máximo 1 scoop de Isopure al día**.

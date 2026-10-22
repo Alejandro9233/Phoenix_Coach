@@ -14,6 +14,7 @@ the calendar never hears about it. Highest load wins on a two-session day:
   D  any quality session (volume_gate.is_quality)
   B  any other cardio
   A  gym only, or rest (Alex, 2026-10-21: the package eats A on gym days)
+and the day before a long run of 2 h or more eats at least D.
 The calendar still wins on its fixed days — an event, a sin_deficit day, or
 PENDIENTE (no menu yet, eat C) — because the plan can't know "eat a full C
 the day before the half". No stored plan: the calendar's guess, labelled.
@@ -33,7 +34,7 @@ from pathlib import Path
 
 from backend.services.pace_enforcer import classify_run_workout
 from backend.services.plan_normalizer import map_sport
-from backend.services.volume_gate import is_quality
+from backend.services.volume_gate import is_quality, parse_minutes
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "nutrition"
 DAY_TYPES = ("A", "B", "C", "D")
@@ -43,6 +44,11 @@ PENDING_FALLBACK = "C"
 # A meal stays "next" until this long after its time, so the card doesn't
 # skip past breakfast the minute the clock reads 12:31.
 NEXT_MEAL_GRACE = timedelta(minutes=30)
+# The day before a long run this long eats at least D: the glycogen for a
+# 2 h+ run is laid down the day before, and A (the usual Saturday) is the
+# week's lowest-carb menu. Alex, 2026-10-22; first applies Sat 14 Nov,
+# the eve of the 27 km.
+LONG_RUN_EVE_MINUTES = 120
 _TIME_FMT = "%I:%M %p"
 
 
@@ -206,6 +212,26 @@ def _meal_view(meal: dict, foods: dict) -> dict:
     }
 
 
+def _next_plan_day(day: date, plan_json: dict | None) -> dict | None:
+    """Tomorrow's plan day when it is in the same stored week. Sunday's
+    tomorrow is next week's Monday, which isn't stored yet — and the long
+    run is pinned to Sunday, so Saturday is the eve that matters."""
+    tomorrow = day + timedelta(days=1)
+    if tomorrow.weekday() == 0:
+        return None
+    return ((plan_json or {}).get("days") or {}).get(tomorrow.strftime("%A"))
+
+
+def _long_run_minutes(plan_day: dict | None) -> float:
+    """Minutes of the run titled as a long run on this plan day, else 0."""
+    best = 0.0
+    for w in (plan_day or {}).get("workouts") or []:
+        if (isinstance(w, dict) and map_sport(w.get("sport") or "") == "running"
+                and "long run" in (w.get("title") or "").lower()):
+            best = max(best, parse_minutes(w.get("total_time")) or 0.0)
+    return best
+
+
 def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | None = None) -> dict:
     """The /nutrition/today payload for `day`, with the next meal as of `now`
     (local wall time). plan_json is the stored week holding `day`, or None."""
@@ -223,6 +249,9 @@ def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | Non
     elif isinstance(plan_day, dict):
         code, reason = day_type_from_plan(plan_day)
         source = "plan"
+        eve = _long_run_minutes(_next_plan_day(day, plan_json))
+        if eve >= LONG_RUN_EVE_MINUTES and _RANK[code] < _RANK["D"]:
+            code, reason = "D", f"Day before a {eve:.0f} min long run"
     elif cal_type:
         code, source, reason = cal_type, "calendar", "No plan this week: calendar estimate"
     else:

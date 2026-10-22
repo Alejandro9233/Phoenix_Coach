@@ -125,6 +125,45 @@ def test_outside_calendar_with_plan_still_works():
     assert menu["day_type"] == "B"
 
 
+# --- the eve of a long run ---------------------------------------------------
+
+def _long(minutes):
+    w = _w("running", "Long Run", [{"type": "main", "duration": f"{minutes}:00", "zone": 2}])
+    w["total_time"] = f"{minutes} min"
+    return w
+
+
+def _week(**days):
+    return {"week_summary": {}, "days": {name: _day(*ws) for name, ws in days.items()}}
+
+
+SAT = date(2026, 10, 31)   # calendar A, no event
+
+
+def test_eve_of_a_two_hour_long_run_eats_d():
+    menu = today_menu(SAT, datetime(2026, 10, 31, 9, 0),
+                      _week(Saturday=[GYM], Sunday=[_long(140)]), PKG)
+    assert (menu["day_type"], menu["reason"]) == ("D", "Day before a 140 min long run")
+
+
+def test_eve_of_a_shorter_long_run_stays_a():
+    menu = today_menu(SAT, datetime(2026, 10, 31, 9, 0),
+                      _week(Saturday=[GYM], Sunday=[_long(95)]), PKG)
+    assert menu["day_type"] == "A"
+
+
+def test_eve_rule_never_lowers_a_day():
+    menu = today_menu(SAT, datetime(2026, 10, 31, 9, 0),
+                      _week(Saturday=[LONG], Sunday=[_long(140)]), PKG)
+    assert menu["day_type"] == "C"
+
+
+def test_sunday_does_not_look_into_next_week():
+    sun = date(2026, 11, 1)
+    menu = today_menu(sun, datetime(2026, 11, 1, 9, 0), _week(Sunday=[EASY], Monday=[_long(140)]), PKG)
+    assert menu["day_type"] == "B"
+
+
 # --- next meal --------------------------------------------------------------
 
 def _next(hh, mm):
