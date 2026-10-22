@@ -3,7 +3,7 @@
   "tipos_de_dia": [
     {
       "codigo": "B",
-      "nombre": "Carrera suave o fuerza pesada",
+      "nombre": "Carrera suave",
       "gasto_estimado_kcal": 2500,
       "deficit_kcal": 301.0,
       "comidas": [
@@ -23,6 +23,10 @@
                 "grasa_saturada_g": 0.4,
                 "fibra_g": 4.0,
                 "sodio_mg": 2.0
+              },
+              "alternativa": {
+                "food_id": "amaranto",
+                "cantidad": 40
               }
             },
             {
@@ -708,6 +712,10 @@
                 "grasa_saturada_g": 0.3,
                 "fibra_g": 3.0,
                 "sodio_mg": 2.0
+              },
+              "alternativa": {
+                "food_id": "amaranto",
+                "cantidad": 30
               }
             },
             {
@@ -1148,7 +1156,7 @@
       "codigo": "C",
       "nombre": "Tirada larga",
       "gasto_estimado_kcal": 3300,
-      "deficit_kcal": 99.0,
+      "deficit_kcal": 67.0,
       "comidas": [
         {
           "hora": "12:30 PM",
@@ -1166,6 +1174,10 @@
                 "grasa_saturada_g": 0.8,
                 "fibra_g": 7.1,
                 "sodio_mg": 4.0
+              },
+              "alternativa": {
+                "food_id": "amaranto",
+                "cantidad": 70
               }
             },
             {
@@ -1385,13 +1397,13 @@
               "cantidad": 2,
               "unidad": "unidad",
               "macros": {
-                "kcal": 200,
+                "kcal": 200.0,
                 "proteina_g": 0,
                 "carbohidrato_g": 50,
                 "grasa_g": 0,
                 "grasa_saturada_g": 0,
                 "fibra_g": 0,
-                "sodio_mg": 0
+                "sodio_mg": 0.0
               }
             },
             {
@@ -1405,18 +1417,18 @@
                 "grasa_g": 0,
                 "grasa_saturada_g": 0,
                 "fibra_g": 0.3,
-                "sodio_mg": 210
+                "sodio_mg": 210.0
               }
             }
           ],
           "totales": {
             "kcal": 203.0,
-            "proteina_g": 0,
+            "proteina_g": 0.0,
             "carbohidrato_g": 50.7,
-            "grasa_g": 0,
-            "grasa_saturada_g": 0,
+            "grasa_g": 0.0,
+            "grasa_saturada_g": 0.0,
             "fibra_g": 0.3,
-            "sodio_mg": 210
+            "sodio_mg": 210.0
           }
         },
         {
@@ -1595,16 +1607,16 @@
             },
             {
               "food_id": "aguacate",
-              "cantidad": 80,
+              "cantidad": 100,
               "unidad": "g",
               "macros": {
-                "kcal": 128.0,
-                "proteina_g": 1.6,
-                "carbohidrato_g": 1.4,
-                "grasa_g": 11.8,
-                "grasa_saturada_g": 1.7,
-                "fibra_g": 5.4,
-                "sodio_mg": 6.0
+                "kcal": 160.0,
+                "proteina_g": 2.0,
+                "carbohidrato_g": 1.8,
+                "grasa_g": 14.7,
+                "grasa_saturada_g": 2.1,
+                "fibra_g": 6.7,
+                "sodio_mg": 7.0
               }
             },
             {
@@ -1623,13 +1635,13 @@
             }
           ],
           "totales": {
-            "kcal": 742.0,
-            "proteina_g": 32.4,
-            "carbohidrato_g": 78.1,
-            "grasa_g": 31.6,
-            "grasa_saturada_g": 9.3,
-            "fibra_g": 12.7,
-            "sodio_mg": 411.0
+            "kcal": 774.0,
+            "proteina_g": 32.8,
+            "carbohidrato_g": 78.5,
+            "grasa_g": 34.6,
+            "grasa_saturada_g": 9.7,
+            "fibra_g": 14.0,
+            "sodio_mg": 412.0
           }
         },
         {
@@ -1690,7 +1702,7 @@
                 "grasa_g": 1.4,
                 "grasa_saturada_g": 0.2,
                 "fibra_g": 0,
-                "sodio_mg": 0
+                "sodio_mg": 0.0
               }
             },
             {
@@ -1712,13 +1724,13 @@
               "cantidad": 2,
               "unidad": "unidad",
               "macros": {
-                "kcal": 0,
+                "kcal": 0.0,
                 "proteina_g": 0,
                 "carbohidrato_g": 0,
                 "grasa_g": 0,
                 "grasa_saturada_g": 0,
                 "fibra_g": 0,
-                "sodio_mg": 0
+                "sodio_mg": 0.0
               }
             }
           ],
@@ -1734,40 +1746,40 @@
         }
       ],
       "totales": {
-        "kcal": 3201.0,
-        "proteina_g": 179.7,
-        "carbohidrato_g": 449.7,
-        "grasa_g": 69.4,
-        "grasa_saturada_g": 24.8,
-        "fibra_g": 45.2,
-        "sodio_mg": 3680.0
+        "kcal": 3233.0,
+        "proteina_g": 180.1,
+        "carbohidrato_g": 450.1,
+        "grasa_g": 72.3,
+        "grasa_saturada_g": 25.2,
+        "fibra_g": 46.5,
+        "sodio_mg": 3681.0
       },
       "proteina_g_por_kg": 2.42,
-      "carbohidrato_g_por_kg": 6.05,
-      "grasa_pct_kcal": 19.5,
+      "carbohidrato_g_por_kg": 6.06,
+      "grasa_pct_kcal": 20.1,
       "micros_totales": {
-        "vitA_ug": 1782.45,
-        "vitC_mg": 1201.26,
+        "vitA_ug": 1783.85,
+        "vitC_mg": 1203.26,
         "vitD_ug": 23.32,
-        "vitE_mg": 15.16,
-        "vitK_ug": 169.4,
-        "tiamina_mg": 2.94,
-        "riboflavina_mg": 3.73,
-        "niacina_mg": 41.35,
-        "b6_mg": 4.02,
-        "folato_ug": 1086.54,
+        "vitE_mg": 15.58,
+        "vitK_ug": 173.6,
+        "tiamina_mg": 2.95,
+        "riboflavina_mg": 3.76,
+        "niacina_mg": 41.7,
+        "b6_mg": 4.07,
+        "folato_ug": 1102.74,
         "b12_ug": 13.3,
-        "colina_mg": 496.14,
-        "calcio_mg": 2423.96,
-        "hierro_mg": 22.88,
-        "magnesio_mg": 882.99,
-        "fosforo_mg": 2655.96,
-        "potasio_mg": 5483.81,
-        "zinc_mg": 24.28,
-        "cobre_mg": 2.6,
-        "selenio_ug": 299.93,
-        "manganeso_mg": 7.15,
-        "ala_g": 2.9,
+        "colina_mg": 498.98,
+        "calcio_mg": 2426.36,
+        "hierro_mg": 22.99,
+        "magnesio_mg": 888.79,
+        "fosforo_mg": 2666.36,
+        "potasio_mg": 5580.81,
+        "zinc_mg": 24.41,
+        "cobre_mg": 2.64,
+        "selenio_ug": 300.0,
+        "manganeso_mg": 7.18,
+        "ala_g": 2.93,
         "epa_g": 0.77,
         "dha_g": 0.74,
         "epa_dha_g": 1.5
@@ -1795,6 +1807,10 @@
                 "grasa_saturada_g": 0.7,
                 "fibra_g": 6.1,
                 "sodio_mg": 4.0
+              },
+              "alternativa": {
+                "food_id": "amaranto",
+                "cantidad": 60
               }
             },
             {

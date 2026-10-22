@@ -1320,12 +1320,20 @@ struct NutritionItem: Codable {
     let pieceName: String?
     /// "raw" / "cooked" / "prepared": how the grams are weighed.
     let weigh: String?
+    /// A swap at the given amount that needs no recalculation (amaranth for oats).
+    let alternative: NutritionAlternative?
 
     enum CodingKeys: String, CodingKey {
-        case name, amount, unit, pieces, weigh
+        case name, amount, unit, pieces, weigh, alternative
         case foodId = "food_id"
         case pieceName = "piece_name"
     }
+}
+
+struct NutritionAlternative: Codable {
+    let name: String
+    let amount: Double
+    let unit: String
 }
 
 struct NutritionTotals: Codable {

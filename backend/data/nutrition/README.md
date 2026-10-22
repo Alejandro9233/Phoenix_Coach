@@ -12,8 +12,8 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 | Tipo | Cuándo | kcal | Proteína | Carbohidrato | Déficit vs gasto |
 |---|---|---|---|---|---|
 | A | Descanso o fuerza ligera | 2,095 | 158 g | 220 g | −255 |
-| B | Carrera suave o fuerza pesada | 2,199 | 157 g | 245 g | −301 |
-| C | Tirada larga (domingo) | 3,201 | 180 g | 450 g | −99 |
+| B | Carrera suave | 2,199 | 157 g | 245 g | −301 |
+| C | Tirada larga (domingo) | 3,233 | 180 g | 450 g | −67 |
 | D | Sesión de calidad (tempo o ritmo de maratón) | 2,792 | 157 g | 380 g | ~0 |
 
 ## Archivos
@@ -33,6 +33,7 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
   - Si es por unidad: `valor × cantidad`.
 - **Crudo o cocido:** carne molida y pollo se pesan **crudos**; arroz y pasta, **ya cocidos**; la Maruchan es la sopa **preparada** (585 g). Está en `nota` de cada alimento y conviene mostrárselo al usuario.
 - **Carbohidrato:** siempre es **disponible**, sin fibra, como en la etiqueta mexicana (NOM-051). La fibra va aparte.
+- **Alternativas:** un ítem puede traer `alternativa` (`food_id` + `cantidad`): se puede cambiar por ese alimento sin recalcular el día. Hoy: amaranto en lugar de avena, mismos gramos.
 - **Piezas:** `pieza` da equivalencias para mostrar (1 tostada = 12 g, 1 scoop = 31 g, 1 segundo de spray = 0.67 g). La cantidad del plan siempre está en gramos o mililitros.
 - **Fuentes:** `fuente_macros` y `fuente_micros` valen `label` (etiqueta del usuario), `usda`, `label+usda` o `estimate`. Si la app muestra datos, conviene distinguir los estimados.
 - **Claves de micronutrientes:** el sufijo indica la unidad (`vitA_ug`, `calcio_mg`, `ala_g`). `epa_dha_g` en las metas es la suma de `epa_g` + `dha_g`.
@@ -56,7 +57,7 @@ Están en `metas_y_reglas.json → reglas`. Las que se pueden automatizar:
 - **Lo que no se recorta nunca:** el pre-entreno, la comida de recuperación y los geles.
 - **Días `sin_deficit: true`:** se comen completos.
 - **Límites que no conviene romper al editar:**
-  - Calcio del día C (está en 2,424 de 2,500 mg).
+  - Calcio del día C (está en 2,426 de 2,500 mg).
   - Magnesio de suplementos: máximo 350 mg al día. Hoy son 204 mg del glicinato, 115 mg por scoop de Isopure y 12.3 mg por tableta de Multilyte; por eso hay **máximo 1 scoop de Isopure al día**.
   - Vitamina C: el usuario toma ½ comprimido de 2,000 mg.
 

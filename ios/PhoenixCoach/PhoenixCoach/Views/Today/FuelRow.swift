@@ -225,17 +225,24 @@ struct FuelSheet: View {
     }
 
     private func itemLine(_ item: NutritionItem) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
-            Text(item.name)
-                .font(.system(size: 13))
-                .foregroundStyle(DS.Colors.onSurface)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: DS.Spacing.s)
-            if let w = item.weigh { DS.MonoLabel(text: w) }
-            Text("\(FuelFormat.amount(item.amount)) \(item.unit)")
-                .font(.system(size: 13))
-                .monospacedDigit()
-                .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
+                Text(item.name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(DS.Colors.onSurface)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: DS.Spacing.s)
+                if let w = item.weigh { DS.MonoLabel(text: w) }
+                Text("\(FuelFormat.amount(item.amount)) \(item.unit)")
+                    .font(.system(size: 13))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
+            if let alt = item.alternative {
+                Text("o \(alt.name) \(FuelFormat.amount(alt.amount)) \(alt.unit)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(DS.Colors.outline)
+            }
         }
         .accessibilityElement(children: .combine)
     }

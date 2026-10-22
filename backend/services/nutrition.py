@@ -85,8 +85,10 @@ def load_package(data_dir: Path = DATA_DIR) -> dict:
         last = None
         for meal in t.get("comidas") or []:
             for item in meal.get("items") or []:
-                if item.get("food_id") not in foods:
-                    raise NutritionPackageError(f"day {code}: unknown food {item.get('food_id')!r}")
+                alt = (item.get("alternativa") or {}).get("food_id")
+                for fid in (item.get("food_id"), alt):
+                    if fid is not None and fid not in foods:
+                        raise NutritionPackageError(f"day {code}: unknown food {fid!r}")
             if meal.get("hora") == "Diario":
                 continue
             at = _parse_time(meal.get("hora"))
@@ -175,6 +177,11 @@ def _item_view(item: dict, foods: dict) -> dict:
     if pieza and pieza.get("peso") and isinstance(amount, (int, float)):
         out["pieces"] = round(amount / pieza["peso"], 1)
         out["piece_name"] = pieza.get("nombre")
+    alt = item.get("alternativa")
+    if alt:
+        alt_food = foods[alt["food_id"]]
+        out["alternative"] = {"food_id": alt["food_id"], "name": alt_food.get("nombre"),
+                              "amount": alt.get("cantidad"), "unit": alt_food.get("unidad")}
     return out
 
 

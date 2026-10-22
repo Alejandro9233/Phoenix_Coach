@@ -158,6 +158,18 @@ def test_menu_shape():
     assert {s["food_id"] for s in menu["supplements"]} == {"salmon", "vitc", "magnesio"}
 
 
+def test_oats_carry_the_amaranth_alternative_at_the_same_grams():
+    menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
+    oats = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "avena")
+    assert oats["alternative"] == {"food_id": "amaranto", "name": "Amaranto natural", "amount": 40, "unit": "g"}
+    assert all("alternative" not in i for m in menu["meals"] for i in m["items"] if i["food_id"] != "avena")
+
+
+def test_long_run_day_meets_the_fat_floor():
+    # metas: grasa >= 20 % de kcal; C sat at 19.5 % until 2026-10-22 (+20 g aguacate).
+    assert PKG["types"]["C"]["grasa_pct_kcal"] >= 20
+
+
 def test_daily_supplements_list_every_one_not_already_in_a_meal():
     # Creatine and ashwagandha carry no nutrients, so no menu lists them;
     # Isopure and Multilyte are scheduled inside meals already.
