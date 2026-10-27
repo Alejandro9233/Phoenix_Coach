@@ -93,6 +93,19 @@ RACE_WEEK_EASY_CAP_KM = 14.0   # hard-cap headroom above the race distance
 # computed to exactly 30.0 km, one flat step instead of a ramp-down.
 TAPER_RUN_RETAIN = {3: 0.78, 2: 0.62, 1: 0.45}
 TAPER_LONG_RUN_MIN = {3: 110, 2: 80, 1: 50}
+# Weekly run km Alex set by hand for the Dec 13 marathon build (2026-10-27).
+# Volume is the gap to sub-3:20 (Tanda), and the 8% ramp off a 35 km week
+# reaches ~50 km only by the taper. Replaces the ramp target and its hard
+# cap for that Monday's week; a comeback or the race week still win. The
+# Nov 8 half-trial week drops so the trial is run fresh. Keyed to that race:
+# a different race date ignores it.
+RUN_KM_PLAN_RACE = date(2026, 12, 13)
+RUN_KM_PLAN = {
+    date(2026, 10, 26): 50.0,
+    date(2026, 11, 2): 42.0,
+    date(2026, 11, 9): 55.0,
+}
+RUN_KM_PLAN_CAP = 1.05     # hard cap over a planned week's km, as in the taper
 
 # Comeback after a break (_detect_comeback). A break is any week at or under
 # RUN_NOISE_FLOOR_KM. The 3-week ramp window used to be the only memory: 1-2
@@ -1337,6 +1350,7 @@ class PeriodizationEngine:
             phase_id=phase_info["phase"], weeks_to_race=weeks_to_race,
             comeback=comeback,
             peak_long_run_km=peak_long_run_km, weeks_to_peak=weeks_to_peak,
+            race_date=athlete.race_date,
         )
         recovery_note = cycle_info["recovery_note"]
         if comeback_active:
@@ -2059,6 +2073,7 @@ class PeriodizationEngine:
         phase_id: str = None, weeks_to_race: int = None,
         comeback=_DETECT,
         peak_long_run_km: float = None, weeks_to_peak: int = None,
+        race_date: date = None,
     ) -> Optional[dict]:
         """THE weekly run-km target, derived from what the athlete actually ran.
 
@@ -2255,6 +2270,12 @@ class PeriodizationEngine:
             target *= 0.75
             hard_cap *= 0.80
             long_run *= 0.7
+
+        planned_km = RUN_KM_PLAN.get(monday) if race_date == RUN_KM_PLAN_RACE else None
+        if planned_km and not comeback_active and not race_week_km:
+            basis = (f"athlete's planned week: {planned_km:g} km "
+                     f"(the ramp alone gave {target:.1f} km)")
+            target, hard_cap = planned_km, planned_km * RUN_KM_PLAN_CAP
 
         return {
             "run_km_target": round(target, 1),
