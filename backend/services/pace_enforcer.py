@@ -303,7 +303,11 @@ def enforce_paces(plan_json: dict, pace_model: dict, days=None) -> tuple:
 # estimate; a declared figure survives only when its implied pace sits
 # inside the band (±15%). Never touches rides, strength or rest.
 
-DISTANCE_BAND_TOLERANCE = 0.15
+# 15% let the LLM's sea-level km through at the CDMX bands: a 69-min easy
+# run declared 11.7 km (5:54/km) against a 6:35-7:17 band and counted toward
+# the week (2026-10-27). The watch runs by time, so time at the band is the
+# truth; 5% is rounding.
+DISTANCE_BAND_TOLERANCE = 0.05
 DISTANCE_MIN_MINUTES = 5
 
 

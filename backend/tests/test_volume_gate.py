@@ -327,7 +327,7 @@ def test_both_attempts_over_ceiling_repairs_not_502(client, test_db_session, mon
     assert any("over budget" in (s.get("reason") or "") for s in stripped)
 
 
-def test_both_attempts_under_floor_persists_with_warning(client, test_db_session, monkeypatch):
+def test_both_attempts_under_floor_are_filled_to_target(client, test_db_session, monkeypatch):
     thin = _week({"Monday": 5, "Thursday": 5})  # 10 km vs target 40
     fake, calls = _fake_generator([thin])
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", fake)
@@ -336,11 +336,12 @@ def test_both_attempts_under_floor_persists_with_warning(client, test_db_session
     assert response.status_code == 200, response.text
     assert len(calls) == 2  # the soft floor still earns the one retry
 
+    # The target is Python's, so Python lifts a short week (volume_fill,
+    # 2026-10-27) — within one added run's worth of the 40 km target.
     plan = _persisted(test_db_session)
-    warnings = plan["week_summary"].get("gate_warnings") or []
-    assert any("target" in w for w in warnings)
-    # No Python-invented sessions: the thin week persisted as generated.
-    assert plan["week_summary"]["expected_run_km"] == 10.0
+    assert 40.0 - 3.0 <= plan["week_summary"]["expected_run_km"] <= 40.0 + 1.0
+    filled = [w for d in plan["days"].values() for w in d["workouts"] if w.get("volume_fill")]
+    assert filled
 
 
 # ─── B2: titles are menu vocabulary, not prompt prose ───────────────────────

@@ -954,6 +954,7 @@ def _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason):
             availability=training_context.get("availability", {}),
             active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
             reason=reason,
+            fill_run_km=True,
         )
     except Exception as e:
         raise HTTPException(
@@ -1198,6 +1199,7 @@ def replan_remaining_days(db: Session = Depends(get_db)):
             days=days_to_replan,
             reason="The athlete requested a mid-week replan.",
             before=before,
+            fill_run_km=True,
         )
     except Exception as e:
         raise HTTPException(

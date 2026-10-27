@@ -188,7 +188,8 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
                             completed_run_km: float = 0.0,
                             completed_hours: float = 0.0,
                             required_run_km: float = None,
-                            inputs: dict = None):
+                            inputs: dict = None,
+                            fill_run_km: bool = False):
     """[generate] -> normalize -> enforce -> [gate] -> finalize.
 
     Returns (plan_json, violations). Two calling modes:
@@ -205,6 +206,10 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
     `days` scopes enforcement, the audit window, and the receipt; None means
     the full week (only initial generation — every other path must scope to
     what it rewrote, past days are history).
+
+    `fill_run_km` (gated only): after the repairs, lift a week planned under
+    its run-km target (volume_fill). Weekly generation and the mid-week
+    replan set it; adapt-today and triage never do.
     """
     from backend.services.constraint_enforcer import enforce_constraints
 
@@ -297,6 +302,31 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
             violations = list(violations) + repairs
             # Re-audit so the stamped sums and warnings describe the repaired
             # plan, not the rejected one.
+            report = volume_gate.audit_plan(
+                candidate, gate_ctx, days=days,
+                availability=availability, active_injuries=active_injuries,
+                completed_run_km=completed_run_km,
+                completed_hours=completed_hours,
+                required_run_km=required_run_km,
+            )
+
+    if fill_run_km and report is not None:
+        from backend.services.volume_fill import fill_run_km as _fill
+        candidate, fills = _fill(
+            candidate, gate_ctx, days=days, completed_run_km=completed_run_km,
+            availability=availability, active_injuries=active_injuries)
+        if fills:
+            print(f"➕ [{source}] Volume fill: "
+                  f"{[(f['day'], f['action'], f['minutes']) for f in fills]}")
+            # A fill writes workouts, so it passes the same gate as the LLM's.
+            candidate, more = enforce_constraints(
+                candidate, availability=availability,
+                active_injuries=active_injuries, days=days)
+            violations = list(violations) + more
+            candidate, _ = enforce_distances(
+                candidate, (gate_ctx or {}).get("pace_model"), days=days)
+            candidate, _ = enforce_zones(
+                candidate, hr_zones=hr_zones, lthr=lthr, days=days)
             report = volume_gate.audit_plan(
                 candidate, gate_ctx, days=days,
                 availability=availability, active_injuries=active_injuries,
