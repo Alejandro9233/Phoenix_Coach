@@ -40,6 +40,18 @@ LONG_RUN_BAND = (1.15, 1.25)   # x fit_mp
 EASY_BAND = (1.22, 1.35)       # x fit_mp
 RECOVERY_BAND = (1.35, 1.45)   # x fit_mp
 
+# Training-ground paces. The bands above come from a sea-level-ish threshold
+# and goal; Alex trains at 2,240 m (CDMX) and his easy runs there sit ~14%
+# slower than the easy band. Minutes came from his real pace while km were
+# stamped at the band, so every run read long on paper and the volume trim
+# deleted real runs to fit (weeks of 2026-10-19 and 2026-10-26). The aerobic
+# bands are rescaled so the easy band centres on the median pace of his own
+# recent runs; quality bands and race pacing keep their anchors. Slower only:
+# real data relaxes the bands, never asks for faster easy running.
+AEROBIC_BANDS = ("recovery", "easy", "long_run")
+LONG_RUN_EASY_RATIO = sum(LONG_RUN_BAND) / sum(EASY_BAND)  # long-run mid / easy mid
+TRAINING_SCALE_BOUNDS = (1.0, 1.35)
+
 GOAL_GAP_PCT = 3.0     # goal within 3% of fitness -> train at goal
 MP_CAP_AHEAD = 0.97    # else M-pace at most 3% faster than fitness pace
 GOAL_BAND_SEC = 5      # goal-anchored band is goal_mp +/- 5 s/km
@@ -286,3 +298,28 @@ def compute_pace_model(threshold_pace_min_km, target_finish_time,
         },
         "note": note,
     }
+
+
+def apply_training_pace(pace_model: dict | None, real_pace_sec_km) -> dict | None:
+    """Rescale the aerobic bands to where the athlete actually trains.
+
+    `real_pace_sec_km` is the median pace of the athlete's recent runs
+    (periodization_engine, volume_targets["training_pace_sec_km"]). The easy
+    band is centred on it and recovery/long_run keep their ratios to easy, so
+    pace_target, the distance stamp and the long-run path all speak the same
+    km. Mutates and returns pace_model; None or no pace -> unchanged."""
+    if not pace_model or not real_pace_sec_km or real_pace_sec_km <= 0:
+        return pace_model
+    fit_mp = pace_model["fit_mp_sec_km"]
+    easy_mid = sum(EASY_BAND) / 2 * fit_mp
+    lo, hi = TRAINING_SCALE_BOUNDS
+    scale = min(hi, max(lo, float(real_pace_sec_km) / easy_mid))
+    pace_model["training_pace_sec_km"] = round(float(real_pace_sec_km), 1)
+    pace_model["training_scale"] = round(scale, 3)
+    if scale == 1.0:
+        return pace_model
+    multipliers = {"recovery": RECOVERY_BAND, "easy": EASY_BAND, "long_run": LONG_RUN_BAND}
+    for key in AEROBIC_BANDS:
+        m_lo, m_hi = multipliers[key]
+        pace_model["bands"][key] = _band(m_lo * fit_mp * scale, m_hi * fit_mp * scale)
+    return pace_model

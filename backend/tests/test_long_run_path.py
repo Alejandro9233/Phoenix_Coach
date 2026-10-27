@@ -8,7 +8,9 @@ Rules locked in here:
   162 min, over Peak's 150). After the 2026-09 comeback the +12 min rule
   alone reached ~18 km.
 - Minutes come from the median pace of the window's runs, so the Nov 8
-  half-marathon trial's race pace can't shrink the 27 km after it.
+  half-marathon trial's race pace can't shrink the 27 km after it — at the
+  long-run band that median implies (pace_model.LONG_RUN_EASY_RATIO), so the
+  minutes and the distance stamp hold the same km.
 - No path in a comeback (the single-run cap rules there), a recovery week,
   outside Build and Peak, or once the peak has been run.
 - compute_context passes the real phase id. It passed phase_info.get("id"),
@@ -90,7 +92,7 @@ def test_first_week_after_the_comeback_starts_the_climb(db):
     _window(db, 9.7)                      # Oct 18: the capped comeback long run
     vt = _target(db, "build", weeks_to_peak=3)
     assert vt["long_run_path"] == {"km": 12.5, "peak_km": 27.0, "weeks_to_peak": 3}
-    assert vt["long_run_minutes"] == 75   # 12.5 km at 6:00, not 58 + 12 = 70
+    assert vt["long_run_minutes"] == 70   # 12.5 km at 5:36, the long-run pace of a 6:00 median
 
 
 def test_the_path_passes_the_half_and_lands_on_27km(db):
@@ -109,7 +111,7 @@ def test_the_week_after_the_half_plans_27km_at_easy_pace(db):
     _window(db, 21.1, long_pace=4.6)      # the trial, raced in ~97 min
     vt = _target(db, "peak", weeks_to_peak=0)
     assert vt["long_run_path"]["km"] == 27.0
-    assert vt["long_run_minutes"] == 162  # at the 6:00 median, not the 4:36 race pace
+    assert vt["long_run_minutes"] == 151  # off the 6:00 median, not the 4:36 race pace
     peak_def = PeriodizationEngine._phase_def(MARATHON, {"phase": "peak"})
     assert vt["long_run_minutes"] > peak_def["long_run_cap_min"]
 
@@ -158,7 +160,7 @@ def test_context_plans_the_path_seven_weeks_out(db):
     ctx = PeriodizationEngine().compute_context(db)
     assert ctx["volume_targets"]["long_run_path"] == {
         "km": 12.5, "peak_km": 27.0, "weeks_to_peak": 3}
-    assert "Long run: 12.5 km (~75 min)" in _format_training_context(ctx)
+    assert "Long run: 12.5 km (~70 min)" in _format_training_context(ctx)
 
 
 def test_context_steps_the_taper_down(db):

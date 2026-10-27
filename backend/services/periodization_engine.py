@@ -53,7 +53,9 @@ from backend.services.constraint_enforcer import (
 )
 from backend.services.long_run_day import LONG_RUN_DAY
 from backend.services.pace_enforcer import km_for_minutes
-from backend.services.pace_model import RACE_KM, compute_pace_model
+from backend.services.pace_model import (
+    LONG_RUN_EASY_RATIO, RACE_KM, apply_training_pace, compute_pace_model,
+)
 from backend.utils.timezone import get_local_today
 
 # Estimated hours one weekly session of each sport contributes to a phase's
@@ -134,6 +136,7 @@ COMEBACK_FIRST_LONG_RUN_MIN = 30   # long run when the window holds no run
 # marathon or not".
 LONG_RUN_PATH_PHASES = ("build", "peak")
 LONG_RUN_PACE_MIN_KM = 3.0   # shorter runs (strides, warm-ups) don't set the pace
+TRAINING_PACE_MIN_RUNS = 3    # fewer runs than this can't rescale the aerobic bands
 _DETECT = object()  # _get_weekly_run_target: detect the comeback itself
 
 
@@ -1361,6 +1364,8 @@ class PeriodizationEngine:
             athlete.threshold_pace_min_km, athlete.target_finish_time,
             race_distance,
         )
+        pace_model = apply_training_pace(
+            pace_model, (volume_targets or {}).get("training_pace_sec_km"))
         # The long run outranks the comeback cap (Alex, 2026-10-19: "I think
         # we can do 87 min"). The cap stays the ceiling on every other run.
         # Converted the way pace_enforcer stamps distance — minutes at the
@@ -2180,10 +2185,10 @@ class PeriodizationEngine:
         # by the last week before the taper, climb a geometric path to it.
         # Re-solved every week from the longest run of the window, so a missed
         # long run makes the next steps bigger. A floor under the rule above,
-        # and it outranks the phase's long-run cap: 27 km at 6:00/km is
-        # 162 min, over Peak's 150. Minutes come from the MEDIAN pace of the
-        # window's runs, so the half-marathon trial's race pace can't shrink
-        # the long run that follows it. Not in a comeback (the single-run cap
+        # and it outranks the phase's long-run cap: 27 km off a 6:00/km
+        # median is 151 min, over Peak's 150. Minutes come from the MEDIAN
+        # pace of the window's runs, so the half-marathon trial's race pace
+        # can't shrink the long run that follows it. Not in a comeback (the single-run cap
         # rules there) or a recovery week (the next week re-solves).
         long_run_path = None
         if (peak_long_run_km and weeks_to_peak is not None and weeks_to_peak >= 0
@@ -2191,7 +2196,10 @@ class PeriodizationEngine:
                 and not is_recovery_week and paces
                 and 0 < longest_km < peak_long_run_km):
             path_km = longest_km * (peak_long_run_km / longest_km) ** (1 / (weeks_to_peak + 1))
-            path_min = path_km * statistics.median(paces)
+            # At the long-run band the median's easy pace implies
+            # (pace_model.apply_training_pace), so the minutes, the distance
+            # stamp and the gate hold the same km.
+            path_min = path_km * statistics.median(paces) * LONG_RUN_EASY_RATIO
             if path_min > long_run:
                 long_run = path_min
                 long_run_path = {"km": round(path_km, 1),
@@ -2264,6 +2272,11 @@ class PeriodizationEngine:
                           ("step", "steps", "base_km", "target_km", "break_weeks")}
                          if comeback_active else None),
             "single_run_cap_km": single_run_cap_km,
+            # Median pace of the window's runs, s/km: where the athlete
+            # actually trains (CDMX). compute_context rescales the aerobic
+            # pace bands to it.
+            "training_pace_sec_km": (round(statistics.median(paces) * 60, 1)
+                                     if len(paces) >= TRAINING_PACE_MIN_RUNS else None),
             "longest_run_30d_km": (round(longest_30d_km, 1)
                                    if longest_30d_km is not None else None),
         }

@@ -241,6 +241,9 @@ def _format_training_context(ctx: dict) -> str:
         lines.append("  Every running workout MUST include a \"pace_target\" field "
                      "copied verbatim from the matching line. Do not write numeric "
                      "paces in prose; the pace_target field is the authority.")
+        if (pm.get("training_scale") or 1.0) > 1.0:
+            lines.append("  Recovery, Easy and Long run are the athlete's real paces where "
+                         "they train (altitude), from their recent runs.")
         if pm.get("note"):
             lines.append(f"  ⚠️ {pm['note']}")
 
