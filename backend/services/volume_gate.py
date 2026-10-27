@@ -1034,6 +1034,17 @@ def apply_terminal_repairs(plan_json: dict, report: GateReport, days=None) -> tu
         if over_hours else 0.0
     )
 
+    # Shorten easy runs before deleting anything: a whole session is the
+    # last resort (volume_fill.shorten_easy_runs). Shortened runs stay out
+    # of `repairs` — the receipt's list is "stripped" (the app titles it so);
+    # the revision's before/after and the workout's volume_trim carry it.
+    from backend.services.volume_fill import shorten_easy_runs
+    if over_run or over_hours:
+        excess_km, excess_hours, shortened = shorten_easy_runs(
+            plan_json, excess_km, excess_hours, days=days)
+        if shortened:
+            print(f"✂️ Shortened: {[(r['day'], r['reason']) for r in shortened]}")
+
     for day_name, w, sport, km, minutes in _strippable(plan_json, days):
         if excess_km <= 0 and excess_hours <= 0:
             break

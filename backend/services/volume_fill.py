@@ -63,16 +63,26 @@ def _fillable_easy(w: dict) -> bool:
             and not _NOT_FILLABLE.search(w.get("title") or ""))
 
 
-def _lengthen(w: dict, extra: int) -> None:
+MIN_MAIN_STEP_MIN = 5
+
+
+def _resize(w: dict, delta: int) -> None:
+    """Grow or shrink a run by `delta` minutes through its main block;
+    warm-up and cool-down stay."""
     steps = [s for s in (w.get("steps") or []) if isinstance(s, dict)]
     main = next((s for s in steps if s.get("type") == "main"), None)
     if main is None and steps:
         main = max(steps, key=lambda s: parse_minutes(s.get("duration")) or 0)
     if main is not None:
-        main["duration"] = _fmt(int(round(parse_minutes(main.get("duration")) or 0)) + extra)
-    total = int(round(parse_minutes(w.get("total_time")) or 0)) + extra
+        main_min = int(round(parse_minutes(main.get("duration")) or 0))
+        main["duration"] = _fmt(max(MIN_MAIN_STEP_MIN, main_min + delta))
+    total = int(round(parse_minutes(w.get("total_time")) or 0)) + delta
     w["total_time"] = _fmt(total)
     w.pop("distance_km", None)   # restamped from the new time
+
+
+def _lengthen(w: dict, extra: int) -> None:
+    _resize(w, extra)
     w["volume_fill"] = f"Lengthened +{extra} min: {FILL_NOTE}"
 
 
@@ -174,3 +184,50 @@ def fill_run_km(plan_json: dict, ctx: dict, days=None, completed_run_km: float =
         fills.append({"day": day_name, "title": "Easy Run", "minutes": minutes,
                       "action": "added"})
     return plan_json, fills
+
+
+EASY_RUN_MIN_MIN = 30      # shorten an easy run no further than this
+TRIM_NOTE = "weekly volume over budget (system trim)"
+
+
+def shorten_easy_runs(plan_json: dict, excess_km: float, excess_hours: float,
+                      days=None) -> tuple:
+    """The trim's first move: shave minutes off the longest easy runs, down
+    to EASY_RUN_MIN_MIN, before any session is deleted. 2026-10-27: the
+    trim deleted two whole easy runs and the fill then stretched a third,
+    leaving four runs for a 50 km week. Each run keeps its own km-per-minute
+    (its stamp is already at the athlete's pace), so no pace model is
+    needed. Returns (excess_km, excess_hours, repairs) left after shaving."""
+    # The week's longest run is protected here as in the strip, whatever
+    # its title.
+    longest = max(((workout_km(w)[0], id(w)) for _d, w in _window_workouts(plan_json, None)
+                   if map_sport(w.get("sport") or "") == "running"), default=(0, None))[1]
+    runs = []
+    for day_name, w in _window_workouts(plan_json, days):
+        minutes = parse_minutes(w.get("total_time")) or 0
+        km, _ = workout_km(w)
+        if (_fillable_easy(w) and id(w) != longest
+                and minutes > EASY_RUN_MIN_MIN and km > 0):
+            runs.append({"day": day_name, "w": w, "min": int(round(minutes)),
+                         "start": int(round(minutes)), "rate": km / minutes})
+    # One minute at a time off the longest run: the cut spreads evenly from
+    # the top instead of gutting one session.
+    while (excess_km > 0 or excess_hours > 0) and runs:
+        r = max(runs, key=lambda x: x["min"])
+        if r["min"] <= EASY_RUN_MIN_MIN:
+            break
+        r["min"] -= 1
+        excess_km -= r["rate"]
+        excess_hours -= 1 / 60
+    repairs = []
+    for r in runs:
+        cut = r["start"] - r["min"]
+        if cut <= 0:
+            continue
+        w = r["w"]
+        _resize(w, -cut)
+        w["distance_km"] = round(r["min"] * r["rate"], 1)
+        reason = f"Shortened −{cut} min: {TRIM_NOTE}"
+        w["volume_trim"] = reason
+        repairs.append({"day": r["day"], "title": w.get("title"), "reason": reason})
+    return excess_km, excess_hours, repairs

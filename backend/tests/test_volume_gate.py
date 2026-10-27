@@ -230,16 +230,33 @@ def test_travel_required_km_is_hard_and_window_scoped():
     assert "travel_run_km" in kinds
 
 
-def test_terminal_repair_strips_shortest_never_longest():
+def test_terminal_repair_shortens_easy_runs_before_stripping():
     plan = _week({"Monday": 8, "Tuesday": 10, "Wednesday": 8,
                   "Thursday": 10, "Saturday": 8, "Sunday": 16})  # 60
     report = audit_plan(plan, _ctx(), availability=AVAIL)
     assert not report.ok
     plan, repairs = apply_terminal_repairs(plan, report)
 
-    stripped_days = {r["day"] for r in repairs}
-    assert "Sunday" not in stripped_days  # the longest run survives
+    # Every run survives, shorter (2026-10-27: whole easy runs were deleted).
+    assert all(plan["days"][d]["workouts"][0]["sport"] == "running"
+               for d in ("Monday", "Tuesday", "Wednesday", "Thursday", "Saturday", "Sunday"))
+    assert repairs == []   # nothing stripped, so the receipt lists nothing
+    trimmed = {d for d, day in plan["days"].items()
+               for w in day["workouts"] if w.get("volume_trim")}
+    assert trimmed and "Sunday" not in trimmed   # the longest run is untouched
     assert volume_gate.planned_run_km(plan) <= 44 + volume_gate.RUN_CEILING_GRACE_KM
+    assert volume_gate.planned_run_km(plan) >= 44 - 1.0  # trimmed to the cap, not below it
+
+
+def test_terminal_repair_strips_shortest_never_longest_when_shortening_runs_out():
+    # Three 30-min easy runs have nothing to shave; the strip still works.
+    plan = _week({"Monday": 5, "Tuesday": 5, "Wednesday": 5, "Sunday": 40})  # 55
+    report = audit_plan(plan, _ctx(), availability=AVAIL)
+    assert not report.ok
+    plan, repairs = apply_terminal_repairs(plan, report)
+
+    stripped_days = {r["day"] for r in repairs}
+    assert stripped_days and "Sunday" not in stripped_days
     for day in stripped_days:
         workouts = plan["days"][day]["workouts"]
         assert workouts[0]["sport"] == "rest"
@@ -320,11 +337,14 @@ def test_both_attempts_over_ceiling_repairs_not_502(client, test_db_session, mon
 
     plan = _persisted(test_db_session)
     assert plan["week_summary"]["expected_run_km"] <= 44 + volume_gate.RUN_CEILING_GRACE_KM
-    # The longest run survived the trim; a receipt records what was cut.
+    # The longest run survived the trim; the easy runs were shortened, not
+    # deleted, and each says why.
     sunday = plan["days"]["Sunday"]["workouts"][0]
-    assert sunday["sport"] == "running"
-    stripped = plan["_revisions"][-1]["stripped"]
-    assert any("over budget" in (s.get("reason") or "") for s in stripped)
+    assert sunday["sport"] == "running" and not sunday.get("volume_trim")
+    runs = [d["workouts"][0] for d in plan["days"].values()
+            if d["workouts"][0]["sport"] == "running"]
+    assert len(runs) == 6
+    assert any("over budget" in (w.get("volume_trim") or "") for w in runs)
 
 
 def test_both_attempts_under_floor_are_filled_to_target(client, test_db_session, monkeypatch):
