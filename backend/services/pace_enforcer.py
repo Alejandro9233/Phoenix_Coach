@@ -335,9 +335,48 @@ def km_for_minutes(minutes, pace_model: dict, band_key: str = "long_run"):
     return round(float(minutes) * 60 / ((lo + hi) / 2), 1)
 
 
+STEP_COVER_SLACK_MIN = 2   # steps must add up to the workout's time, give or take
+
+
+def _step_band_key(step: dict, workout_band: str) -> str:
+    """The band one step runs at: the main block at the workout's band,
+    warm-up and cool-down at easy, jog recoveries at recovery."""
+    kind = (step.get("type") or "").lower()
+    if kind in ("warmup", "cooldown"):
+        return "easy" if workout_band != "recovery" else "recovery"
+    if kind in ("recovery", "rest"):
+        return "recovery"
+    return workout_band
+
+
+def _steps_time_km(workout: dict, pace_model: dict, minutes: float):
+    """km the steps cover, each step's time at its own band — or None when
+    a step lacks a duration or the steps don't add up to the workout.
+    2026-10-27: an 80-min Cruise Intervals counted all 80 min at tempo pace
+    (17.9 km for ~15 real), the week "passed" its cap, and the trim deleted
+    the day's easy run."""
+    steps = [st for st in workout.get("steps") or [] if isinstance(st, dict)]
+    if not steps:
+        return None
+    workout_band = classify_run_workout(workout.get("title"))
+    km = covered = 0.0
+    for st in steps:
+        step_min = parse_minutes(st.get("duration"))
+        band = _band_seconds(pace_model, _step_band_key(st, workout_band))
+        if not step_min or not band:
+            return None
+        km += step_min * 60 / ((band[0] + band[1]) / 2)
+        covered += step_min
+    if abs(covered - minutes) > STEP_COVER_SLACK_MIN:
+        return None
+    return round(km, 1)
+
+
 def expected_run_km(workout: dict, pace_model: dict):
     """(km, basis) a running workout should declare, or (None, None).
-    basis: 'steps' when every step names its km, else 'pace'."""
+    basis: 'steps' when every step names its km, else 'pace' — each step's
+    time at its own band when the steps cover the workout, else the whole
+    time at the workout's band. The watch runs these by time."""
     from backend.services.volume_gate import steps_sum_km
 
     minutes = parse_minutes(workout.get("total_time"))
@@ -347,6 +386,9 @@ def expected_run_km(workout: dict, pace_model: dict):
         return round(float(total), 1), "steps"
     if not minutes or minutes < DISTANCE_MIN_MINUTES or not band:
         return None, None
+    stepped = _steps_time_km(workout, pace_model, minutes)
+    if stepped:
+        return stepped, "pace"
     lo, hi = band
     return round(minutes * 60 / ((lo + hi) / 2), 1), "pace"
 
@@ -382,10 +424,13 @@ def enforce_distances(plan_json: dict, pace_model: dict, days=None) -> tuple:
             expected, basis = expected_run_km(w, pace_model)
             if expected is None:
                 continue
+            declared = w.get("distance_km")
+            has_declared = isinstance(declared, (int, float)) and not isinstance(declared, bool)
             if basis == "steps":
-                keep = isinstance(w.get("distance_km"), (int, float)) and abs(float(w["distance_km"]) - expected) < 0.15
+                keep = has_declared and abs(float(declared) - expected) < 0.15
             else:
-                keep = declared_km_is_plausible(w, pace_model)
+                keep = (has_declared and expected > 0
+                        and abs(float(declared) - expected) <= expected * DISTANCE_BAND_TOLERANCE)
             if keep:
                 continue
             corrections.append({"day": day_name, "title": w.get("title"),

@@ -200,7 +200,7 @@ def test_copied_example_distance_is_replaced_from_time_and_band():
 
 
 def test_plausible_declared_distance_is_kept():
-    km = round(35 * 60 / _mid("easy"), 1) - 0.3        # a little slower than mid, inside the band
+    km = round(35 * 60 / _mid("easy"), 1) - 0.2        # within 5% of the time-based km
     plan = _week(Wednesday=[_run_workout("Easy Run", "35 min", km)])
     plan, fixes = enforce_distances(plan, PM)
     assert fixes == [] and plan["days"]["Wednesday"]["workouts"][0]["distance_km"] == km
