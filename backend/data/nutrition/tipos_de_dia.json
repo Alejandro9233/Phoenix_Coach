@@ -557,7 +557,7 @@
       "codigo": "A",
       "nombre": "Descanso o fuerza ligera",
       "gasto_estimado_kcal": 2025,
-      "deficit_kcal": 161.0,
+      "deficit_kcal": 157.0,
       "comidas": [
         {
           "hora": "12:30 PM",
@@ -918,7 +918,7 @@
         },
         {
           "hora": "10:00 PM",
-          "nombre": "Cena: tostadas de atún",
+          "nombre": "Cena: tostadas de pollo",
           "items": [
             {
               "food_id": "tostada",
@@ -935,17 +935,17 @@
               }
             },
             {
-              "food_id": "atun",
+              "food_id": "pollo",
               "cantidad": 100,
               "unidad": "g",
               "macros": {
-                "kcal": 93.0,
-                "proteina_g": 21.4,
-                "carbohidrato_g": 1.3,
-                "grasa_g": 0.3,
-                "grasa_saturada_g": 0.1,
+                "kcal": 97.0,
+                "proteina_g": 22.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.0,
                 "fibra_g": 0.0,
-                "sodio_mg": 229.0
+                "sodio_mg": 180.0
               }
             },
             {
@@ -978,13 +978,13 @@
             }
           ],
           "totales": {
-            "kcal": 247.0,
-            "proteina_g": 25.0,
-            "carbohidrato_g": 20.8,
-            "grasa_g": 6.2,
-            "grasa_saturada_g": 1.0,
+            "kcal": 251.0,
+            "proteina_g": 25.6,
+            "carbohidrato_g": 19.4,
+            "grasa_g": 6.9,
+            "grasa_saturada_g": 0.9,
             "fibra_g": 6.0,
-            "sodio_mg": 310.0
+            "sodio_mg": 261.0
           }
         },
         {
@@ -1093,43 +1093,43 @@
         }
       ],
       "totales": {
-        "kcal": 1864.0,
-        "proteina_g": 153.3,
-        "carbohidrato_g": 199.7,
-        "grasa_g": 47.0,
-        "grasa_saturada_g": 14.8,
+        "kcal": 1868.0,
+        "proteina_g": 153.9,
+        "carbohidrato_g": 198.4,
+        "grasa_g": 47.7,
+        "grasa_saturada_g": 14.7,
         "fibra_g": 40.5,
-        "sodio_mg": 1661.0
+        "sodio_mg": 1612.0
       },
-      "proteina_g_por_kg": 2.06,
-      "carbohidrato_g_por_kg": 2.69,
-      "grasa_pct_kcal": 22.7,
+      "proteina_g_por_kg": 2.07,
+      "carbohidrato_g_por_kg": 2.67,
+      "grasa_pct_kcal": 23.0,
       "micros_totales": {
-        "vitA_ug": 2166.04,
+        "vitA_ug": 2120.82,
         "vitC_mg": 1066.8,
-        "vitD_ug": 13.71,
-        "vitE_mg": 15.62,
-        "vitK_ug": 277.5,
-        "tiamina_mg": 2.16,
-        "riboflavina_mg": 3.63,
-        "niacina_mg": 33.85,
-        "b6_mg": 3.46,
-        "folato_ug": 945.53,
-        "b12_ug": 8.34,
-        "colina_mg": 681.56,
-        "calcio_mg": 2101.45,
-        "hierro_mg": 17.03,
-        "magnesio_mg": 682.47,
-        "fosforo_mg": 2169.2,
-        "potasio_mg": 4015.84,
-        "zinc_mg": 15.59,
-        "cobre_mg": 1.55,
-        "selenio_ug": 216.2,
-        "manganeso_mg": 4.38,
-        "ala_g": 2.44,
-        "epa_g": 0.69,
-        "dha_g": 0.63,
-        "epa_dha_g": 1.32
+        "vitD_ug": 13.05,
+        "vitE_mg": 14.87,
+        "vitK_ug": 277.2,
+        "tiamina_mg": 2.22,
+        "riboflavina_mg": 3.74,
+        "niacina_mg": 36.27,
+        "b6_mg": 3.93,
+        "folato_ug": 939.81,
+        "b12_ug": 6.43,
+        "colina_mg": 674.75,
+        "calcio_mg": 2052.05,
+        "hierro_mg": 16.39,
+        "magnesio_mg": 678.23,
+        "fosforo_mg": 2142.66,
+        "potasio_mg": 4148.62,
+        "zinc_mg": 15.05,
+        "cobre_mg": 1.44,
+        "selenio_ug": 177.13,
+        "manganeso_mg": 4.35,
+        "ala_g": 2.45,
+        "epa_g": 0.61,
+        "dha_g": 0.47,
+        "epa_dha_g": 1.07
       }
     },
     {
