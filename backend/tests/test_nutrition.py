@@ -221,7 +221,76 @@ def test_rest_day_meets_the_fiber_target():
 
 def test_long_run_day_meets_the_fat_floor():
     # metas: grasa >= 20 % de kcal; C sat at 19.5 % until 2026-10-22 (+20 g aguacate).
-    assert PKG["types"]["C"]["grasa_pct_kcal"] >= 20
+    # Measured on the food: the gels (pure carbs, 2026-10-29) scale with the
+    # run and would push it under by themselves.
+    c = PKG["types"]["C"]
+    run = next(m for m in c["comidas"] if m["nombre"].startswith("Durante"))
+    kcal = c["totales"]["kcal"] - run["totales"]["kcal"]
+    assert c["totales"]["grasa_g"] * 9 / kcal >= 0.20
+
+
+def _long(minutes):
+    return {"sport": "running", "title": "Long Run", "total_time": f"{minutes} min",
+            "steps": [{"type": "main", "duration": f"{minutes}:00", "zone": 2}]}
+
+
+def _gels(menu):
+    meal = next(m for m in menu["meals"] if m["name"].startswith("Durante"))
+    return meal, next(i for i in meal["items"] if i["food_id"] == "gel")
+
+
+def test_long_run_gels_follow_the_run_at_80_g_per_hour():
+    # Sun 2026-11-01, 128 min: 80 g/h x 2.13 h = 171 g -> 4 gels of 40 g.
+    menu = today_menu(date(2026, 11, 1), datetime(2026, 11, 1, 9, 0), _plan("Sunday", _long(128)), PKG)
+    meal, gel = _gels(menu)
+    assert gel["amount"] == 4
+    assert "80 g/h" in meal["name"] and "cada 30 min" in meal["name"]
+
+
+def test_gel_rate_steps_up_after_the_half():
+    # Sun 2026-11-22, 150 min: 90 g/h x 2.5 h = 225 g -> 6 gels, one every 25 min.
+    menu = today_menu(date(2026, 11, 22), datetime(2026, 11, 22, 9, 0), _plan("Sunday", _long(150)), PKG)
+    meal, gel = _gels(menu)
+    assert gel["amount"] == 6
+    assert "90 g/h" in meal["name"] and "cada 25 min" in meal["name"]
+
+
+def test_gels_move_the_totals_with_them():
+    # 180 min at 80 g/h = 240 g -> 6 gels, 2 more than the package's 4.
+    base = PKG["types"]["C"]["totales"]
+    menu = today_menu(date(2026, 11, 1), datetime(2026, 11, 1, 9, 0), _plan("Sunday", _long(180)), PKG)
+    meal, gel = _gels(menu)
+    assert gel["amount"] == 6
+    assert menu["totals"]["kcal"] == base["kcal"] + 2 * 160
+    assert menu["totals"]["carbs_g"] == round(base["carbohidrato_g"] + 2 * 40, 1)
+    assert menu["deficit_kcal"] == PKG["types"]["C"]["deficit_kcal"] - 2 * 160
+    # The package itself is untouched for the next request.
+    assert next(i for m in PKG["types"]["C"]["comidas"] for i in m["items"] if i["food_id"] == "gel")["cantidad"] == 4
+
+
+def test_the_27_km_calendar_day_still_follows_the_run():
+    # 2026-11-15 is a fixed calendar day (evento); the gels still scale.
+    menu = today_menu(date(2026, 11, 15), datetime(2026, 11, 15, 9, 0), _plan("Sunday", _long(170)), PKG)
+    assert (menu["day_type"], menu["source"]) == ("C", "calendar")
+    assert _gels(menu)[1]["amount"] == 6  # 90 g/h x 2.83 h = 255 g -> 6.4
+
+
+def test_c_day_without_a_long_run_keeps_the_package_gels():
+    # The half on 2026-11-08: calendar C, the plan's race isn't titled a long run.
+    race = {"sport": "running", "title": "Half Marathon Trial", "total_time": "100 min", "steps": []}
+    menu = today_menu(date(2026, 11, 8), datetime(2026, 11, 8, 9, 0), _plan("Sunday", race), PKG)
+    meal, gel = _gels(menu)
+    assert gel["amount"] == 4 and "g/h" not in meal["name"]
+
+
+def test_gel_ladder_out_of_order_is_rejected(tmp_path):
+    pkg_dir = tmp_path / "pkg"
+    shutil.copytree(DATA_DIR, pkg_dir)
+    rules = json.loads((pkg_dir / "metas_y_reglas.json").read_text())
+    rules["geles_tirada"]["carb_g_por_hora"].reverse()
+    (pkg_dir / "metas_y_reglas.json").write_text(json.dumps(rules))
+    with pytest.raises(NutritionPackageError, match="date order"):
+        load_package(pkg_dir)
 
 
 def test_daily_supplements_list_every_one_not_already_in_a_meal():

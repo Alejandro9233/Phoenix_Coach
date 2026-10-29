@@ -219,6 +219,10 @@
       "regla": "La víspera de una tirada larga de 2 h o más se come menú D (no A). Primera vez: sábado 14 nov, antes de los 27 km."
     },
     {
+      "id": "geles_tirada",
+      "regla": "En la tirada larga los geles siguen a su duración: carbohidrato por hora según geles_tirada (80 g/h hasta el medio maratón, 90 g/h después, para entrenar el estómago al ritmo de carrera). El primer gel a los 15 min. Sin plan, 4 geles."
+    },
+    {
       "id": "estrategia",
       "regla": "Rendimiento primero hasta el medio maratón del 8 nov: déficit solo en días A y B (~170 kcal/día en semanas de Construcción). Sin recortes extra; el freno es la regla sin_bajar."
     },
@@ -235,6 +239,21 @@
       "regla": "Carne y pollo se pesan crudos; arroz y pasta, ya cocidos."
     }
   ],
+  "geles_tirada": {
+    "gel_id": "gel",
+    "primer_gel_min": 15,
+    "carb_g_por_hora": [
+      {
+        "desde": "2026-10-26",
+        "g": 80
+      },
+      {
+        "desde": "2026-11-09",
+        "g": 90
+      }
+    ],
+    "nota": "Entrenamiento del estómago: la tasa sube por escalones con fecha. El menú C del paquete trae 4 geles; con una tirada en el plan, la app cambia ese número."
+  },
   "meal_prep": {
     "sesiones": [
       {

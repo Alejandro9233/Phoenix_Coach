@@ -13,7 +13,7 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 |---|---|---|---|---|---|
 | A | Descanso o fuerza ligera | 2,086 | 158 g | 218 g | −264 |
 | B | Carrera suave | 2,198 | 160 g | 245 g | −302 |
-| C | Tirada larga (domingo) | 3,234 | 186 g | 449 g | −66 |
+| C | Tirada larga (domingo) | 3,674 | 186 g | 559 g | −374 |
 | D | Sesión de calidad (tempo o ritmo de maratón) | 2,794 | 162 g | 380 g | ~0 |
 
 ## Archivos
@@ -58,6 +58,7 @@ Están en `metas_y_reglas.json → reglas`. Las que se pueden automatizar:
 - **Lo que no se recorta nunca:** el pre-entreno, la comida de recuperación y los geles.
 - **Días `sin_deficit: true`:** se comen completos.
 - **Víspera de tirada larga de 2 h o más:** menú D aunque el plan diga descanso o gimnasio (la app lo aplica sola desde el plan).
+- **Geles de la tirada larga (desde el 29 oct 2026):** la app pone tantos geles de 40 g como pida la tasa de `geles_tirada` (80 g/h hasta el medio maratón, 90 g/h desde el 9 nov) por la duración de la tirada del plan, y mueve los totales del día con ellos. Sin tirada en el plan, el menú C trae 4. Los totales de C en este paquete son con 4 geles.
 - **Límites que no conviene romper al editar:**
   - Calcio del día C (está en 2,393 de 2,500 mg).
   - Magnesio de suplementos: máximo 350 mg al día. Hoy son 204 mg del glicinato, 115 mg por scoop de Isopure y 12.3 mg por tableta de Multilyte; por eso hay **máximo 1 scoop de Isopure al día**.

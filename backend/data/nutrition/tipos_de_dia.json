@@ -1178,7 +1178,7 @@
       "codigo": "C",
       "nombre": "Tirada larga",
       "gasto_estimado_kcal": 3300,
-      "deficit_kcal": 66.0,
+      "deficit_kcal": -374.0,
       "comidas": [
         {
           "hora": "12:30 PM",
@@ -1416,12 +1416,12 @@
           "items": [
             {
               "food_id": "gel",
-              "cantidad": 2,
+              "cantidad": 4,
               "unidad": "unidad",
               "macros": {
-                "kcal": 200.0,
+                "kcal": 640.0,
                 "proteina_g": 0,
-                "carbohidrato_g": 50,
+                "carbohidrato_g": 160,
                 "grasa_g": 0,
                 "grasa_saturada_g": 0,
                 "fibra_g": 0,
@@ -1444,9 +1444,9 @@
             }
           ],
           "totales": {
-            "kcal": 203.0,
+            "kcal": 643.0,
             "proteina_g": 0.0,
-            "carbohidrato_g": 50.7,
+            "carbohidrato_g": 160.7,
             "grasa_g": 0.0,
             "grasa_saturada_g": 0.0,
             "fibra_g": 0.3,
@@ -1772,17 +1772,17 @@
         }
       ],
       "totales": {
-        "kcal": 3234.0,
+        "kcal": 3674.0,
         "proteina_g": 185.7,
-        "carbohidrato_g": 449.3,
+        "carbohidrato_g": 559.3,
         "grasa_g": 74.5,
         "grasa_saturada_g": 26.6,
         "fibra_g": 48.3,
         "sodio_mg": 3616.0
       },
       "proteina_g_por_kg": 2.5,
-      "carbohidrato_g_por_kg": 6.05,
-      "grasa_pct_kcal": 20.7,
+      "carbohidrato_g_por_kg": 7.53,
+      "grasa_pct_kcal": 18.2,
       "micros_totales": {
         "vitA_ug": 1823.61,
         "vitC_mg": 1204.14,

@@ -1891,13 +1891,13 @@
     },
     {
       "id": "gel",
-      "nombre": "Gel energético (supuesto, por pieza)",
+      "nombre": "Gel energético de 40 g (por pieza)",
       "unidad": "pieza",
       "valores_por": "1 unidad",
       "macros": {
-        "kcal": 100,
+        "kcal": 160,
         "proteina_g": 0,
-        "carbohidrato_disponible_g": 25,
+        "carbohidrato_disponible_g": 40,
         "grasa_g": 0,
         "grasa_saturada_g": 0,
         "fibra_g": 0,
@@ -1907,7 +1907,7 @@
       "fuente_macros": "estimate",
       "fuente_micros": "none",
       "pieza": null,
-      "nota": "Supuesto: gel de 25 g de carbohidrato y 100 kcal por pieza. Valores POR PIEZA.",
+      "nota": "Alex, 29 oct 2026: geles de 40 g de carbohidrato (4 en su medio maratón PR). Marca y sodio pendientes; 160 kcal supuestas. Valores POR PIEZA.",
       "en_plan": true
     },
     {

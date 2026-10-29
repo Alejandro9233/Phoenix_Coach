@@ -27,7 +27,15 @@ Every meal belongs to its calendar date: the bedtime snack sits at 11:59 PM
 rejects a package whose meal times don't run forward through the day, so a
 regenerated file that brings 1:00 AM back fails loudly instead of showing
 the snack as the first meal of the morning.
+
+Long-run gels follow the run, not the menu (Alex, 2026-10-29: train the gut
+for race-day carbs). On any C day whose plan day has a run titled as a long
+run — the calendar's fixed 27 km included — the gel count is the dated
+carbs-per-hour rate in metas_y_reglas.geles_tirada times its minutes, and
+the meal and day totals move with it. A C day with no long run in the plan
+(the half, a pending day, no stored plan) keeps the package's 4 gels.
 """
+import math
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -82,7 +90,9 @@ def load_package(data_dir: Path = DATA_DIR) -> dict:
     types = {t["codigo"]: t for t in _read("tipos_de_dia.json", data_dir).get("tipos_de_dia") or []}
     calendar_doc = _read("calendario.json", data_dir)
     calendar = {d["fecha"]: d for d in calendar_doc.get("dias") or []}
-    supplements = _read("metas_y_reglas.json", data_dir).get("suplementos") or []
+    rules = _read("metas_y_reglas.json", data_dir)
+    supplements = rules.get("suplementos") or []
+    gels = _gel_rule(rules.get("geles_tirada"), foods)
 
     missing = [c for c in DAY_TYPES if c not in types]
     if missing:
@@ -117,8 +127,60 @@ def load_package(data_dir: Path = DATA_DIR) -> dict:
                 if m.get("hora") != "Diario" for i in m.get("items") or []}
     daily = [{"id": s.get("id"), "name": s.get("nombre"), "dose": s.get("dosis")}
              for s in supplements if s.get("id") not in in_meals]
-    return {"foods": foods, "types": types, "calendar": calendar,
+    return {"foods": foods, "types": types, "calendar": calendar, "gels": gels,
             "daily_supplements": daily, "version": calendar_doc.get("version")}
+
+
+def _gel_rule(rule: dict | None, foods: dict) -> dict | None:
+    """geles_tirada checked: a known gel with carbs, and a ladder of
+    (start date, g/h) steps that runs forward. None when the package has none."""
+    if not rule:
+        return None
+    gel = foods.get(rule.get("gel_id"))
+    if not gel or not (gel.get("macros") or {}).get("carbohidrato_disponible_g"):
+        raise NutritionPackageError(f"geles_tirada: unknown or carb-free gel {rule.get('gel_id')!r}")
+    try:
+        ladder = [(date.fromisoformat(s["desde"]), float(s["g"])) for s in rule.get("carb_g_por_hora") or []]
+    except (KeyError, TypeError, ValueError) as e:
+        raise NutritionPackageError(f"geles_tirada: bad carb_g_por_hora step ({e})")
+    if not ladder or [d for d, _ in ladder] != sorted({d for d, _ in ladder}):
+        raise NutritionPackageError("geles_tirada: carb_g_por_hora needs steps in date order")
+    return {"gel_id": rule["gel_id"], "ladder": ladder, "first_min": rule.get("primer_gel_min") or 15}
+
+
+def _gel_rate(day: date, gels: dict) -> float | None:
+    """The carbs-per-hour step in force on `day`, or None before the first."""
+    rate = None
+    for start, g in gels["ladder"]:
+        if start <= day:
+            rate = g
+    return rate
+
+
+def _fit_gels(meals: list, totals: dict, deficit, minutes: float, rate: float, foods: dict, gel_id: str, first_min: int):
+    """Set the gel count to rate x run length, and move the meal and day
+    totals by the gels added or dropped. Returns the new deficit."""
+    gel = foods[gel_id]["macros"]
+    per = gel["carbohidrato_disponible_g"]
+    count = max(1, math.floor(rate * minutes / 60 / per + 0.5))
+    every = max(5, 5 * round(60 * per / rate / 5))
+    delta_keys = {"kcal": "kcal", "protein_g": "proteina_g", "carbs_g": "carbohidrato_disponible_g",
+                  "fat_g": "grasa_g", "fiber_g": "fibra_g", "sodium_mg": "sodio_mg"}
+    for meal in meals:
+        item = next((i for i in meal["items"] if i["food_id"] == gel_id), None)
+        if item is None:
+            continue
+        diff = count - (item["amount"] or 0)
+        item["amount"] = count
+        meal["name"] = f"{meal['name']} · {rate:.0f} g/h: 1 gel cada {every} min desde el min {first_min}"
+        for view in (meal["totals"], totals):
+            for k, src in delta_keys.items():
+                if view.get(k) is not None:
+                    view[k] = round(view[k] + diff * (gel.get(src) or 0), 1)
+        if deficit is not None:
+            deficit = round(deficit - diff * (gel.get("kcal") or 0))
+        break
+    return deficit
 
 
 def package() -> dict:
@@ -262,6 +324,14 @@ def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | Non
     timed = [m for m in t.get("comidas") or [] if m.get("hora") != "Diario"]
     daily = [m for m in t.get("comidas") or [] if m.get("hora") == "Diario"]
     meals = [_meal_view(m, pkg["foods"]) for m in timed]
+    totals = _totals_view(t.get("totales"))
+    deficit = t.get("deficit_kcal")
+    gels = pkg.get("gels")
+    if code == "C" and gels:
+        minutes, rate = _long_run_minutes(plan_day), _gel_rate(day, gels)
+        if minutes and rate:
+            deficit = _fit_gels(meals, totals, deficit, minutes, rate, pkg["foods"],
+                                gels["gel_id"], gels["first_min"])
 
     next_index = None
     clock = now.replace(tzinfo=None)
@@ -281,8 +351,8 @@ def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | Non
         "event": cal.get("evento"),
         "no_deficit": bool(cal.get("sin_deficit")),
         "note": cal.get("nota"),
-        "deficit_kcal": t.get("deficit_kcal"),
-        "totals": _totals_view(t.get("totales")),
+        "deficit_kcal": deficit,
+        "totals": totals,
         "meals": meals,
         "next_meal_index": next_index,
         "supplements": [_item_view(i, pkg["foods"]) for m in daily for i in m.get("items") or []],

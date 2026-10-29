@@ -201,7 +201,7 @@
       "tipo_dia": "C",
       "sin_deficit": true,
       "evento": "Tirada larga de 27 km",
-      "nota": "C ampliado pendiente (~9 g/kg de carbohidrato, gel cada 30–40 min). Mientras, C sin recortar."
+      "nota": "C ampliado pendiente (~9 g/kg de carbohidrato). Los geles siguen a la duración de la tirada (geles_tirada, 90 g/h). Mientras, C sin recortar."
     },
     {
       "fecha": "2026-11-16",
