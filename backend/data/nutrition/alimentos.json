@@ -1232,7 +1232,7 @@
         "peso": 8
       },
       "nota": "P035: pesar cocido y escurrido. Valores del USDA (SR 168322); la etiqueta de Obertal (P031, 100 kcal por 100 g crudo) no cuadra con un tocino real.",
-      "en_plan": true
+      "en_plan": false
     },
     {
       "id": "atun",

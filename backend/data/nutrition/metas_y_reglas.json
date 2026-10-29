@@ -196,7 +196,7 @@
     },
     {
       "id": "sin_bajar",
-      "regla": "Si no baja en 3 semanas: arroz cocido de los días A a 80 g."
+      "regla": "Si no baja en 3 semanas: el siguiente recorte se decide con los pesajes. El arroz de A ya está en 80 g (29 oct 2026)."
     },
     {
       "id": "baja_rapido",
@@ -224,7 +224,7 @@
     },
     {
       "id": "estrategia",
-      "regla": "Rendimiento primero hasta el medio maratón del 8 nov: déficit solo en días A y B (~170 kcal/día en semanas de Construcción). Sin recortes extra; el freno es la regla sin_bajar."
+      "regla": "Rendimiento primero hasta el medio maratón del 8 nov: déficit solo en días A y B. Desde el 29 oct el gasto sale de un mantenimiento de 2,025 kcal sin entreno (Katch-McArdle con 61 kg de masa magra × 1.2, sin caminar) más lo que quema cada sesión (~1 kcal por kg por km). Gasto por tipo: A 2,025 (2,165 con gimnasio), B 2,450, D 2,700, C 3,325 con una tirada de ~20 km. Piso del día A: 1,830 kcal (disponibilidad de energía de 30 kcal por kg de masa magra)."
     },
     {
       "id": "calcio_domingo",

@@ -11,16 +11,18 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 
 | Tipo | Cuándo | kcal | Proteína | Carbohidrato | Déficit vs gasto |
 |---|---|---|---|---|---|
-| A | Descanso o fuerza ligera | 2,086 | 158 g | 218 g | −264 |
-| B | Carrera suave | 2,198 | 160 g | 245 g | −302 |
-| C | Tirada larga (domingo) | 3,674 | 186 g | 559 g | −374 |
-| D | Sesión de calidad (tempo o ritmo de maratón) | 2,794 | 162 g | 380 g | ~0 |
+| A | Descanso o fuerza ligera | 1,864 | 153 g | 200 g | −161 (−301 con gimnasio) |
+| B | Carrera suave | 2,198 | 160 g | 245 g | −252 |
+| C | Tirada larga (domingo) | 3,674 | 186 g | 559 g | +349 (geles) |
+| D | Sesión de calidad (tempo o ritmo de maratón) | 2,794 | 162 g | 380 g | +94 |
+
+Gasto desde el 29 oct 2026: mantenimiento de 2,025 kcal sin entreno (Katch-McArdle con 61 kg de masa magra × 1.2, sin caminar) más cada sesión a ~1 kcal por kg por km. El día A no baja de 1,830 kcal (disponibilidad de energía de 30 kcal por kg de masa magra).
 
 ## Archivos
 
 | Archivo | Contenido |
 |---|---|
-| `alimentos.json` | Catálogo de 48 alimentos y suplementos. 35 se usan en el plan (`en_plan: true`); el resto son alternativas ya calculadas. |
+| `alimentos.json` | Catálogo de 48 alimentos y suplementos. 34 se usan en el plan (`en_plan: true`); el resto son alternativas ya calculadas. |
 | `tipos_de_dia.json` | Los 4 tipos de día, con cada comida, sus ingredientes y cantidades, y los totales por comida y por día, incluidos los micronutrientes. |
 | `calendario.json` | Del 19 oct al 13 dic 2026, con el tipo de día de cada fecha, la fase, los días sin déficit y los eventos (medio maratón, tirada de 27 km, carga y maratón). |
 | `metas_y_reglas.json` | Metas de macros y 23 micronutrientes con su límite superior, suplementos, reglas de ajuste, meal prep y pendientes. |

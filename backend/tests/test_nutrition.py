@@ -229,9 +229,13 @@ def test_long_run_day_meets_the_fat_floor():
     assert c["totales"]["grasa_g"] * 9 / kcal >= 0.20
 
 
-def _long(minutes):
-    return {"sport": "running", "title": "Long Run", "total_time": f"{minutes} min",
-            "steps": [{"type": "main", "duration": f"{minutes}:00", "zone": 2}]}
+def test_rest_day_cut_stays_above_its_floors():
+    # 2026-10-29: day A cut to the 2,025 kcal maintenance (Katch-McArdle x 1.2).
+    # Floors: energy availability 30 kcal/kg of lean mass (61 kg), protein 2.0 g/kg.
+    a = PKG["types"]["A"]
+    assert a["gasto_estimado_kcal"] == 2025
+    assert a["totales"]["kcal"] >= 30 * 61
+    assert a["totales"]["proteina_g"] >= 2.0 * 74.3
 
 
 def _gels(menu):
