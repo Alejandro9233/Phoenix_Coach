@@ -48,30 +48,26 @@ NavigationStack {
 }
 ```
 
-**Sheet scaffold** — RacePlanSheet is the model for detail sheets:
+**Sheet scaffold** — RacePlanSheet is the model for detail sheets. Every
+sheet is the system's floating Liquid Glass (sheet-surface round, V1,
+2026-10-29): no ground of our own, no close button, a partial detent so it
+floats, and the grabber to close it:
 ```swift
 NavigationStack {
-    ZStack { DS.Colors.background.ignoresSafeArea(); ScrollView { ... } }
+    ScrollView { ... }
         .navigationTitle("Race Plan")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(DS.Colors.outline)
-                }
-                .accessibilityLabel("Close")
-            }
-        }
+        .glassSheet()            // clears the navigation container over the glass
 }
 .presentationDetents([.fraction(0.88), .large])
 .presentationDragIndicator(.visible)
 ```
+Never paint `DS.Colors.background`, a `presentationBackground`, or an opaque
+`toolbarBackground` on a sheet — each one covers the glass.
 Utility input sheets use `Form` + `.scrollContentBackground(.hidden)` +
 `.listRowBackground(DS.Colors.surface)` per row, with Cancel (outline) /
-confirm toolbar text buttons instead of xmark (AddInjurySheet is the
-model). Never ship a `Form` without `.scrollContentBackground(.hidden)` —
+confirm toolbar text buttons (InjuryFormSheet is the model) — the one
+sheet kind that keeps a toolbar exit, because Cancel discards input. Never ship a `Form` without `.scrollContentBackground(.hidden)` —
 the system grouped gray is alien chrome here.
 
 **Cards** — `.glassCard()` is the card on every screen except Today,
@@ -334,3 +330,4 @@ rule, not the component.
 - 2026-10-21 Today fuel (nutrition) card under the session: V1 instrument (day letter, hairline, next meal + foods), V2 day line (six meal ticks across the card), V4 kcal hero (2,199 kcal + macros + Day chip, next meal in an inner panel), V5 density (a column of dots per meal, one per 50 kcal) — lost to V3: no card, one hairline row ("Fuel · B" · next meal time and name · meal kcal and day kcal · chevron), tap opens the day's menu sheet. Ported as `FuelRow` + `FuelSheet`; the hairline became `DS.Hairline` (shared with TimelineRow).
 - 2026-10-21 Fuel sheet round 1 (the day's menu behind the Fuel row): V2 next meal first + the rest folded to rows, V3 receipt ledger with a 48pt kcal hero, V4 kcal split bar + per-meal macros on glass cards, V5 pieces first ("2 rebanadas", grams secondary) — lost to V1: a timeline rail, no cards (time · dot · meal, foods under the meal).
 - 2026-10-21 Fuel sheet round 2 (opening a meal on the rail, clips): V1 slide-down reveal, V3 staggered cascade, V5 one-line food preview when closed — lost to V4 (chevron flips, foods arrive blurred and sharpen) combined with V2's accordion (one meal open at a time). "Use 4, but add the one meal open at a time." Next meal opens by default. Ported into `FuelSheet`.
+- 2026-10-29 Sheet surface (all sheets, shown on the Fuel sheet over Today; Alex wants the Spotify-style floating card with the content behind blurred): V2 ultra-thin material, V3 regular material + dark tint, V4 thick material, V5 native glass at half height — lost to V1, the system's native Liquid Glass at the 0.88 detent. "1 and remove the close button": sheets have no xmark/Done; the grabber closes them. Ported as `.glassSheet()` on every sheet (8 sheet views, 11 presentations).

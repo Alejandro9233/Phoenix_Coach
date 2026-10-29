@@ -192,6 +192,18 @@ extension View {
     func outlineCard() -> some View { modifier(OutlineCardModifier()) }
 }
 
+// MARK: - Sheets
+
+extension View {
+    /// Every sheet is the system's floating Liquid Glass (sheet-surface round,
+    /// V1, 2026-10-29): no ground of our own, no close button — the grabber and
+    /// a drag down close it. Goes on the sheet's root view, inside its
+    /// NavigationStack, so the navigation container doesn't paint over the glass.
+    func glassSheet() -> some View {
+        containerBackground(.clear, for: .navigation)
+    }
+}
+
 extension DS.Colors {
     /// The readiness tint. White on green: colour only when something needs
     /// attention. Unknown reads as outline, never as a warning.

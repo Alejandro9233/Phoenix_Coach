@@ -62,7 +62,6 @@ struct FuelRow: View {
 /// chevron + blur-in, with V2's accordion). Supplements close the day.
 struct FuelSheet: View {
     let day: NutritionDay
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var open: Int?
 
@@ -75,41 +74,27 @@ struct FuelSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                DS.Colors.background.ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: DS.Spacing.xxl) {
-                        header
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(Array(meals.enumerated()), id: \.offset) { i, meal in
-                                railRow(i, meal)
-                            }
-                        }
-                        if let sups = day.dailySupplements, !sups.isEmpty {
-                            VStack(alignment: .leading, spacing: DS.Spacing.m) {
-                                DS.SectionLabel(text: "Supplements")
-                                ForEach(sups, id: \.id) { sup in supplementLine(sup) }
-                            }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xxl) {
+                    header
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(meals.enumerated()), id: \.offset) { i, meal in
+                            railRow(i, meal)
                         }
                     }
-                    .padding(.horizontal, DS.Spacing.page)
-                    .padding(.vertical, DS.Spacing.l)
+                    if let sups = day.dailySupplements, !sups.isEmpty {
+                        VStack(alignment: .leading, spacing: DS.Spacing.m) {
+                            DS.SectionLabel(text: "Supplements")
+                            ForEach(sups, id: \.id) { sup in supplementLine(sup) }
+                        }
+                    }
                 }
+                .padding(.horizontal, DS.Spacing.page)
+                .padding(.vertical, DS.Spacing.l)
             }
             .navigationTitle("Fuel · Day \(day.dayType ?? "")")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(DS.Colors.outline)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("Close")
-                }
-            }
+            .glassSheet()
         }
         .presentationDetents([.fraction(0.88), .large])
         .presentationDragIndicator(.visible)

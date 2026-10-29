@@ -387,8 +387,6 @@ struct InjuryFormSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DS.Colors.background.ignoresSafeArea()
-
                 Form {
                     Section {
                         TextField("Body Part (e.g. Left Ankle)", text: $bodyPart)
@@ -476,6 +474,7 @@ struct InjuryFormSheet: View {
             }
             .navigationTitle(isEditing ? "Edit Injury" : "New Injury")
             .navigationBarTitleDisplayMode(.inline)
+            .glassSheet()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -500,6 +499,8 @@ struct InjuryFormSheet: View {
             }
         }
         .onAppear(perform: hydrate)
+        .presentationDetents([.fraction(0.88), .large])
+        .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder

@@ -8,35 +8,22 @@ import SwiftUI
 struct RacePlanSheet: View {
     let race: RaceStatus
     let pacing: RacePacing
-    @Environment(\.dismiss) private var dismiss
-
     var body: some View {
         NavigationStack {
-            ZStack {
-                DS.Colors.background.ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        headerCard
-                        splitsCard
-                        waypointsCard
-                        if let caps = pacing.hrCaps {
-                            hrCapsCard(caps)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    headerCard
+                    splitsCard
+                    waypointsCard
+                    if let caps = pacing.hrCaps {
+                        hrCapsCard(caps)
                     }
-                    .padding(16)
                 }
+                .padding(16)
             }
             .navigationTitle("Race Plan")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(DS.Colors.outline)
-                    }
-                }
-            }
+            .glassSheet()
         }
         .presentationDetents([.fraction(0.88), .large])
         .presentationDragIndicator(.visible)

@@ -1398,20 +1398,9 @@ struct AdaptationComparisonSheet: View {
                 }
                 .padding(20)
             }
-            .background(DS.Colors.background.ignoresSafeArea())
             .navigationTitle("Adaptation Telemetry")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(DS.Colors.outline)
-                    }
-                }
-            }
+            .glassSheet()
         }
         .presentationDetents([.fraction(0.88), .large])
         .presentationDragIndicator(.visible)
@@ -1649,7 +1638,6 @@ enum MetricType {
 }
 
 struct MetricChartSheet: View {
-    @Environment(\.dismiss) var dismiss
     let title: String
     let data: [RecoverySnapshot]
     let metricType: MetricType
@@ -1663,8 +1651,6 @@ struct MetricChartSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DS.Colors.background.ignoresSafeArea()
-                
                 VStack(spacing: 24) {
                     if chartData.isEmpty {
                         ContentUnavailableView("No Data", systemImage: "chart.xyaxis.line")
@@ -1695,16 +1681,10 @@ struct MetricChartSheet: View {
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(DS.Colors.accent)
-                        .font(.body.bold())
-                }
-            }
+            .glassSheet()
         }
         .presentationDetents([.medium])
-        .presentationBackground(.ultraThinMaterial)
+        .presentationDragIndicator(.visible)
     }
     
     private func value(for item: RecoverySnapshot) -> Double? {

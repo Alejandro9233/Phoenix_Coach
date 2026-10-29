@@ -859,8 +859,6 @@ struct WeeklyWorkoutsDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DS.Colors.background.ignoresSafeArea()
-                
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         // Week Overview Card
@@ -993,18 +991,10 @@ struct WeeklyWorkoutsDetailSheet: View {
             }
             .navigationTitle("Week \(week.weekNumber) Schedule")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(DS.Colors.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(DS.Colors.accent)
-                }
-            }
+            .glassSheet()
         }
+        .presentationDetents([.fraction(0.88), .large])
+        .presentationDragIndicator(.visible)
     }
     
     // MARK: - Subcomponents

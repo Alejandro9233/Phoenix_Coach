@@ -11,38 +11,27 @@ struct RefreshDebriefSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                DS.Colors.background.ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        syncSection
-                        if let activities = event.newActivities, !activities.isEmpty {
-                            activitiesSection(activities)
-                        }
-                        recoverySection
-                        if let triggers = event.triggers, !triggers.isEmpty {
-                            triggersSection(triggers)
-                        }
-                        adaptationSection
-                        if let week = event.weekAfter {
-                            weekAfterSection(week)
-                        }
-                        discussButton
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    syncSection
+                    if let activities = event.newActivities, !activities.isEmpty {
+                        activitiesSection(activities)
                     }
-                    .padding(16)
+                    recoverySection
+                    if let triggers = event.triggers, !triggers.isEmpty {
+                        triggersSection(triggers)
+                    }
+                    adaptationSection
+                    if let week = event.weekAfter {
+                        weekAfterSection(week)
+                    }
+                    discussButton
                 }
+                .padding(16)
             }
             .navigationTitle("Sync Debrief")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(DS.Colors.outline)
-                    }
-                }
-            }
+            .glassSheet()
         }
         .presentationDetents([.fraction(0.88), .large])
         .presentationDragIndicator(.visible)
@@ -340,47 +329,35 @@ struct RunProgressBar: View {
 
 struct PlanDiffSheet: View {
     let event: HistoryEvent
-    @Environment(\.dismiss) private var dismiss
     @State private var selectedDay: String?
 
     private var days: [String] { event.days ?? [] }
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                DS.Colors.background.ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        headerSection
-                        if days.count > 1 { dayPicker }
-                        if let day = selectedDay ?? days.first {
-                            dayDiff(day)
-                        }
-                        if let stripped = event.stripped, !stripped.isEmpty {
-                            strippedSection(stripped)
-                        }
-                        if event.afterSource != nil && event.afterSource != "receipt" {
-                            Text(event.afterSource == "reconstructed"
-                                 ? "The \"after\" state was reconstructed from later plan changes."
-                                 : "The \"after\" state shows the current plan — this change predates exact snapshots.")
-                                .font(.system(size: 11, weight: .light))
-                                .foregroundStyle(DS.Colors.outline)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    headerSection
+                    if days.count > 1 { dayPicker }
+                    if let day = selectedDay ?? days.first {
+                        dayDiff(day)
                     }
-                    .padding(16)
-                }
-            }
-            .navigationTitle("Plan Change")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .semibold))
+                    if let stripped = event.stripped, !stripped.isEmpty {
+                        strippedSection(stripped)
+                    }
+                    if event.afterSource != nil && event.afterSource != "receipt" {
+                        Text(event.afterSource == "reconstructed"
+                             ? "The \"after\" state was reconstructed from later plan changes."
+                             : "The \"after\" state shows the current plan — this change predates exact snapshots.")
+                            .font(.system(size: 11, weight: .light))
                             .foregroundStyle(DS.Colors.outline)
                     }
                 }
+                .padding(16)
             }
+            .navigationTitle("Plan Change")
+            .navigationBarTitleDisplayMode(.inline)
+            .glassSheet()
         }
         .presentationDetents([.fraction(0.88), .large])
         .presentationDragIndicator(.visible)
