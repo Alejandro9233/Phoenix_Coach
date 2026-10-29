@@ -90,11 +90,13 @@ Quedan bajo meta, aceptados por ahora:
 
 ## Fuente de verdad
 
-Los mismos números están en la ficha del usuario (Claude Docs, pestañas "Plan v2: con tus productos", "Menús a detalle" y "Requerimientos"). Si el usuario cambia el plan ahí, este paquete se regenera; no edites los totales a mano.
+**Desde el 28 oct 2026 la fuente de verdad es este paquete** (decidido por Alex). La ficha del usuario en Claude Docs (pestañas "Menús a detalle" y "Plan v2: con tus productos") se actualiza desde aquí, no al revés.
+
+Para cambiar el menú: edita cantidades o alimentos en `alimentos.json` / `tipos_de_dia.json` y recalcula los totales con `python3 scripts/nutrition_recompute.py backend/data/nutrition` (usa las reglas de redondeo del paquete; verificado contra el día C). Nunca edites totales a mano. Después, lleva los números nuevos a la ficha.
 
 ## En la app (Phoenix)
 
 - `backend/services/nutrition.py` lee estos archivos; `GET /nutrition/today` sirve el menú del día.
 - El tipo de día sale del plan semanal guardado, no de `calendario.json`. El calendario solo manda en sus días fijos (evento, `sin_deficit`, `PENDIENTE`) y cuando no hay plan.
-- **Antes de dormir es a las 11:59 PM** (era 1:00 AM; cambiado el 2026-10-21 para que ninguna comida cruce la medianoche). Si el paquete se regenera con 1:00 AM, la app lo rechaza (503). Cambia la hora también en la ficha de Claude Docs.
-- Actualizar = reemplazar los JSON y desplegar.
+- **Antes de dormir es a las 11:59 PM** (era 1:00 AM; cambiado el 2026-10-21 para que ninguna comida cruce la medianoche). Si una comida vuelve a quedar después de medianoche, la app rechaza el paquete (503).
+- Actualizar = editar los JSON, recalcular, probar (`backend/tests/test_nutrition.py`) y desplegar.
