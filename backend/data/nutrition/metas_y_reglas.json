@@ -224,7 +224,7 @@
     },
     {
       "id": "calcio_domingo",
-      "regla": "El día C queda en 2,426 de 2,500 mg de calcio: no agregar lácteos ese día."
+      "regla": "El día C queda en 2,393 de 2,500 mg de calcio: no agregar lácteos ese día."
     },
     {
       "id": "cafeina",
@@ -270,6 +270,7 @@
     "Confirmar qué días son de calidad (supuesto: martes y jueves desde el 26 oct).",
     "Proporción real de atún y camarón en el atún Dolores (afecta solo micronutrientes).",
     "Disponibilidad de energía (~28–33 kcal por kg de masa magra con el déficit); alternativa en discusión: sacar parte del déficit con pasos.",
-    "Masa magra medida (hoy supuesta en 61 kg) y análisis de sangre (ferritina, hemoglobina, vitamina D)."
+    "Masa magra medida (hoy supuesta en 61 kg) y análisis de sangre (ferritina, hemoglobina, vitamina D).",
+    "Marca del camarón congelado (P036): foto del frente de la bolsa."
   ]
 }

@@ -187,7 +187,7 @@ def test_bedtime_snack_is_last_meal_of_its_day():
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2199.0
+    assert menu["totals"]["kcal"] == 2198.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     pollo = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "pollo")
@@ -197,11 +197,26 @@ def test_menu_shape():
     assert {s["food_id"] for s in menu["supplements"]} == {"salmon", "vitc", "magnesio"}
 
 
-def test_oats_carry_the_amaranth_alternative_at_the_same_grams():
+def test_alternatives_are_carb_matched():
+    # Oats (Bob's Red Mill) 43 g -> amaranth 40 g; Lucky Charms 30 g -> Groovies 48 g.
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    oats = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "avena")
-    assert oats["alternative"] == {"food_id": "amaranto", "name": "Amaranto natural", "amount": 40, "unit": "g"}
-    assert all("alternative" not in i for m in menu["meals"] for i in m["items"] if i["food_id"] != "avena")
+    alts = {i["food_id"]: (i["amount"], i["alternative"]["food_id"], i["alternative"]["amount"])
+            for m in menu["meals"] for i in m["items"] if "alternative" in i}
+    assert alts == {"avena": (43, "amaranto", 40), "lucky": (30, "groovies", 48)}
+
+
+def test_pre_workout_is_one_slice_of_oroweat():
+    # 2026-10-28 batch: Oroweat replaces Bimbo; the jam makes up the carbs.
+    menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
+    pre = next(m for m in menu["meals"] if m["time"] == "3:30 PM")
+    bread = next(i for i in pre["items"] if i["food_id"] == "pan_oroweat")
+    assert (bread["pieces"], bread["piece_name"]) == (1.0, "rebanada")
+    assert abs(pre["totals"]["carbs_g"] - 53.9) <= 1   # the Bimbo pre-workout carried 53.9 g
+
+
+def test_rest_day_meets_the_fiber_target():
+    # metas: fibra 38 g; day A sat at 32.8 g until the cranberries (2026-10-28).
+    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 38
 
 
 def test_long_run_day_meets_the_fat_floor():

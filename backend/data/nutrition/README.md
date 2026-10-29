@@ -11,16 +11,16 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 
 | Tipo | Cuándo | kcal | Proteína | Carbohidrato | Déficit vs gasto |
 |---|---|---|---|---|---|
-| A | Descanso o fuerza ligera | 2,095 | 158 g | 220 g | −255 |
-| B | Carrera suave | 2,199 | 157 g | 245 g | −301 |
-| C | Tirada larga (domingo) | 3,233 | 180 g | 450 g | −67 |
-| D | Sesión de calidad (tempo o ritmo de maratón) | 2,792 | 157 g | 380 g | ~0 |
+| A | Descanso o fuerza ligera | 2,086 | 158 g | 218 g | −264 |
+| B | Carrera suave | 2,198 | 160 g | 245 g | −302 |
+| C | Tirada larga (domingo) | 3,234 | 186 g | 449 g | −66 |
+| D | Sesión de calidad (tempo o ritmo de maratón) | 2,794 | 162 g | 380 g | ~0 |
 
 ## Archivos
 
 | Archivo | Contenido |
 |---|---|
-| `alimentos.json` | Catálogo de 42 alimentos y suplementos. 34 se usan en el plan (`en_plan: true`); el resto son alternativas ya calculadas. |
+| `alimentos.json` | Catálogo de 48 alimentos y suplementos. 35 se usan en el plan (`en_plan: true`); el resto son alternativas ya calculadas. |
 | `tipos_de_dia.json` | Los 4 tipos de día, con cada comida, sus ingredientes y cantidades, y los totales por comida y por día, incluidos los micronutrientes. |
 | `calendario.json` | Del 19 oct al 13 dic 2026, con el tipo de día de cada fecha, la fase, los días sin déficit y los eventos (medio maratón, tirada de 27 km, carga y maratón). |
 | `metas_y_reglas.json` | Metas de macros y 23 micronutrientes con su límite superior, suplementos, reglas de ajuste, meal prep y pendientes. |
@@ -33,6 +33,7 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
   - Si es por unidad: `valor × cantidad`.
 - **Crudo o cocido:** carne molida y pollo se pesan **crudos**; arroz y pasta, **ya cocidos**; la Maruchan es la sopa **preparada** (585 g). Está en `nota` de cada alimento y conviene mostrárselo al usuario.
 - **Carbohidrato:** siempre es **disponible**, sin fibra, como en la etiqueta mexicana (NOM-051). La fibra va aparte.
+- **Lote del 28 oct 2026:** chía OKKO, avena Bob's Red Mill (alta en proteína), bagel New York Deli, pan Oroweat y tocino Obertal entraron al menú con los gramos ajustados al mismo carbohidrato; arándanos OKKO en la merienda de A; Groovies como alternativa a Lucky Charms; camarón congelado solo en el catálogo. La avena Granvita usa la fila `avena_generica` (su etiqueta solo da valores preparada).
 - **Alternativas:** un ítem puede traer `alternativa` (`food_id` + `cantidad`): se puede cambiar por ese alimento sin recalcular el día. Hoy: amaranto en lugar de avena, mismos gramos.
 - **Piezas:** `pieza` da equivalencias para mostrar (1 tostada = 12 g, 1 scoop = 31 g, 1 segundo de spray = 0.67 g). La cantidad del plan siempre está en gramos o mililitros.
 - **Fuentes:** `fuente_macros` y `fuente_micros` valen `label` (etiqueta del usuario), `usda`, `label+usda` o `estimate`. Si la app muestra datos, conviene distinguir los estimados.
@@ -58,7 +59,7 @@ Están en `metas_y_reglas.json → reglas`. Las que se pueden automatizar:
 - **Días `sin_deficit: true`:** se comen completos.
 - **Víspera de tirada larga de 2 h o más:** menú D aunque el plan diga descanso o gimnasio (la app lo aplica sola desde el plan).
 - **Límites que no conviene romper al editar:**
-  - Calcio del día C (está en 2,426 de 2,500 mg).
+  - Calcio del día C (está en 2,393 de 2,500 mg).
   - Magnesio de suplementos: máximo 350 mg al día. Hoy son 204 mg del glicinato, 115 mg por scoop de Isopure y 12.3 mg por tableta de Multilyte; por eso hay **máximo 1 scoop de Isopure al día**.
   - Vitamina C: el usuario toma ½ comprimido de 2,000 mg.
 

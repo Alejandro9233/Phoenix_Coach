@@ -95,7 +95,53 @@
     },
     {
       "id": "avena",
-      "nombre": "Avena en hojuelas",
+      "nombre": "Avena alta en proteína Bob's Red Mill",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 374.66,
+        "proteina_g": 20.83,
+        "carbohidrato_disponible_g": 54.16,
+        "grasa_g": 8.33,
+        "grasa_saturada_g": 2.08,
+        "fibra_g": 12.5,
+        "sodio_mg": 0
+      },
+      "micros": {
+        "vitA_ug": 0,
+        "vitC_mg": 0,
+        "vitD_ug": 0,
+        "vitE_mg": 0.42,
+        "vitK_ug": 2.0,
+        "tiamina_mg": 0.46,
+        "riboflavina_mg": 0.155,
+        "niacina_mg": 1.125,
+        "b6_mg": 0.1,
+        "folato_ug": 32,
+        "b12_ug": 0,
+        "colina_mg": 40.4,
+        "calcio_mg": 52,
+        "hierro_mg": 4.25,
+        "magnesio_mg": 138,
+        "fosforo_mg": 410,
+        "potasio_mg": 362,
+        "zinc_mg": 3.64,
+        "cobre_mg": 0.39,
+        "selenio_ug": 28.9,
+        "manganeso_mg": 3.63,
+        "ala_g": 0.1,
+        "epa_g": 0,
+        "dha_g": 0
+      },
+      "fuente_macros": "label",
+      "fuente_micros": "usda",
+      "pieza": null,
+      "nota": "P032, etiqueta del 28 oct 2026. Pesar en seco. Micronutrientes de la avena del USDA.",
+      "en_plan": true
+    },
+    {
+      "id": "avena_generica",
+      "nombre": "Avena en hojuelas común (USDA; Granvita u otra)",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
@@ -136,8 +182,8 @@
       "fuente_macros": "usda",
       "fuente_micros": "usda",
       "pieza": null,
-      "nota": null,
-      "en_plan": true
+      "nota": "Para avena común como Granvita, cuya etiqueta solo da valores preparada con agua. Gramos del plan con esta avena: A 30, B 40, D 60, C 70.",
+      "en_plan": false
     },
     {
       "id": "amaranto",
@@ -187,17 +233,17 @@
     },
     {
       "id": "chia",
-      "nombre": "Semillas de chía",
+      "nombre": "Semillas de chía OKKO",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
-        "kcal": 486,
-        "proteina_g": 16.54,
-        "carbohidrato_disponible_g": 7.72,
-        "grasa_g": 30.74,
-        "grasa_saturada_g": 3.33,
-        "fibra_g": 34.4,
-        "sodio_mg": 16
+        "kcal": 380,
+        "proteina_g": 17,
+        "carbohidrato_disponible_g": 8,
+        "grasa_g": 31,
+        "grasa_saturada_g": 3.5,
+        "fibra_g": 34,
+        "sodio_mg": 20
       },
       "micros": {
         "vitC_mg": 1.6,
@@ -206,21 +252,21 @@
         "riboflavina_mg": 0.17,
         "niacina_mg": 8.83,
         "b12_ug": 0.0,
-        "calcio_mg": 631,
-        "hierro_mg": 7.72,
-        "magnesio_mg": 335,
-        "fosforo_mg": 860,
+        "calcio_mg": 630.0,
+        "hierro_mg": 7.933,
+        "magnesio_mg": 338.933,
+        "fosforo_mg": 863.2,
         "potasio_mg": 407,
         "zinc_mg": 4.58,
         "cobre_mg": 0.92,
         "selenio_ug": 55.2,
         "manganeso_mg": 2.723,
-        "ala_g": 17.83
+        "ala_g": 18
       },
-      "fuente_macros": "usda",
-      "fuente_micros": "usda",
+      "fuente_macros": "label",
+      "fuente_micros": "label+usda",
       "pieza": null,
-      "nota": null,
+      "nota": "P030, etiqueta del 28 oct 2026. La etiqueta no cuenta la energía de la fibra (380 contra 486 kcal del USDA).",
       "en_plan": true
     },
     {
@@ -270,6 +316,27 @@
         "peso": 126
       },
       "nota": null,
+      "en_plan": true
+    },
+    {
+      "id": "arandano",
+      "nombre": "Arándanos deshidratados sin azúcar OKKO",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 140,
+        "proteina_g": 1,
+        "carbohidrato_disponible_g": 32,
+        "grasa_g": 1,
+        "grasa_saturada_g": 0,
+        "fibra_g": 51,
+        "sodio_mg": 5
+      },
+      "micros": {},
+      "fuente_macros": "label",
+      "fuente_micros": "none",
+      "pieza": null,
+      "nota": "P034, etiqueta del 28 oct 2026. Casi toda la fibra es añadida y fermentable (tapioca): no comer justo antes de correr.",
       "en_plan": true
     },
     {
@@ -460,6 +527,55 @@
         "peso": 27
       },
       "nota": null,
+      "en_plan": false
+    },
+    {
+      "id": "pan_oroweat",
+      "nombre": "Pan de masa madre con mantequilla Oroweat",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 270,
+        "proteina_g": 9.2,
+        "carbohidrato_disponible_g": 48.1,
+        "grasa_g": 4.5,
+        "grasa_saturada_g": 2.8,
+        "fibra_g": 2.3,
+        "sodio_mg": 413
+      },
+      "micros": {
+        "vitA_ug": 93.553,
+        "vitC_mg": 0,
+        "vitD_ug": 0,
+        "vitE_mg": 0.22,
+        "vitK_ug": 0.2,
+        "tiamina_mg": 0.32,
+        "riboflavina_mg": 0.158,
+        "niacina_mg": 2.588,
+        "b6_mg": 0.087,
+        "folato_ug": 116.235,
+        "b12_ug": 0,
+        "colina_mg": 14.6,
+        "calcio_mg": 95.294,
+        "hierro_mg": 2.4,
+        "magnesio_mg": 17.506,
+        "fosforo_mg": 70.306,
+        "potasio_mg": 126,
+        "zinc_mg": 4.353,
+        "cobre_mg": 0.1,
+        "selenio_ug": 22.0,
+        "manganeso_mg": 0.536,
+        "ala_g": 0.166,
+        "epa_g": 0.001,
+        "dha_g": 0
+      },
+      "fuente_macros": "label",
+      "fuente_micros": "label+usda",
+      "pieza": {
+        "nombre": "rebanada",
+        "peso": 42.5
+      },
+      "nota": "P028, etiqueta del 28 oct 2026. Sin conservadores. Micronutrientes de la etiqueta (%VNR) y del pan del USDA.",
       "en_plan": true
     },
     {
@@ -1022,17 +1138,17 @@
     },
     {
       "id": "bagel",
-      "nombre": "Bagel natural",
+      "nombre": "Bagel con masa madre New York Deli",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
-        "kcal": 264,
-        "proteina_g": 10.56,
-        "carbohidrato_disponible_g": 50.78,
-        "grasa_g": 1.32,
-        "grasa_saturada_g": 0.36,
-        "fibra_g": 1.6,
-        "sodio_mg": 422
+        "kcal": 258.2,
+        "proteina_g": 8,
+        "carbohidrato_disponible_g": 48.3,
+        "grasa_g": 3.7,
+        "grasa_saturada_g": 1.6,
+        "fibra_g": 2,
+        "sodio_mg": 256
       },
       "micros": {
         "vitA_ug": 0,
@@ -1060,15 +1176,18 @@
         "epa_g": 0.0,
         "dha_g": 0.0
       },
-      "fuente_macros": "usda",
+      "fuente_macros": "label",
       "fuente_micros": "usda",
-      "pieza": null,
-      "nota": null,
+      "pieza": {
+        "nombre": "bagel",
+        "peso": 90
+      },
+      "nota": "P029, etiqueta del 28 oct 2026; 90 g por bagel (confirmado por Alex). Lleva jarabe de maíz de alta fructosa, grasa vegetal hidrogenada y azodicarbonamida. Micronutrientes del bagel del USDA.",
       "en_plan": true
     },
     {
       "id": "tocino",
-      "nombre": "Tocino cocido",
+      "nombre": "Tocino Obertal (cocido y escurrido)",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
@@ -1112,7 +1231,7 @@
         "nombre": "tira",
         "peso": 8
       },
-      "nota": null,
+      "nota": "P035: pesar cocido y escurrido. Valores del USDA (SR 168322); la etiqueta de Obertal (P031, 100 kcal por 100 g crudo) no cuadra con un tocino real.",
       "en_plan": true
     },
     {
@@ -1163,6 +1282,30 @@
       },
       "nota": "Etiqueta de atún ya escurrido. Micronutrientes estimados como 50% atún / 50% camarón (proporción real pendiente).",
       "en_plan": true
+    },
+    {
+      "id": "camaron",
+      "nombre": "Camarón congelado (crudo)",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 55,
+        "proteina_g": 11.6,
+        "carbohidrato_disponible_g": 0.8,
+        "grasa_g": 0.6,
+        "grasa_saturada_g": 0.2,
+        "fibra_g": 0,
+        "sodio_mg": 479
+      },
+      "micros": {},
+      "fuente_macros": "label",
+      "fuente_micros": "none",
+      "pieza": {
+        "nombre": "camarón",
+        "peso": 3
+      },
+      "nota": "P036, etiqueta del 28 oct 2026; marca pendiente. Pesar descongelado y escurrido. Trae agua o solución: 11.6 g de proteína por 100 g contra ~20 g del USDA, y 479 mg de sodio.",
+      "en_plan": false
     },
     {
       "id": "maruchan",
@@ -1249,6 +1392,40 @@
       },
       "nota": "Micronutrientes declarados en la etiqueta (fortificado).",
       "en_plan": true
+    },
+    {
+      "id": "groovies",
+      "nombre": "Cereal Groovies quinoa y maíz canela",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 271,
+        "proteina_g": 9,
+        "carbohidrato_disponible_g": 52,
+        "grasa_g": 3,
+        "grasa_saturada_g": 0,
+        "fibra_g": 14,
+        "sodio_mg": 250
+      },
+      "micros": {
+        "vitA_ug": 96.6,
+        "niacina_mg": 1.9,
+        "riboflavina_mg": 0.1428,
+        "b6_mg": 0.1581,
+        "tiamina_mg": 0.136,
+        "folato_ug": 64.6,
+        "b12_ug": 0.4,
+        "hierro_mg": 3.4,
+        "zinc_mg": 2
+      },
+      "fuente_macros": "label",
+      "fuente_micros": "label",
+      "pieza": {
+        "nombre": "porción",
+        "peso": 30
+      },
+      "nota": "P027, etiqueta del 28 oct 2026. Endulzado con alulosa, 0 g de azúcar añadida, 14 g de fibra por 100 g (fibra de maíz e inulina). No declara vitamina D (Lucky Charms da 3.3 µg en 30 g).",
+      "en_plan": false
     },
     {
       "id": "miel",
