@@ -11,7 +11,7 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 
 | Tipo | Cuándo | kcal | Proteína | Carbohidrato | Déficit vs gasto |
 |---|---|---|---|---|---|
-| A | Descanso o fuerza ligera | 1,864 | 153 g | 200 g | −161 (−301 con gimnasio) |
+| A | Descanso o fuerza ligera | 1,868 | 154 g | 198 g | −157 (−297 con gimnasio) |
 | B | Carrera suave | 2,198 | 160 g | 245 g | −252 |
 | C | Tirada larga (domingo) | 3,674 | 186 g | 559 g | +349 (geles) |
 | D | Sesión de calidad (tempo o ritmo de maratón) | 2,794 | 162 g | 380 g | +94 |
