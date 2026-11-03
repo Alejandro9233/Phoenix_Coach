@@ -97,12 +97,14 @@ TAPER_LONG_RUN_MIN = {3: 110, 2: 80, 1: 50}
 # Volume is the gap to sub-3:20 (Tanda), and the 8% ramp off a 35 km week
 # reaches ~50 km only by the taper. Replaces the ramp target and its hard
 # cap for that Monday's week; a comeback or the race week still win. The
-# Nov 8 half-trial week drops so the trial is run fresh. Keyed to that race:
-# a different race date ignores it.
+# Nov 8 half-trial week is hand-set (hand_set_weeks.py): 48 km, half of it
+# Sunday's trial, the rest short and easy so the trial is run fresh (was 42
+# before the week was written out, 2026-11-03). Keyed to that race: a
+# different race date ignores it.
 RUN_KM_PLAN_RACE = date(2026, 12, 13)
 RUN_KM_PLAN = {
     date(2026, 10, 26): 50.0,
-    date(2026, 11, 2): 42.0,
+    date(2026, 11, 2): 48.0,
     date(2026, 11, 9): 55.0,
 }
 RUN_KM_PLAN_CAP = 1.05     # hard cap over a planned week's km, as in the taper

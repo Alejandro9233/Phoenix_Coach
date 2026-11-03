@@ -26,3 +26,17 @@ os.environ["COROS_MCP_ENABLED"] = "0"
 assert os.environ["DATABASE_URL"].startswith("sqlite"), (
     "Tests must never see a non-sqlite DATABASE_URL"
 )
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_hand_set_weeks(monkeypatch):
+    """Hand-set weeks (hand_set_weeks.py) are keyed to real dates, so a test
+    that generates "this week" would get Alex's hand-written week instead of
+    the LLM path it means to test. Off for every test; test_hand_set_weeks
+    turns its own back on."""
+    from backend.services import hand_set_weeks
+
+    monkeypatch.setattr(hand_set_weeks, "HAND_SET_WEEKS", {})

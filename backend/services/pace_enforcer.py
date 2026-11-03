@@ -27,6 +27,9 @@ from backend.services.volume_gate import parse_minutes, strip_pace_refs
 # long_run. Vocabulary is closed — titles come from the phase menus and B2
 # rejects inventions — so substring matching over menu words is enough.
 _CLASSIFICATION = [
+    # Hand-set trial workouts (hand_set_weeks.py). No pace-model band has
+    # this key, so the pace and distance stamps leave their figures alone.
+    ("trial", ("time trial", "trial pace")),
     ("marathon", ("marathon pace", "m-pace", "mp long")),
     ("progressive", ("progressive", "progression")),
     ("long_run", ("long run",)),

@@ -40,7 +40,7 @@ COROS_MAX_ZONE = 6
 LTHR_FRACTIONS = (0.81, 0.90, 0.94, 1.00)
 BAND_ZONE = {
     "recovery": 1, "easy": 2, "long_run": 2, "progressive": 2,
-    "marathon": 3, "tempo": 4, "interval": 5,
+    "marathon": 3, "tempo": 4, "interval": 5, "trial": 4,
 }
 STRIDES_ZONE = 3
 _FAST_BLOCK_RE = re.compile(r"strid|opener|sprint|surge|pick-?up", re.I)

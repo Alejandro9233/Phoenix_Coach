@@ -944,18 +944,33 @@ def _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason):
         return raw
 
     from backend.services.constraint_enforcer import get_active_injuries
+    from backend.services.hand_set_weeks import hand_set_week
     from backend.services.plan_meta import run_plan_write_pipeline
+    # A hand-set week (hand_set_weeks.py) replaces the LLM and skips the
+    # volume gate, but still runs the ungated pipeline: enforcer and stamps.
+    hand_set = hand_set_week(start_of_week)
+    if hand_set and carry_revisions:
+        hand_set["_revisions"] = list(carry_revisions)
     try:
-        new_plan_json, violations = run_plan_write_pipeline(
-            db,
-            generate=_generate,
-            gate_ctx=training_context,
-            source=source,
-            availability=training_context.get("availability", {}),
-            active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
-            reason=reason,
-            fill_run_km=True,
-        )
+        if hand_set:
+            new_plan_json, violations = run_plan_write_pipeline(
+                db, hand_set,
+                source=source,
+                availability=training_context.get("availability", {}),
+                active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+                reason=reason,
+            )
+        else:
+            new_plan_json, violations = run_plan_write_pipeline(
+                db,
+                generate=_generate,
+                gate_ctx=training_context,
+                source=source,
+                availability=training_context.get("availability", {}),
+                active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+                reason=reason,
+                fill_run_km=True,
+            )
     except Exception as e:
         raise HTTPException(
             status_code=502,
