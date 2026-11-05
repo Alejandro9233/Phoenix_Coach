@@ -94,7 +94,10 @@ def test_the_pipeline_keeps_the_trial_as_written(db):
     assert [s["duration"] for s in reps["steps"] if s["type"] == "main"] == ["09:15"] * 3
     assert is_quality(reps)
 
-    assert _run(plan, "Friday")["pace_target"] == "6:19-7:00/km"
+    pickups = _run(plan, "Friday")
+    assert pickups["pace_target"] == "6:19-7:00/km easy · pick-ups 4:37/km"
+    assert pickups["distance_km"] == 4.7
+    assert _run(plan, "Tuesday")["pace_target"] == "6:19-7:00/km"
     assert not is_quality(_run(plan, "Saturday"))
 
 

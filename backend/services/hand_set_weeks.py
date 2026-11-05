@@ -114,18 +114,38 @@ HAND_SET_WEEKS = {
             },
             "Thursday": _rest(
                 "Rest",
-                "Recovery from Wednesday's reps.",
-                "Your calf and hip routine is fine today.",
+                "Wednesday's treadmill broke one rep in, so the trial-pace work moves to Friday as pick-ups.",
+                "Nothing, or an easy 20-30 min swim. Your calf and hip routine is fine today.",
             ),
+            # Wednesday's reps didn't happen (the treadmill broke, 2026-11-05):
+            # Friday carries a short taste of trial pace instead.
             "Friday": {
-                "summary": "Easy 30 min",
+                "summary": "Easy 30 min with 3 x 1 min at trial pace",
                 "workouts": [
-                    {"sport": "running", "title": "Easy Run", "steps": _easy(30),
+                    {"sport": "running", "title": "Trial Pace Pick-ups",
+                     "steps": [
+                         {"type": "warmup", "duration": "12:00", "zone": 1,
+                          "description": "Easy jog"},
+                         {"type": "main", "duration": "01:00", "zone": 3,
+                          "description": "Pick-up at 4:37/km (13.0 km/h on a treadmill)"},
+                         {"type": "recovery", "duration": "02:00", "zone": 1,
+                          "description": "Easy jog"},
+                         {"type": "main", "duration": "01:00", "zone": 3,
+                          "description": "Pick-up at 4:37/km (13.0 km/h on a treadmill)"},
+                         {"type": "recovery", "duration": "02:00", "zone": 1,
+                          "description": "Easy jog"},
+                         {"type": "main", "duration": "01:00", "zone": 3,
+                          "description": "Pick-up at 4:37/km (13.0 km/h on a treadmill)"},
+                         {"type": "cooldown", "duration": "11:00", "zone": 1,
+                          "description": "Easy jog"},
+                     ],
                      "total_time": "30 min", "hr_target": EASY_HR,
-                     "muscle_groups": [], "distance_km": 4.5},
+                     "muscle_groups": [], "distance_km": 4.7,
+                     "pace_target": "6:19-7:00/km easy · pick-ups 4:37/km"},
                 ],
-                "rationale": "Keeps the legs moving two days out.",
-                "coach_note": "No leg work in the gym from here to Sunday.",
+                "rationale": "Wednesday's reps were lost to the treadmill. One minute at a time two days out tunes the pace without tiring the legs.",
+                "coach_note": ("On a treadmill, go by the machine's speed, not the watch. Note your HR at the end "
+                               "of the third pick-up. No leg work in the gym from here to Sunday."),
             },
             "Saturday": {
                 "summary": "Shakeout 20 min + strides",
