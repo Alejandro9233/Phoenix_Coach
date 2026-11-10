@@ -106,7 +106,24 @@ RUN_KM_PLAN = {
     date(2026, 10, 26): 50.0,
     date(2026, 11, 2): 48.0,
     date(2026, 11, 9): 55.0,
+    # The short taper agreed 2026-10-27, built 2026-11-09. He came off a
+    # 20-day break plus ~6 build weeks: little fatigue to shed, and
+    # detraining is the bigger risk (Bosquet: 8-14 days).
+    date(2026, 11, 16): 60.0,
+    date(2026, 11, 23): 55.0,
+    date(2026, 11, 30): 38.0,
 }
+# Long-run minutes for those weeks. Nov 23 is the agreed "last long run,
+# about 2 h"; the other two were set to fit their km.
+RUN_KM_PLAN_LONG_RUN_MIN = {
+    date(2026, 11, 16): 150,
+    date(2026, 11, 23): 120,
+    date(2026, 11, 30): 75,
+}
+# These weeks train as Peak, not Taper: the taper's 3-5 h ceiling would
+# hard-fail a 60 km week and its menu would strip the quality from it.
+RUN_KM_PLAN_PEAK_WEEKS = {date(2026, 11, 16), date(2026, 11, 23)}
+RUN_KM_PLAN_PEAK_WEEKS_OUT = 4  # weeks to race that map to the Peak phase
 RUN_KM_PLAN_CAP = 1.05     # hard cap over a planned week's km, as in the taper
 
 # Comeback after a break (_detect_comeback). A break is any week at or under
@@ -1261,9 +1278,9 @@ class PeriodizationEngine:
         profile = self._get_profile(race_distance)
 
         # Phase
-        phase_info = self._determine_phase(weeks_to_race, race_distance)
-
         start_of_week = today - timedelta(days=today.weekday())
+        phase_info = self._phase_for_week(
+            weeks_to_race, race_distance, start_of_week, athlete.race_date)
 
         # Coming back from a break? Replayed from the watch's runs each time.
         comeback = self._detect_comeback(db, start_of_week)
@@ -1564,7 +1581,8 @@ class PeriodizationEngine:
             w_to_race = (race_monday - week_start).days // 7
 
             # Determine phase & cycle week — distance-aware
-            phase_info = self._determine_phase(w_to_race, race_distance)
+            phase_info = self._phase_for_week(
+                w_to_race, race_distance, week_start, athlete.race_date)
             cycle_anchor = (projected_end if projected_end and week_start >= projected_end
                             else anchor)
             cycle_info = self._get_cycle_week(cycle_anchor, week_start)
@@ -1718,6 +1736,14 @@ class PeriodizationEngine:
             "phase_total_weeks": fallback["total_weeks"],
             "phase_priorities": fallback["priorities"],
         }
+
+    def _phase_for_week(self, weeks_to_race: int, race_distance: str,
+                        monday: date, race_date: Optional[date]) -> dict:
+        """_determine_phase, except the weeks of the athlete's short taper
+        that still train as Peak (RUN_KM_PLAN_PEAK_WEEKS)."""
+        if race_date == RUN_KM_PLAN_RACE and monday in RUN_KM_PLAN_PEAK_WEEKS:
+            weeks_to_race = RUN_KM_PLAN_PEAK_WEEKS_OUT
+        return self._determine_phase(weeks_to_race, race_distance)
 
     def _detect_comeback(self, db: Session, monday: date) -> Optional[dict]:
         """Where the athlete stands coming back from the most recent break,
@@ -2278,6 +2304,7 @@ class PeriodizationEngine:
             basis = (f"athlete's planned week: {planned_km:g} km "
                      f"(the ramp alone gave {target:.1f} km)")
             target, hard_cap = planned_km, planned_km * RUN_KM_PLAN_CAP
+            long_run = RUN_KM_PLAN_LONG_RUN_MIN.get(monday, long_run)
 
         return {
             "run_km_target": round(target, 1),
