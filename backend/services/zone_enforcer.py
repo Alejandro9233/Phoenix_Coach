@@ -23,8 +23,10 @@ Rules, per step of a running workout:
   title's band implies: recovery 1, easy/long run/progressive 2, marathon 3,
   tempo 4, interval 5.
 - warmup / cooldown: 1.
-- any step whose description names strides, openers, sprints, surges or
-  pickups: 3. Twenty-second efforts on jog recoveries average a tempo-ish
+- any other step whose description names strides, openers, sprints, surges
+  or pickups: 3. A warm-up that ends in strides stays 1: the Nov 8 trial's
+  "Easy jog, then 4 x 20 s strides" went to the watch as Z3, a 160-168 bpm
+  target for the whole 15-minute warm-up. Twenty-second efforts on jog recoveries average a tempo-ish
   heart rate; it is the least wrong single zone for a mixed block and stops
   the watch calling the fast part of the session Z1.
 - other recovery steps: 1.
@@ -73,11 +75,13 @@ def _main_zone(workout: dict, ceilings) -> int:
 
 
 def step_zone(step: dict, main_zone: int) -> int:
+    if step.get("type") in ("warmup", "cooldown"):
+        return 1
     if _FAST_BLOCK_RE.search(str(step.get("description") or "")):
         return STRIDES_ZONE
     if step.get("type") == "main":
         return main_zone
-    return 1   # warmup, cooldown, recovery jogs
+    return 1   # recovery jogs
 
 
 def enforce_zones(plan_json: dict, hr_zones=None, lthr=None, days=None) -> tuple:

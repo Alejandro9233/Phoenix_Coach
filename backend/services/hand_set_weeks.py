@@ -15,6 +15,10 @@ pace, distance and fuel stamps. Trial-paced workouts carry their own
 pace_target — pace_enforcer classifies them as "trial", a band the pace
 model doesn't have, so the stamp leaves them alone.
 
+The 2026-11-09 week is the 55 km marathon week around the 27 km long run.
+The trial stopped at 8.2 km and Alex chose not to retest (2026-11-09): "I
+need to get ready for the marathon."
+
 Mid-week replans, adapt-today and triage still go through the LLM for the
 days they rewrite.
 """
@@ -33,6 +37,20 @@ def _rest(summary, rationale, coach_note):
         "rationale": rationale,
         "coach_note": coach_note,
     }
+
+
+def _strength(summary_groups, main, minutes=40):
+    return {"sport": "strength", "title": "Maintenance",
+            "steps": [
+                {"type": "warmup", "duration": "05:00", "zone": 1,
+                 "description": "Band activation"},
+                {"type": "main", "duration": f"{minutes - 10}:00", "zone": 2,
+                 "description": main},
+                {"type": "cooldown", "duration": "05:00", "zone": 1,
+                 "description": "Stretch"},
+            ],
+            "total_time": f"{minutes} min", "hr_target": "--",
+            "muscle_groups": summary_groups}
 
 
 def _easy(minutes, strides=False):
@@ -177,6 +195,100 @@ HAND_SET_WEEKS = {
                 "rationale": "Pass at 1:37:30 or faster -> the full on Dec 13 and the 27 km long run next Sunday. Slower -> race the 21K.",
                 "coach_note": ("Don't start fast. If 4:40 already costs 172+ bpm by km 5, today isn't a 1:37 day; "
                                "run it steady and we decide on the data. Gel before the start, at km 7 and at km 14."),
+            },
+        },
+    },
+    date(2026, 11, 9): {
+        "week_summary": {
+            "focus": "Marathon week: 55 km around the 27 km long run",
+            "rationale": (
+                "The half trial stopped at 8.2 km and there is no retest: the "
+                "build goes on. Easy days up front, one marathon-pace session "
+                "on Thursday, a rest day, then the longest run of the cycle "
+                "on Sunday."
+            ),
+        },
+        "days": {
+            "Monday": _rest("Rest", "The day after Sunday's trial.", ""),
+            "Tuesday": {
+                "summary": "Easy 40 min, upper-body gym",
+                "workouts": [
+                    {"sport": "running", "title": "Easy Run",
+                     "steps": _easy(40), "total_time": "40 min",
+                     "hr_target": EASY_HR, "muscle_groups": [], "distance_km": 6.1},
+                    _strength(["chest", "shoulders", "back", "arms"],
+                              "Upper: bench, overhead press, rows, pull-ups, 2 sets."),
+                ],
+                "rationale": "Back to running gently after Sunday.",
+                "coach_note": "If your legs still feel bad, cut it to 30 minutes.",
+            },
+            "Wednesday": {
+                "summary": "Easy 50 min, legs in the gym",
+                "workouts": [
+                    {"sport": "running", "title": "Easy Run",
+                     "steps": _easy(50), "total_time": "50 min",
+                     "hr_target": EASY_HR, "muscle_groups": [], "distance_km": 7.6},
+                    _strength(["legs"],
+                              "Squats, Romanian deadlifts, calf raises, 2 sets, "
+                              "moderate weight, nothing to failure."),
+                ],
+                "rationale": "Legs come back this week, four days before the long run.",
+                "coach_note": "Run first, gym after if you do both close together.",
+            },
+            "Thursday": {
+                "summary": "3 x 8 min at marathon pace",
+                "workouts": [
+                    {"sport": "running", "title": "Marathon Pace Intervals",
+                     "steps": [
+                         {"type": "warmup", "duration": "15:00", "zone": 1,
+                          "description": "Easy jog"},
+                         {"type": "main", "duration": "08:00", "zone": 3,
+                          "description": "At marathon pace"},
+                         {"type": "recovery", "duration": "02:00", "zone": 1,
+                          "description": "Easy jog"},
+                         {"type": "main", "duration": "08:00", "zone": 3,
+                          "description": "At marathon pace"},
+                         {"type": "recovery", "duration": "02:00", "zone": 1,
+                          "description": "Easy jog"},
+                         {"type": "main", "duration": "08:00", "zone": 3,
+                          "description": "At marathon pace"},
+                         {"type": "cooldown", "duration": "10:00", "zone": 1,
+                          "description": "Easy jog"},
+                     ],
+                     "total_time": "53 min", "hr_target": "160-168 bpm",
+                     "muscle_groups": [], "distance_km": 9.4},
+                ],
+                "rationale": "The week's one hard session, at the pace the marathon asks for.",
+                "coach_note": "If your legs are still bad, make it an easy run. On a treadmill, go by the machine's speed.",
+            },
+            "Friday": _rest("Rest", "Fresh legs for the weekend.", "Your calf and hip routine is fine today."),
+            "Saturday": {
+                "summary": "Easy 35 min",
+                "workouts": [
+                    {"sport": "running", "title": "Easy Run",
+                     "steps": _easy(35), "total_time": "35 min",
+                     "hr_target": EASY_HR, "muscle_groups": [], "distance_km": 5.3},
+                ],
+                "rationale": "Keeps the legs moving the day before the long run.",
+                "coach_note": "Very easy. Big carb dinner, early night.",
+            },
+            "Sunday": {
+                "summary": "Long run: 27 km",
+                "workouts": [
+                    {"sport": "running", "title": "Long Run",
+                     "steps": [
+                         {"type": "warmup", "duration": "10:00", "zone": 1,
+                          "description": "Very easy jog"},
+                         {"type": "main", "duration": "147:00", "zone": 2,
+                          "description": "Steady at long-run pace"},
+                         {"type": "cooldown", "duration": "10:00", "zone": 1,
+                          "description": "Easy jog or walk"},
+                     ],
+                     "total_time": "167 min", "hr_target": "142-159 bpm",
+                     "muscle_groups": [], "distance_km": 27.0},
+                ],
+                "rationale": "The longest run of the marathon build.",
+                "coach_note": "Start slower than you want to. Practice your race gels.",
             },
         },
     },

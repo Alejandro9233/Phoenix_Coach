@@ -62,6 +62,18 @@ def test_easy_run_main_is_z2_strides_z3_edges_z1():
     assert [(f["step"], f["found"], f["set"]) for f in fixes] == [("main", 1, 2), ("recovery", 1, 3)]
 
 
+def test_a_warmup_that_ends_in_strides_stays_z1():
+    """The Nov 8 trial's warm-up went to the watch as Z3: 160-168 bpm for
+    15 minutes before the first real step."""
+    run = {"sport": "running", "title": "Tempo Run", "total_time": "45 min",
+           "hr_target": "160-168 bpm", "steps": [
+               {"type": "warmup", "duration": "15:00", "zone": 3,
+                "description": "Easy jog, then 4 x 20 s strides"},
+               {"type": "main", "duration": "30:00", "zone": 3, "description": "Steady"}]}
+    plan, _ = enforce_zones(_plan({"Tuesday": [run]}), hr_zones=HR_ZONES)
+    assert plan["days"]["Tuesday"]["workouts"][0]["steps"][0]["zone"] == 1
+
+
 def test_long_run_range_is_z2_and_a_right_plan_reports_nothing():
     run = {"sport": "running", "title": "Long Run", "total_time": "75 min",
            "hr_target": "140-155 bpm", "steps": _steps(1, 2, 3, 1)}

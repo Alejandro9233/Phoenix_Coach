@@ -6,6 +6,7 @@ Rules locked in here:
   as written; easy runs still get the pace-model band; fuel is stamped.
 - Every run maps onto a watch course.
 - The week's km sit inside RUN_KM_PLAN's cap for that week.
+- The Nov 9 marathon week holds its 55 km, 27 km long run and easy warm-ups.
 """
 from datetime import date
 
@@ -55,11 +56,11 @@ def db(monkeypatch):
     engine.dispose()
 
 
-def _persist(db):
+def _persist(db, monday=TRIAL_WEEK):
     from backend.services.plan_meta import run_plan_write_pipeline
 
     plan, violations = run_plan_write_pipeline(
-        db, hand_set_week(TRIAL_WEEK), source="generate",
+        db, hand_set_week(monday), source="generate",
         availability={"run_days": "mon,tue,wed,thu,fri,sat,sun",
                       "strength_days": "mon,tue,wed,thu,fri,sat"},
         active_injuries=[], reason="test")
@@ -70,9 +71,9 @@ def _run(plan, day):
     return next(w for w in plan["days"][day]["workouts"] if w["sport"] == "running")
 
 
-def test_only_the_trial_week_is_hand_set(db):
+def test_only_the_written_weeks_are_hand_set(db):
     assert hand_set_week(TRIAL_WEEK) is not None
-    assert hand_set_week(date(2026, 11, 9)) is None
+    assert hand_set_week(date(2026, 11, 16)) is None
     week = hand_set_week(TRIAL_WEEK)
     week["days"]["Sunday"]["summary"] = "changed"
     assert HAND_SET_WEEKS[TRIAL_WEEK]["days"]["Sunday"]["summary"] != "changed"
@@ -127,3 +128,20 @@ def test_generation_uses_the_hand_set_week_without_the_llm(db, monkeypatch):
     monkeypatch.setattr(main, "_watch_sync_safe", lambda *a, **k: {"status": "off"})
     plan = main._generate_weekly_plan(db, TRIAL_WEEK, None, "generate", "test")
     assert _run(plan, "Sunday")["title"] == "Half Marathon Time Trial"
+
+
+def test_the_marathon_week_holds_its_km_and_long_run(db):
+    monday = date(2026, 11, 9)
+    plan, violations = _persist(db, monday)
+    assert violations == []
+    km = sum(w.get("distance_km") or 0 for d in plan["days"].values()
+             for w in d["workouts"] if w["sport"] == "running")
+    assert RUN_KM_PLAN[monday] * 0.95 <= km <= RUN_KM_PLAN[monday] * RUN_KM_PLAN_CAP
+    long_run = _run(plan, "Sunday")
+    assert 26.5 <= long_run["distance_km"] <= 27.5
+    assert long_run.get("fuel")
+    session = _run(plan, "Thursday")
+    assert session["pace_target"] == "4:39-4:49/km"
+    assert is_quality(session)
+    for day in ("Tuesday", "Wednesday", "Thursday", "Saturday", "Sunday"):
+        assert coros_watch.workout_to_course(_run(plan, day))["sections"]
