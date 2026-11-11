@@ -22,7 +22,7 @@ from backend.services.pace_enforcer import enforce_distances
 from backend.services.pace_model import apply_training_pace, compute_pace_model
 from backend.services.plan_normalizer import map_sport
 from backend.services.volume_fill import fill_run_km
-from backend.services.volume_gate import parse_minutes, workout_km
+from backend.services.volume_gate import HOURS_CEILING_FACTOR, parse_minutes, planned_hours, workout_km
 
 PM = apply_training_pace(compute_pace_model(4.45, "3:20:00", "Marathon"), 416.4)
 WINDOW = ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -123,3 +123,44 @@ def test_runs_go_only_on_run_days():
     avail = {"run_days": "tue,thu,fri,sun"}
     plan, fills = fill_run_km(_week(), _ctx(), days=WINDOW, availability=avail)
     assert all(f["action"] == "lengthened" for f in fills)
+
+
+# ─── The fill stays under the gate's hours ceiling ──────────────────────────
+# The gate trimmed an over-hours week, the fill refilled the km with no hours
+# check, and the week persisted over the ceiling.
+def _hours_ctx(hours_high, target):
+    ctx = _ctx(target=target)
+    ctx["volume_references"] = {"phase_hours_range": f"3-{hours_high:g}"}
+    return ctx
+
+
+# The hours_high of the weeks of Nov 16, Nov 23 and Nov 30 (no bike); the
+# targets sit above what the sample week runs, so the fill has work to do.
+@pytest.mark.parametrize("hours_high, target", [
+    (6.5, 75.0),
+    (6.5, 70.0),
+    (4.2, 55.0),
+])
+def test_the_fill_never_pushes_the_week_over_the_hours_ceiling(hours_high, target):
+    plan = _week()
+    before = planned_hours(plan, WINDOW)
+    plan, fills = fill_run_km(plan, _hours_ctx(hours_high, target), days=WINDOW,
+                              availability=AVAIL)
+    ceiling = hours_high * HOURS_CEILING_FACTOR
+    assert planned_hours(plan, WINDOW) <= max(ceiling, before)
+    # Never pays hours the plan did not have headroom for.
+    assert sum(f["minutes"] for f in fills) <= max(0, (ceiling - before) * 60)
+
+
+def test_a_capped_fill_says_hours_stopped_the_km():
+    plan, fills = fill_run_km(_week(), _hours_ctx(6.5, 75.0), days=WINDOW, availability=AVAIL)
+    assert fills and all(f["hours_capped"] for f in fills)
+    notes = [w["volume_fill"] for d in WINDOW for w in plan["days"][d]["workouts"]
+             if w.get("volume_fill")]
+    assert notes and all("weekly hours ceiling" in n for n in notes)
+
+
+def test_completed_hours_count_against_the_ceiling():
+    plan, fills = fill_run_km(_week(), _hours_ctx(6.5, 75.0), days=WINDOW,
+                              availability=AVAIL, completed_hours=2.4)
+    assert planned_hours(plan, WINDOW) + 2.4 <= 6.5 * HOURS_CEILING_FACTOR

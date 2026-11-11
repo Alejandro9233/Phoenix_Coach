@@ -378,6 +378,13 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
 
     rest_days = [d for d, c in choices.items() if c == "rest" and d in VALID_DAYS]
     swap_days = [d for d, c in choices.items() if c == "swap" and d in VALID_DAYS]
+    # Hand-set week: the LLM may only rebuild days that hold a blocked sport.
+    from backend.services.hand_set_guard import restrict_rebuild_days
+    swap_days = restrict_rebuild_days(start_of_week, swap_days, affected=[
+        d for d in swap_days
+        if any(map_sport(w.get("sport", "")) in blocked_sports
+               for w in ((days_dict.get(d) or {}).get("workouts") or []))
+    ])
 
     # 2. Rest days are pure arithmetic — no LLM needed to delete a session.
     reason = f"{injury.body_part} (reported {today})"
@@ -1146,6 +1153,10 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
         VALID_DAYS[o] for o in range(today.weekday(), 7)
         if VALID_DAYS[o] not in blocked
     ]
+    # Hand-set week: only the travel days change (already rested above). The
+    # other days keep their stored version; the LLM is not asked to rebuild.
+    from backend.services.hand_set_guard import restrict_rebuild_days
+    rebuild_days = restrict_rebuild_days(start_of_week, rebuild_days, affected=[])
     availability = {
         "swim_days": athlete.swim_days,
         "bike_days": athlete.bike_days,

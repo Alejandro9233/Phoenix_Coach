@@ -785,10 +785,11 @@ Respond ONLY with the JSON block. Do not write introductory or concluding conver
                 temperature=PLAN_TEMPERATURE, seed=None,
             )
         except Exception as e:
+            # Fail loud: returning the planned day made the caller persist an
+            # adapt receipt for an adaptation that never happened (same shape
+            # as the deleted _fallback_weekly_plan).
             print(f"Error adapting workout: {e}")
-            adapted = planned_workout.copy()
-            adapted["adaptation"] = None
-            return adapted
+            raise
 
     def generate_remaining_days(self, athlete_summary: str, profile: dict,
                                  training_context: dict,

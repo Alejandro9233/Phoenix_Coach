@@ -20,6 +20,12 @@ training pace (pace_model.apply_training_pace — CDMX), the same arithmetic the
 distance stamp uses. The watch runs these workouts by time, so time at the
 real pace is the honest km.
 
+The fill never pushes the week over the gate's hours ceiling (hours_high x
+HOURS_CEILING_FACTOR, strength excluded). It used to: the gate trimmed an
+over-hours week, the fill refilled the km, and the week persisted over the
+ceiling. Capped, the fill stops at the headroom and notes that the km target
+was out of reach because of hours.
+
 Only weekly generation and the mid-week replan fill (run_plan_write_pipeline
 fill_run_km=True). Never adapt-today or triage — a lighter day there is the
 point — and never the goal race week. The caller re-runs the constraint
@@ -30,7 +36,8 @@ import re
 from backend.services.pace_enforcer import _band_seconds, classify_run_workout
 from backend.services.plan_normalizer import VALID_DAYS, map_sport
 from backend.services.volume_gate import (
-    _injury_blocked_sports, _is_race_week, _window_workouts, parse_minutes, workout_km,
+    HOURS_CEILING_FACTOR, _injury_blocked_sports, _is_race_week, _window_workouts,
+    compute_budget, parse_minutes, planned_hours, workout_km,
 )
 
 FILL_MIN_KM = 1.0          # shortfalls under this are rounding, not a defect
@@ -40,6 +47,7 @@ NEW_RUN_MIN_MIN = 30
 WARM_COOL_MIN = 5          # each side of an added run's main block
 DEFAULT_EASY_SEC_KM = 360.0  # no pace model: the gate's own 6:00/km estimate
 FILL_NOTE = "weekly km target (system fill)"
+HOURS_CAP_NOTE = "km target not fully reached: weekly hours ceiling"
 _NOT_FILLABLE = re.compile(r"strid|opener|shakeout|sprint|pick-?up|surge", re.I)
 _DAY_ABBR = {d: d[:3].lower() for d in VALID_DAYS}
 
@@ -135,9 +143,11 @@ def _open_days(plan_json: dict, window, availability: dict, long_run_day: str) -
 
 
 def fill_run_km(plan_json: dict, ctx: dict, days=None, completed_run_km: float = 0.0,
-                availability: dict = None, active_injuries=None) -> tuple:
-    """Lift the window's running to the week's target. Returns (plan_json,
-    fills) — one {"day", "title", "minutes", "action"} per change."""
+                availability: dict = None, active_injuries=None,
+                completed_hours: float = 0.0) -> tuple:
+    """Lift the window's running to the week's target, within the hours
+    ceiling. Returns (plan_json, fills) — one {"day", "title", "minutes",
+    "action"} per change."""
     vt = (ctx or {}).get("volume_targets") or {}
     target = vt.get("run_km_target")
     if not target or _is_race_week(ctx or {}):
@@ -153,6 +163,15 @@ def fill_run_km(plan_json: dict, ctx: dict, days=None, completed_run_km: float =
 
     pace = _easy_pace_min((ctx or {}).get("pace_model"))
     fills = []
+    touched = []   # workouts changed, to note an hours-capped fill
+
+    # Minutes left under the gate's hours ceiling; None = no ceiling.
+    hours_high = (compute_budget(ctx) or {}).get("hours_high")
+    headroom = None
+    if hours_high is not None:
+        headroom = int((hours_high * HOURS_CEILING_FACTOR - completed_hours
+                        - planned_hours(plan_json, window)) * 60)
+    capped = False
 
     easy = sorted(((d, w) for d, w in _window_workouts(plan_json, window) if _fillable_easy(w)),
                   key=lambda dw: parse_minutes(dw[1].get("total_time")) or 0)
@@ -161,10 +180,15 @@ def fill_run_km(plan_json: dict, ctx: dict, days=None, completed_run_km: float =
             break
         room = EASY_RUN_MAX_MIN - int(round(parse_minutes(w.get("total_time")) or 0))
         extra = min(room, int(round(deficit * pace)))
+        if headroom is not None and extra > headroom:
+            extra, capped = max(headroom, 0), True
         if extra < 5:
             continue
         _lengthen(w, extra)
+        touched.append(w)
         deficit -= extra / pace
+        if headroom is not None:
+            headroom -= extra
         fills.append({"day": day_name, "title": w.get("title"), "minutes": extra,
                       "action": "lengthened"})
 
@@ -174,15 +198,28 @@ def fill_run_km(plan_json: dict, ctx: dict, days=None, completed_run_km: float =
         if deficit < NEW_RUN_MIN_KM:
             break
         minutes = int(min(EASY_RUN_MAX_MIN, max(NEW_RUN_MIN_MIN, round(deficit * pace))))
+        if headroom is not None and minutes > headroom:
+            minutes, capped = headroom, True
+            if minutes < NEW_RUN_MIN_MIN:
+                break
         day = plan_json["days"][day_name]
         kept = [w for w in day.get("workouts") or []
                 if isinstance(w, dict) and map_sport(w.get("sport") or "") != "rest"]
-        day["workouts"] = [_new_run(minutes, hr_target)] + kept
+        new = _new_run(minutes, hr_target)
+        touched.append(new)
+        if headroom is not None:
+            headroom -= minutes
+        day["workouts"] = [new] + kept
         if not kept:
             day["summary"] = "Easy run — added to reach the week's km target"
         deficit -= minutes / pace
         fills.append({"day": day_name, "title": "Easy Run", "minutes": minutes,
                       "action": "added"})
+    if capped and deficit >= FILL_MIN_KM:
+        for w in touched:
+            w["volume_fill"] += f"; {HOURS_CAP_NOTE}"
+        for f in fills:
+            f["hours_capped"] = True
     return plan_json, fills
 
 

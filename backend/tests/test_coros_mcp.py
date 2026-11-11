@@ -266,6 +266,96 @@ def test_refresh_without_refresh_token_asks_for_login():
         mcp.refresh_token({"issuer": "x", "client_id": "c", "access_token": "a"})
 
 
+def _auth_env(monkeypatch, tmp_path, expires_in, refresh="r"):
+    import time
+    monkeypatch.setenv("COROS_MCP_TOKEN_ROOT", str(tmp_path))
+    monkeypatch.delenv("COROS_MCP_TOKEN_PATH", raising=False)
+    monkeypatch.delenv("COROS_MCP_ENABLED", raising=False)
+    return mcp.save_token({"issuer": "https://mcpus.coros.com", "client_id": "c",
+                           "access_token": "old", "refresh_token": refresh,
+                           "expires_at": int(time.time()) + expires_in, "obtained_at": 0})
+
+
+class _Resp:
+    def __init__(self, status, body):
+        self.status_code, self._body = status, body
+        self.text = json.dumps(body)
+    def json(self):
+        return self._body
+
+
+def test_early_refresh_under_seven_days(monkeypatch, tmp_path):
+    _auth_env(monkeypatch, tmp_path, 3 * 86400)
+    monkeypatch.setattr(mcp.requests, "post", lambda *a, **k: _Resp(
+        200, {"access_token": "new", "expires_in": 30 * 86400}))
+    assert mcp.ensure_token()["access_token"] == "new"
+    assert mcp.ensure_token()["access_token"] == "new"  # now 30 d out: no refresh
+
+
+def test_no_refresh_with_more_than_seven_days(monkeypatch, tmp_path):
+    _auth_env(monkeypatch, tmp_path, 20 * 86400)
+    def boom(*a, **k):
+        raise AssertionError("must not refresh")
+    monkeypatch.setattr(mcp.requests, "post", boom)
+    assert mcp.ensure_token()["access_token"] == "old"
+
+
+def test_failed_early_refresh_keeps_valid_token(monkeypatch, tmp_path):
+    _auth_env(monkeypatch, tmp_path, 3 * 86400)
+    def boom(*a, **k):
+        raise mcp.requests.ConnectionError("down")
+    monkeypatch.setattr(mcp.requests, "post", boom)
+    assert mcp.ensure_token()["access_token"] == "old"
+    # a dead login with a still-valid token also keeps it, but leaves the marker
+    monkeypatch.setattr(mcp.requests, "post", lambda *a, **k: _Resp(400, {"error": "invalid_grant"}))
+    assert mcp.ensure_token()["access_token"] == "old"
+    assert mcp.auth_state()["needs_login"] is True
+
+
+def test_invalid_grant_writes_marker_and_raises(monkeypatch, tmp_path):
+    path = _auth_env(monkeypatch, tmp_path, -10)  # expired
+    monkeypatch.setattr(mcp.requests, "post", lambda *a, **k: _Resp(400, {"error": "invalid_grant"}))
+    with pytest.raises(mcp.CorosMcpError, match="COROS login expired"):
+        mcp.ensure_token()
+    marker = json.loads((path.parent / "needs_login.json").read_text())
+    assert marker["at"] and "invalid_grant" in marker["error"]
+
+
+def test_save_token_clears_marker(monkeypatch, tmp_path):
+    path = _auth_env(monkeypatch, tmp_path, 100)
+    (path.parent / "needs_login.json").write_text("{}")
+    _auth_env(monkeypatch, tmp_path, 30 * 86400)
+    assert not (path.parent / "needs_login.json").exists()
+
+
+def test_auth_state_fields(monkeypatch, tmp_path):
+    monkeypatch.setenv("COROS_MCP_TOKEN_ROOT", str(tmp_path))
+    monkeypatch.delenv("COROS_MCP_TOKEN_PATH", raising=False)
+    assert mcp.auth_state() == {"token": False, "needs_login": False,
+                                "expires_at": None, "days_left": None, "error": None}
+    path = _auth_env(monkeypatch, tmp_path, 10 * 86400)
+    st = mcp.auth_state()
+    assert st["token"] and not st["needs_login"] and st["error"] is None
+    assert 9.9 < st["days_left"] <= 10 and st["expires_at"].startswith("20")
+    (path.parent / "needs_login.json").write_text(json.dumps({"at": 1, "error": "invalid_grant"}))
+    st = mcp.auth_state()
+    assert st["needs_login"] and st["error"] == "invalid_grant"
+    assert "old" not in json.dumps(st) and "refresh" not in json.dumps(st)
+
+
+def test_dead_auth_message_only_for_auth_fallbacks(monkeypatch, tmp_path):
+    monkeypatch.setenv("COROS_MCP_TOKEN_ROOT", str(tmp_path))
+    monkeypatch.delenv("COROS_MCP_TOKEN_PATH", raising=False)
+    timeout = {"source": "scraper", "fallback_reason": "TimeoutError: "}
+    assert mcp.dead_auth_message(timeout) is None
+    assert mcp.dead_auth_message({"source": "mcp", "fallback_reason": None}) is None
+    dead = {"source": "scraper", "fallback_reason": "CorosAuthExpired: COROS login expired"}
+    assert "desconectado" in mcp.dead_auth_message(dead)
+    path = _auth_env(monkeypatch, tmp_path, 100)
+    (path.parent / "needs_login.json").write_text("{}")
+    assert "desconectado" in mcp.dead_auth_message(timeout)
+
+
 # ---------------------------------------------------------------- live-sync parsers
 
 def test_parse_sport_records_fixture():

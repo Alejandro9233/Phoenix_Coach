@@ -647,3 +647,23 @@ def test_long_ride_short_is_advisory_in_a_blocked_running_week():
     flat["days"]["Sunday"]["workouts"][0]["total_time"] = "1:45:00"
     report = audit_plan(flat, ctx, availability=avail, active_injuries=[Injury()])
     assert "long_ride_short" not in [v["kind"] for v in report.soft]
+
+
+def test_taper_menu_allows_a_short_long_run_but_not_a_full_one():
+    # The week of Nov 30 asks for a 75-min long run; "Long Run (full length)"
+    # and "Long Run (short)" are the same base title, so the menu forbids by km.
+    from backend.services.periodization_engine import _TAPER_MENU
+
+    ctx = _ctx(phase="taper", hours="2-4")
+    ctx["workout_menu"] = _TAPER_MENU["allowed"]
+    ctx["forbidden_workouts"] = _TAPER_MENU["forbidden"]
+
+    short = _week({"Monday": 6, "Sunday": (12, "Long Run (short)")})
+    short["days"]["Sunday"]["workouts"][0]["total_time"] = "75 min"
+    report = audit_plan(short, ctx, availability=AVAIL)
+    assert not [v for v in report.hard if v["kind"] == "forbidden_title"]
+
+    full = _week({"Monday": 6, "Sunday": (27, "Long Run (full length)")})
+    report = audit_plan(full, ctx, availability=AVAIL)
+    assert any(v["kind"] == "forbidden_title" and "Long Run" in v["title"]
+               for v in report.hard)

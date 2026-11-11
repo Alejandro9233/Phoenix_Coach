@@ -44,7 +44,7 @@ import secrets
 import stat
 import time
 import urllib.parse
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import requests
@@ -79,12 +79,22 @@ class CorosMcpError(Exception):
     pass
 
 
+class CorosAuthExpired(CorosMcpError):
+    """The refresh token is dead; only a new login fixes it."""
+
+
 # --------------------------------------------------------------------------
 # Tokens
 # --------------------------------------------------------------------------
 
 def token_root() -> Path:
     return Path(os.getenv("COROS_MCP_TOKEN_ROOT") or (Path.home() / ".phoenix" / "coros_mcp"))
+
+
+NEEDS_LOGIN_FILE = "needs_login.json"
+EARLY_REFRESH_S = 7 * 86400  # tokens last 30 days; refresh with a week left
+LOGIN_EXPIRED_MSG = ("COROS login expired — run scripts/coros_mcp_cli.py login "
+                     "on the server")
 
 
 def find_token_path() -> Path | None:
@@ -118,7 +128,22 @@ def save_token(tok: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(tok, indent=2))
     path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    # A fresh token (login or refresh) means the login works again.
+    try:
+        (path.parent / NEEDS_LOGIN_FILE).unlink()
+    except FileNotFoundError:
+        pass
     return path
+
+
+def _mark_needs_login(token_path: Path, error: str) -> None:
+    """Tiny marker next to the token: the refresh token is dead, only a new
+    login fixes it. No secrets — a timestamp and a short error."""
+    try:
+        (token_path.parent / NEEDS_LOGIN_FILE).write_text(json.dumps(
+            {"at": int(time.time()), "error": error[:160]}))
+    except OSError as e:
+        print(f"COROS MCP: could not write {NEEDS_LOGIN_FILE}: {e}")
 
 
 def _safe_error_body(text: str) -> str:
@@ -155,6 +180,10 @@ def refresh_token(tok: dict) -> dict:
         "client_id": tok["client_id"],
         "refresh_token": tok["refresh_token"],
     }, timeout=HTTP_TIMEOUT)
+    if r.status_code in (400, 401):
+        # invalid_grant and friends: the refresh token is dead for good.
+        raise CorosAuthExpired(f"{LOGIN_EXPIRED_MSG} (HTTP {r.status_code} "
+                               f"{_safe_error_body(r.text)})")
     if r.status_code != 200:
         raise CorosMcpError(f"token refresh failed: HTTP {r.status_code} "
                             f"{_safe_error_body(r.text)} — run login again")
@@ -166,17 +195,59 @@ def refresh_token(tok: dict) -> dict:
 
 
 def ensure_token(skew_s: int = 60) -> dict:
-    """Load the saved token, refreshing it when within `skew_s` of expiry."""
+    """Load the saved token. Refresh when under 7 days remain (the access
+    token lasts 30 days, so a failed refresh still leaves time to notice).
+    An early refresh that fails keeps the old token while it is valid; a dead
+    login (400/401) writes the needs_login marker and raises."""
     path = find_token_path()
     if path is None:
         raise CorosMcpError("no COROS MCP token on this machine — run "
                             "`scripts/coros_mcp_cli.py login`")
     tok = load_token(path)
-    if tok.get("expires_at", 0) - skew_s > time.time():
+    left = tok.get("expires_at", 0) - time.time()
+    if left - skew_s > 0 and left > EARLY_REFRESH_S:
         return tok
-    tok = refresh_token(tok)
-    save_token(tok)
-    return tok
+    still_valid = left - skew_s > 0
+    try:
+        new = refresh_token(tok)
+    except CorosAuthExpired as e:
+        _mark_needs_login(path, str(e))
+        if still_valid:
+            print(f"COROS MCP: early refresh failed, login is dead ({e}); "
+                  f"old token valid for {left / 86400:.1f} more days")
+            return tok
+        raise
+    except Exception as e:
+        if still_valid:
+            print(f"COROS MCP: early refresh failed ({e}); using the old token")
+            return tok
+        raise
+    save_token(new)
+    return new
+
+
+def auth_state() -> dict:
+    """Login health for /watch/status and the refresh result. No secrets."""
+    out = {"token": False, "needs_login": False, "expires_at": None,
+           "days_left": None, "error": None}
+    path = find_token_path()
+    if path is None:
+        return out
+    out["token"] = True
+    try:
+        exp = json.loads(path.read_text()).get("expires_at")
+        if exp:
+            out["expires_at"] = datetime.fromtimestamp(exp, timezone.utc).isoformat()
+            out["days_left"] = round((exp - time.time()) / 86400, 2)
+    except (OSError, ValueError):
+        pass
+    try:
+        marker = json.loads((path.parent / NEEDS_LOGIN_FILE).read_text())
+        out["needs_login"] = True
+        out["error"] = str(marker.get("error") or "login expired")[:160]
+    except (OSError, ValueError):
+        pass
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -970,6 +1041,24 @@ def enabled() -> bool:
 
 
 shadow_enabled = enabled  # older name
+
+
+DEAD_AUTH_MESSAGE = ("COROS está desconectado. Vuelve a iniciar sesión en el "
+                     "servidor: scripts/coros_mcp_cli.py login. Mientras tanto "
+                     "no llegan planes al reloj ni datos de sueño.")
+
+
+def dead_auth_message(coros_source: dict) -> str | None:
+    """The phone alert text when the MCP fell back to the scraper because the
+    login is dead (marker present, or the fallback reason says so); else None.
+    Timeouts and other fallbacks keep the quiet behaviour."""
+    if (coros_source or {}).get("source") != "scraper":
+        return None
+    reason = str((coros_source or {}).get("fallback_reason") or "").lower()
+    if (auth_state()["needs_login"] or "invalid_grant" in reason
+            or "login expired" in reason or "run login again" in reason):
+        return DEAD_AUTH_MESSAGE
+    return None
 
 
 def fetch_gate_rows(days: int = 7) -> dict:

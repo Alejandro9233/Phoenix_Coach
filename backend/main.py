@@ -1163,6 +1163,11 @@ def replan_remaining_days(db: Session = Depends(get_db)):
 
     response_agent = ResponseAgent()
 
+    # Hand-set week: the remaining days come from hand_set_weeks.py, not the
+    # LLM (same as regenerate), through the ungated pipeline.
+    from backend.services.hand_set_guard import overlay_hand_set_days
+    hand_set_plan = overlay_hand_set_days(plan_json, start_of_week, days_to_replan)
+
     def _generate(feedback=None):
         result = response_agent.generate_remaining_days(
             athlete_summary=athlete_summary,
@@ -1202,20 +1207,31 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     from backend.services.constraint_enforcer import get_active_injuries
     from backend.services.plan_meta import run_plan_write_pipeline
     try:
-        plan_json, violations = run_plan_write_pipeline(
-            db,
-            generate=_generate,
-            gate_ctx=training_context,
-            completed_run_km=completed_run_km,
-            completed_hours=completed_hours,
-            source="replan_remaining",
-            availability=training_context.get("availability", {}),
-            active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
-            days=days_to_replan,
-            reason="The athlete requested a mid-week replan.",
-            before=before,
-            fill_run_km=True,
-        )
+        if hand_set_plan is not None:
+            plan_json, violations = run_plan_write_pipeline(
+                db, hand_set_plan,
+                source="replan_remaining",
+                availability=training_context.get("availability", {}),
+                active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+                days=days_to_replan,
+                reason="The athlete requested a mid-week replan.",
+                before=before,
+            )
+        else:
+            plan_json, violations = run_plan_write_pipeline(
+                db,
+                generate=_generate,
+                gate_ctx=training_context,
+                completed_run_km=completed_run_km,
+                completed_hours=completed_hours,
+                source="replan_remaining",
+                availability=training_context.get("availability", {}),
+                active_injuries=get_active_injuries(db, athlete.id) if athlete else [],
+                days=days_to_replan,
+                reason="The athlete requested a mid-week replan.",
+                before=before,
+                fill_run_km=True,
+            )
     except Exception as e:
         raise HTTPException(
             status_code=502,
@@ -1379,6 +1395,14 @@ def _preserve_adapted_distances(adapted_day: dict, original_day: dict) -> None:
             w["distance_km"] = float(match["distance_km"])
 
 
+def _hand_set_today() -> bool:
+    """True when this week is hand-set (hand_set_weeks.py)."""
+    from datetime import timedelta
+    from backend.services.hand_set_guard import is_hand_set
+    today = get_local_today()
+    return is_hand_set(today - timedelta(days=today.weekday()))
+
+
 @app.post("/weekly-plan/adapt-today")
 def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
@@ -1535,7 +1559,15 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     
     # Adapt
     response_agent = ResponseAgent()
-    adapted_day = response_agent.adapt_daily(planned_workout_day, today_metrics, training_context=training_context)
+    # A failed LLM call persists nothing (no receipt, last_adapted untouched),
+    # like weekly generation. The auto path catches this and records adapt_error.
+    try:
+        adapted_day = response_agent.adapt_daily(planned_workout_day, today_metrics, training_context=training_context)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Adaptation failed; existing plan left untouched: {e}"
+        )
     _preserve_adapted_distances(adapted_day, planned_workout_day)
 
     # Update weekly plan
@@ -1859,6 +1891,13 @@ async def _run_smart_refresh(db: Session, progress=None):
         sync_status = "partial"
         sync_message = f"Scraper error: {str(e)}. Using cached data."
 
+    # A dead COROS login falls back to the scraper quietly and the watch push
+    # and sleep data stop. The phone only alerts on "partial", so say it.
+    dead_auth = coros_mcp.dead_auth_message(coros_source)
+    if dead_auth:
+        sync_status = "partial"
+        sync_message = dead_auth
+
     # 2. Get latest recovery snapshot
     report("Evaluating recovery...")
     latest = db.query(RecoverySnapshot).order_by(RecoverySnapshot.date.desc()).first()
@@ -1967,6 +2006,11 @@ async def _run_smart_refresh(db: Session, progress=None):
     if needs_adaptation and _todays_training_done(db):
         adapt_skip_reason = "Today's training is already done — its load is what tripped the triggers."
         print(f"⛔ Completion gate: {adapt_skip_reason}")
+    elif needs_adaptation and _hand_set_today():
+        # A hand-written week is not the LLM's to rewrite on a bad morning.
+        # The athlete can still ask for it with Adaptar hoy (manual path).
+        adapt_skip_reason = "Semana escrita a mano: no se adapta sola. Usa Adaptar hoy si la quieres cambiar."
+        print(f"⛔ Hand-set week: {adapt_skip_reason}")
     elif needs_adaptation:
         try:
             report("Adapting today's plan...")
@@ -2088,6 +2132,7 @@ async def _run_smart_refresh(db: Session, progress=None):
         "event": event,
         "event_id": event_id,
         "event_recorded": event_recorded,
+        "coros_auth": coros_mcp.auth_state(),
     }
 
 

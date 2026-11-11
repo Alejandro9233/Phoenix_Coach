@@ -314,7 +314,8 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
         from backend.services.volume_fill import fill_run_km as _fill
         candidate, fills = _fill(
             candidate, gate_ctx, days=days, completed_run_km=completed_run_km,
-            availability=availability, active_injuries=active_injuries)
+            availability=availability, active_injuries=active_injuries,
+            completed_hours=completed_hours)
         if fills:
             print(f"➕ [{source}] Volume fill: "
                   f"{[(f['day'], f['action'], f['minutes']) for f in fills]}")

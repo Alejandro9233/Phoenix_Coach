@@ -199,6 +199,39 @@ def test_athlete_deleted_our_workout_is_respected(db):
     assert db.query(WatchWorkout).first().status == "removed"
 
 
+def test_athlete_deleted_workout_is_not_recreated_on_the_third_sync(db):
+    fake = FakeWatch()
+    plan = _plan(Wednesday=[_run("Wed tempo")])
+    ws.sync_watch(db, plan, MON, client=fake, today=MON, force=True)   # pushed
+    fake.items.clear()                                                  # he deletes it in the COROS app
+    ws.sync_watch(db, plan, MON, client=fake, today=MON, force=True)   # marks the row removed
+    fake.writes.clear()
+    rep = ws.sync_watch(db, plan, MON, client=fake, today=MON, force=True)
+    assert fake.writes == [] and rep["skipped"][0]["reason"].startswith("removed by the athlete")
+    assert db.query(WatchWorkout).first().status == "removed"
+
+
+def test_athlete_item_on_the_day_is_respected_on_the_second_sync(db):
+    fake = FakeWatch(items={date(2026, 3, 11): [("Easy run", "82", False)]})
+    plan = _plan(Wednesday=[_run("Wed tempo")])
+    ws.sync_watch(db, plan, MON, client=fake, today=MON, force=True)
+    rep = ws.sync_watch(db, plan, MON, client=fake, today=MON, force=True)
+    assert fake.writes == [] and rep["skipped"][0]["reason"] == "athlete already scheduled: Easy run"
+    assert db.query(WatchWorkout).first().status == "athlete_scheduled"
+
+
+def test_unmappable_edit_leaves_the_pushed_workout_alone(db):
+    fake = FakeWatch()
+    ws.sync_watch(db, _plan(Wednesday=[_run("Wed tempo")]), MON, client=fake, today=MON, force=True)
+    fake.writes.clear()
+    rep = ws.sync_watch(db, _plan(Wednesday=[_run("Wed tempo", zone=None)]), MON, client=fake, today=MON, force=True)
+    assert fake.writes == []                                            # no update, no CANCELLED placeholder
+    assert rep["status"] == "partial" and rep["errors"]
+    assert rep["skipped"][0]["reason"].startswith("unmappable:") and "zone" in rep["skipped"][0]["reason"]
+    row = db.query(WatchWorkout).filter_by(date=date(2026, 3, 11), slot=1).first()
+    assert row.status == "pushed" and row.id_in_plan == "501"
+
+
 def test_two_runs_one_day_get_their_own_slots(db):
     fake = FakeWatch()
     plan = _plan(Wednesday=[{"sport": "strength", "title": "Core", "steps": []}, _run("AM easy"), _run("PM strides", zone=3)])
@@ -211,7 +244,8 @@ def test_mapper_refusal_skips_that_workout_only(db):
     fake = FakeWatch()
     plan = _plan(Wednesday=[_run("Bad", zone=None), _run("Good")])
     rep = ws.sync_watch(db, plan, MON, client=fake, today=MON, force=True)
-    assert [w[2] for w in fake.writes] == ["Phoenix 2 · Good"] and rep["status"] == "ok"
+    assert [w[2] for w in fake.writes] == ["Phoenix 2 · Good"] and rep["status"] == "partial"
+    assert len(rep["errors"]) == 1 and "Wednesday slot 1 (Bad)" in rep["errors"][0]
 
 
 def test_write_entry_allows_exactly_two_tools():
@@ -237,6 +271,16 @@ def test_watch_status_reports_week_and_last_failure(db, monkeypatch):
     st = ws.watch_status(db, today=MON)
     assert st["enabled"] is False and st["week_start"] == "2026-03-09" and len(st["rows"]) == 2
     assert st["last_failure"] == {"date": "2026-03-11", "name": "Phoenix 1 · x", "error": "HTTP 504"}
+
+
+def test_watch_status_says_when_the_coros_login_is_dead(db, monkeypatch, tmp_path):
+    tok = tmp_path / "token.json"
+    tok.write_text('{"access_token": "x", "expires_at": 1}')
+    (tmp_path / "needs_login.json").write_text('{"at": 1, "error": "invalid_grant"}')
+    monkeypatch.setenv("COROS_MCP_TOKEN_PATH", str(tok))
+    st = ws.watch_status(db, today=MON)
+    assert st["rows"] == [] and st["last_failure"] is None
+    assert st["coros_auth"]["needs_login"] is True and "invalid_grant" in st["coros_auth"]["error"]
 
 
 @pytest.mark.parametrize("text, readable", [

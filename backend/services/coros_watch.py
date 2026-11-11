@@ -182,6 +182,7 @@ class DayCourses:
     date: date
     courses: list[tuple[int, dict]] = field(default_factory=list)   # (slot, course)
     errors: list[str] = field(default_factory=list)                 # unmappable workouts
+    error_slots: set[int] = field(default_factory=set)              # slots that failed to map
     enforced_reason: str | None = None                              # the day was stripped
 
 
@@ -208,6 +209,7 @@ def plan_day_courses(plan_json: dict, week_start: date) -> dict[date, DayCourses
                 dc.courses.append((slot, workout_to_course(w, slot)))
             except CourseMappingError as e:
                 dc.errors.append(f"{name} slot {slot} ({w.get('title')}): {e}")
+                dc.error_slots.add(slot)
         out[d] = dc
     return out
 

@@ -17,6 +17,7 @@ How a run decides, per (date, slot), from today forward:
    - not on the watch, but we had pushed it → he deleted it in the app → skip.
 4. Planned course absent but Phoenix has something on the watch for that
    slot → overwrite with the CANCELLED placeholder (COROS cannot delete).
+   A workout the mapper refused → skip and report it; never touch the watch.
 5. A completed watch item is locked by COROS → skip.
 Each write records a row BEFORE the call (status creating) and after it
 (pushed/cancelled/failed with the returned id), so a timeout that landed is
@@ -118,12 +119,17 @@ def decide_actions(week: dict[date, cw.DayCourses], schedule: dict[date, list[di
         on_watch = cw.phoenix_items(items)
         athlete_items = [i for i in items if not i.get("phoenix_slot")]
         planned = dict(dc.courses)
-        slots = set(planned) | set(on_watch) | {s for (rd, s) in rows if rd == d}
+        slots = set(planned) | set(on_watch) | dc.error_slots | {s for (rd, s) in rows if rd == d}
         for slot in sorted(slots):
             row = rows.get((d, slot))
             watch = on_watch.get(slot)
             course = planned.get(slot)
             cancel = False
+            if slot in dc.error_slots:
+                # the mapper refused this workout: leave whatever is on the watch alone
+                why = "; ".join(e for e in dc.errors if f"slot {slot} (" in e)
+                actions.append(Action(d, slot, "skip", f"unmappable: {why}"))
+                continue
             if course is None:
                 if watch is None:
                     actions.append(Action(d, slot, "skip", "not planned, nothing on the watch"))
@@ -145,9 +151,10 @@ def decide_actions(week: dict[date, cw.DayCourses], schedule: dict[date, list[di
                                           course=course, id_in_plan=watch["idInPlan"], cancel=cancel))
                 continue
             # nothing of ours on the watch for this slot
-            if row is not None and row.id_in_plan and row.status in ("pushed", "cancelled"):
+            if row is not None and (row.status == "removed" or (
+                    row.id_in_plan and row.status in ("pushed", "cancelled"))):
                 actions.append(Action(d, slot, "skip", "removed by the athlete in the COROS app"))
-            elif athlete_items and row is None:
+            elif athlete_items and (row is None or row.status == "athlete_scheduled"):
                 names = ", ".join(i["name"] for i in athlete_items)
                 actions.append(Action(d, slot, "skip", f"athlete already scheduled: {names}"))
             else:
@@ -173,12 +180,13 @@ def sync_watch(db, plan_json: dict, week_start: date, days: list[str] | None = N
     """Push/update/cancel this week's courses from today forward. Returns a
     report; never raises (callers run it after the plan commit and must not
     fail a request over the watch). `days` limits to weekday names."""
-    report = {"status": "off", "writes": [], "skipped": [], "error": None}
+    report = {"status": "off", "writes": [], "skipped": [], "errors": [], "error": None}
     if not force and not push_enabled():
         return report
     today = today or get_local_today()
     week = cw.plan_day_courses(plan_json, week_start)
     dates = [d for d in sorted(week) if d >= today and (days is None or d.strftime("%A") in days)]
+    report["errors"] = [e for d in dates for e in week[d].errors]
     report["status"] = "nothing"
     if not dates:
         return report
@@ -231,12 +239,14 @@ def sync_watch(db, plan_json: dict, week_start: date, days: list[str] | None = N
     cutoff = today - timedelta(days=KEEP_DAYS)
     db.query(WatchWorkout).filter(WatchWorkout.date < cutoff).delete(synchronize_session=False)
     db.commit()
-    report["status"] = "ok" if all(w.get("ok") for w in report["writes"]) else "partial"
+    report["status"] = "ok" if all(w.get("ok") for w in report["writes"]) and not report["errors"] else "partial"
     return report
 
 
 def watch_status(db, today: date | None = None) -> dict:
-    """For the app: this week's rows and the newest failure."""
+    """For the app: this week's rows, the newest failure, and the COROS login.
+    A dead login fails before any row is written (the schedule read), so
+    without `coros_auth` the week of 2026-11-09 read as rows: [], no failure."""
     today = today or get_local_today()
     week_start = today - timedelta(days=today.weekday())
     rows = db.query(WatchWorkout).filter(WatchWorkout.date >= week_start,
@@ -251,4 +261,5 @@ def watch_status(db, today: date | None = None) -> dict:
                   "error": r.last_error} for r in rows],
         "last_failure": ({"date": failures[-1].date.isoformat(), "name": failures[-1].course_name,
                           "error": failures[-1].last_error} if failures else None),
+        "coros_auth": coros_mcp.auth_state(),
     }

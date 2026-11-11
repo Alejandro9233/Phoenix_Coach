@@ -40,6 +40,7 @@ docstring used to claim enforcement lived here and it did not, which shipped str
 sessions onto non-strength days for months.
 """
 import copy
+import math
 import re
 import statistics
 from datetime import date, datetime, timedelta
@@ -52,7 +53,7 @@ from backend.services.constraint_enforcer import (
     get_travel_day_names, parse_day_list,
 )
 from backend.services.long_run_day import LONG_RUN_DAY
-from backend.services.pace_enforcer import km_for_minutes
+from backend.services.pace_enforcer import _band_seconds, km_for_minutes
 from backend.services.pace_model import (
     LONG_RUN_EASY_RATIO, RACE_KM, apply_training_pace, compute_pace_model,
 )
@@ -64,6 +65,17 @@ from backend.utils.timezone import get_local_today
 # Strength is absent on purpose: hours exclude strength everywhere
 # (volume_gate charter), so gym availability never moves the window.
 SESSION_HOURS_ESTIMATE = {"swimming": 1.0, "cycling": 1.25, "running": 1.0}
+# Slowest easy pace the hours ceiling must hold a week's run km at when there
+# is no pace model (CDMX, 2,240 m: easy runs 5:45-6:30/km).
+HOURS_PACE_SEC_KM = 390.0
+
+
+def _fmt_hours_range(lo: float, hi: float) -> str:
+    """"4.5-6.5": one decimal, the top rounded UP and the bottom DOWN, for a
+    band raised to fit the km target (whole hours would add up to an hour)."""
+    lo = math.floor(lo * 10 + 1e-9) / 10
+    hi = math.ceil(hi * 10 - 1e-9) / 10
+    return f"{lo:g}-{hi:g}"
 
 # Blocked-running weeks (_carry_blocked_running): the long run becomes a long
 # ride of LONG_RIDE_PER_LONG_RUN x its minutes — no impact, so the same
@@ -204,17 +216,22 @@ _TAPER_MENU = {
         "running": [
             "Easy Run (short)", "Strides/Openers",
             "Tempo Run (short)", "Marathon Pace Long Run (short)",
+            "Long Run (short)",
         ],
         "cycling": ["Endurance Ride (short, Z2)"],
         "swimming": ["Technique Session (short)"],
         "strength": [],
     },
     "forbidden": [
-        "ALL long sessions and any second quality session",
+        "ALL long sessions (bar the short Long Run) and any second quality session",
         "Tempo Run (>8 km)", "Cruise Intervals (>6 km)",
         "Marathon Pace Long Run (>12 km)",
         "VO2max Intervals", "Sweet Spot",
-        "Threshold Intervals", "Long Run (full length)",
+        "Threshold Intervals",
+        # Same base title as "Long Run (short)" once parentheticals drop, so the
+        # forbid has to be a km condition (_COND_KM_RE), not a name. The week of
+        # Nov 30 asks for a 75-min long run (~11-12 km at CDMX pace).
+        "Long Run (>14 km)",
         "Strength (stop 7-10 days before race)",
     ],
     "reason": "Taper — cut volume hard, keep ONE short session at race pace. Fewer, never slower. Trust the process.",
@@ -1384,13 +1401,6 @@ class PeriodizationEngine:
             recovery_note = ("Recovery week skipped — the taper is the recovery "
                              "from here to the race.")
 
-        # After the hours window AND the long run are fixed: an injury changes
-        # which sport holds the week, not how much of it there is.
-        self._carry_blocked_running(
-            volume_refs, athlete, set(injury_blocked),
-            long_run_minutes=(volume_targets or {}).get("long_run_minutes"),
-        )
-
         # Python-derived training paces from the watch's LT pace (running
         # races only). None degrades every consumer to HR-zone guidance.
         pace_model = compute_pace_model(
@@ -1411,6 +1421,23 @@ class PeriodizationEngine:
             if lr_km and lr_km > volume_targets["single_run_cap_km"]:
                 volume_targets["single_run_cap_km"] = lr_km
                 volume_targets["single_run_cap_source"] = "long_run"
+
+        # The hours window follows the run-km target, not the other way round
+        # (CLAUDE.md: Python sets volume). Not on race week (the gate skips
+        # hours there) or with running blocked (the bike carries the week).
+        if not race_week and "running" not in injury_blocked:
+            easy_band = _band_seconds(pace_model, "easy")
+            self._raise_hours_for_km(
+                volume_refs, (volume_targets or {}).get("run_km_target"),
+                max(easy_band[1], HOURS_PACE_SEC_KM) if easy_band else HOURS_PACE_SEC_KM,
+            )
+
+        # After the hours window AND the long run are fixed: an injury changes
+        # which sport holds the week, not how much of it there is.
+        self._carry_blocked_running(
+            volume_refs, athlete, set(injury_blocked),
+            long_run_minutes=(volume_targets or {}).get("long_run_minutes"),
+        )
 
         # Recovery status
         recovery = self._get_recovery_status(db)
@@ -1964,7 +1991,35 @@ class PeriodizationEngine:
             lo, hi = lo * 0.75, hi * 0.75
         lo = max(lo, 0.0)
         hi = max(hi, lo)
-        return f"{lo:.0f}-{hi:.0f}"
+        # The top rounds UP: "{:.0f}" turned 6.5 into "6".
+        return f"{lo:.0f}-{math.ceil(hi - 1e-9):d}"
+
+    @staticmethod
+    def _raise_hours_for_km(refs: dict, run_km_target, pace_sec_km: float) -> None:
+        """Lift the hours window's top to what the week's run-km target needs.
+
+        _hours_range_for deducts every lost session as a whole hour, but a
+        run is not an hour: a 60 km week is 6.5 h at 6:30/km. With no bike
+        the Marathon peak band fell to 4-6 h (gate ceiling 6.6 h) beside a
+        60 km target with a 150-min long run, and the taper's 2-4 h ceiling
+        sat under a 38 km week. The gate then trimmed the week and
+        volume_fill refilled it. hi = km x the slow end of easy pace + the
+        other sports' estimated hours (strength excluded), never lowered.
+        """
+        if not run_km_target or not refs.get("phase_hours_range"):
+            return
+        try:
+            lo, hi = (float(x) for x in refs["phase_hours_range"].split("-"))
+        except ValueError:
+            return
+        other = sum(
+            SESSION_HOURS_ESTIMATE.get(sport, 0.0) * (info or {}).get("sessions", 0)
+            for sport, info in (refs.get("sport_sessions") or {}).items()
+            if sport != "running" and isinstance((info or {}).get("sessions"), int)
+        )
+        need = run_km_target * pace_sec_km / 3600 + other
+        if need > hi:
+            refs["phase_hours_range"] = _fmt_hours_range(lo, need)
 
     def _get_volume_references(
         self, phase_info: dict, is_recovery_week: bool,
