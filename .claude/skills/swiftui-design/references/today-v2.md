@@ -55,6 +55,12 @@ of this session's working tree; the pieces are reusable as-is.
 - **Key set panel** (inner panel, white 0.03, radius medium): `Key set`
   label + `Z3 · 45 min` in zone colour, then the step description in white
   13pt. Key set = the longest step that isn't warm-up or cool-down.
+- **Quality runs** (2026-11-12, 554089c, matches the watch): a run whose main
+  work is Z3+ leads with its pace band (zone colour) + `max 168 bpm` instead
+  of "target Z3" + HR range, in the subtitle and the left column. Repeated
+  block + recovery pairs collapse to a `3×  MAIN  08:00` row with the
+  recovery hanging under it (outline, no hairline between); key set reads
+  `3 × 08:00 · 4:39–4:49/km`.
 - Rows stay tappable to reveal their description; no chevrons drawn.
 - **Coach opener** (last row): sparkles + one line in the coach's voice from
   the plan's `coach_note` ("Questions about the 4×10? Ask me.") + ↗. Tap
