@@ -198,6 +198,11 @@ def test_replan_receipt_and_fresh_context(client, test_db_session, monkeypatch):
             "week_summary": {"focus": "Easy running, comeback step 1",
                              "rationale": "the week as it now stands"},
             "days": json.loads(json.dumps(fixed_days))})
+    # From Thursday on the remaining days sit under the run floor and
+    # volume_fill lengthens one (5.5 -> 5.6 h); the fill has its own tests.
+    from backend.services import volume_fill
+    monkeypatch.setattr(volume_fill, "fill_run_km",
+                        lambda plan_json, *a, **kw: (plan_json, []))
 
     resp = client.post("/weekly-plan/replan-remaining")
     assert resp.status_code == 200
