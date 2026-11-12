@@ -25,38 +25,111 @@ def _run(**kw):
     return w
 
 
+def _assert_section(s):
+    assert s["sectionType"] in (1, 2, 3, 4) and s["targetType"] in (1, 2, 3, 4)
+    if s["targetType"] == 4:
+        assert "targetValue" not in s
+    else:
+        assert isinstance(s["targetValue"], int) and s["targetValue"] > 0
+    assert s["intensityType"] in (1, 2)
+    formats = [k for k in ("sectionIntensity", "intensityValueStart", "intensityPercentStart") if k in s]
+    assert len(formats) == 1, f"exactly one intensity format, got {formats}"
+    if "sectionIntensity" in s:
+        assert 1 <= s["sectionIntensity"] <= 6
+    elif s["intensityType"] == 1:
+        assert 30 <= s["intensityValueStart"] < s["intensityValueEnd"] <= 240
+    else:
+        assert 120 <= s["intensityValueStart"] < s["intensityValueEnd"] <= 1499
+
+
 def assert_course_contract(course):
     assert set(course) == {"courseName", "courseDescription", "sportType", "sections"}
     assert 1 <= len(course["courseName"]) <= 100 and course["courseDescription"]
     assert course["sportType"] in (1, 2, 5) and course["sections"]
     for s in course["sections"]:
-        assert s["sectionType"] in (1, 2, 3, 4) and s["targetType"] in (1, 2, 3, 4)
-        if s["targetType"] == 4:
-            assert "targetValue" not in s
+        if s.get("intervalGroup"):
+            # Containers carry no target or intensity; members are type 2/3 only.
+            assert set(s) == {"intervalGroup", "repeats", "sets"} and 1 <= s["repeats"] <= 20
+            for m in s["sets"]:
+                assert m["sectionType"] in (2, 3)
+                _assert_section(m)
         else:
-            assert isinstance(s["targetValue"], int) and s["targetValue"] > 0
-        assert s["intensityType"] == 1
-        formats = [k for k in ("sectionIntensity", "intensityValueStart", "intensityPercentStart") if k in s]
-        assert len(formats) == 1, f"exactly one intensity format, got {formats}"
-        if "sectionIntensity" in s:
-            assert 1 <= s["sectionIntensity"] <= 6
-        else:
-            assert 30 <= s["intensityValueStart"] < s["intensityValueEnd"] <= 240
+            _assert_section(s)
 
 
-def test_workout_maps_steps_one_to_one_with_hr_zones():
+def test_workout_maps_steps_with_hr_zones_and_easy_sections_at_z2():
     course = cw.workout_to_course(_run(), slot=1)       # hr_target "2" is a zone, not a range
     assert_course_contract(course)
     assert course["courseName"] == "Phoenix 1 · Easy run" and course["sportType"] == 1
     assert course["sections"] == [
-        {"sectionType": 1, "targetType": 2, "targetValue": 600, "intensityType": 1, "sectionIntensity": 1},
+        {"sectionType": 1, "targetType": 2, "targetValue": 600, "intensityType": 1, "sectionIntensity": 2},
         {"sectionType": 2, "targetType": 2, "targetValue": 1800, "intensityType": 1, "sectionIntensity": 2},
-        {"sectionType": 4, "targetType": 2, "targetValue": 300, "intensityType": 1, "sectionIntensity": 1},
+        {"sectionType": 4, "targetType": 2, "targetValue": 300, "intensityType": 1, "sectionIntensity": 2},
     ]
     d = course["courseDescription"]
-    assert "Pace target 6:20–6:40/km." in d and "About 7.2 km." in d and "HR target 2." in d
-    assert "Warmup 10:00 Z1 · Main 30:00 Z2 · Cooldown 05:00 Z1." in d
+    # An easy run's pace_target is not a watch target, so it isn't announced.
+    assert "6:20" not in d and "Unos 7.2 km." in d
+    assert "Calentamiento 10:00 · Rodaje 30:00 · Enfriamiento 5:00." in d
     assert d.endswith(cw.PHOENIX_FOOTER)
+
+
+def _mp_intervals(**kw):
+    w = {"sport": "running", "title": "Marathon Pace Intervals", "hr_target": "160-168 bpm",
+         "pace_target": "4:39-4:49/km", "distance_km": 9.4,
+         "steps": [{"type": "warmup", "duration": "15:00", "zone": 1},
+                   {"type": "main", "duration": "08:00", "zone": 3}, {"type": "recovery", "duration": "02:00", "zone": 1},
+                   {"type": "main", "duration": "08:00", "zone": 3}, {"type": "recovery", "duration": "02:00", "zone": 1},
+                   {"type": "main", "duration": "08:00", "zone": 3},
+                   {"type": "cooldown", "duration": "10:00", "zone": 1}]}
+    w.update(kw)
+    return w
+
+
+def test_quality_run_targets_pace_in_one_interval_group():
+    # Alex 2026-11-12: seven loose steps, an HR target that lags the rep, and
+    # Z1 recoveries that alarmed. Now: 3 x (8:00 at pace + 2:00 easy).
+    course = cw.workout_to_course(_mp_intervals())
+    assert_course_contract(course)
+    warm, group, cool = course["sections"]
+    assert warm["sectionIntensity"] == 2
+    assert group == {"intervalGroup": True, "repeats": 3, "sets": [
+        {"sectionType": 2, "targetType": 2, "targetValue": 480, "intensityType": 2,
+         "intensityValueStart": 279, "intensityValueEnd": 289},
+        {"sectionType": 3, "targetType": 2, "targetValue": 120, "intensityType": 1, "sectionIntensity": 2}]}
+    # The group adds a third recovery; the cooldown gives it back, same session length.
+    assert cool["targetValue"] == 480
+    d = course["courseDescription"]
+    assert "Bloques a 4:39-4:49/km. FC techo 168." in d
+    assert "3 × (Bloque 8:00 + Suave 2:00)" in d
+
+
+def test_quality_run_without_a_usable_pace_falls_back_to_hr():
+    course = cw.workout_to_course(_mp_intervals(pace_target="--"))
+    assert_course_contract(course)
+    block = course["sections"][1]["sets"][0]
+    assert block["intensityType"] == 1 and (block["intensityValueStart"], block["intensityValueEnd"]) == (160, 168)
+
+
+def test_group_without_a_cooldown_keeps_the_extra_recovery():
+    w = _mp_intervals()
+    w["steps"] = w["steps"][:-1]
+    sections = cw.workout_to_course(w)["sections"]
+    assert len(sections) == 2 and sections[1]["repeats"] == 3
+
+
+def test_uneven_reps_stay_loose():
+    w = _mp_intervals()
+    w["steps"][3] = {"type": "main", "duration": "06:00", "zone": 3}
+    sections = cw.workout_to_course(w)["sections"]
+    assert not any(s.get("intervalGroup") for s in sections) and len(sections) == 7
+
+
+@pytest.mark.parametrize("target, expected", [
+    ("4:39-4:49/km", (279, 289)), ("4:39–4:49", (279, 289)), ("6:20 – 6:40 /km", (380, 400)),
+    ("4:49-4:39/km", None), ("--", None), (None, None), ("easy", None),
+])
+def test_pace_target_range_parsing(target, expected):
+    assert cw.pace_target_range({"pace_target": target}) == expected
 
 
 def test_main_sections_carry_the_workouts_bpm_range_when_it_has_one():
@@ -69,8 +142,8 @@ def test_main_sections_carry_the_workouts_bpm_range_when_it_has_one():
     main = course["sections"][1]
     assert main == {"sectionType": 2, "targetType": 2, "targetValue": 1200, "intensityType": 1,
                     "intensityValueStart": 142, "intensityValueEnd": 159}
-    assert course["sections"][0]["sectionIntensity"] == 1 and course["sections"][2]["sectionIntensity"] == 1
-    assert "HR target 142-159 bpm." in course["courseDescription"]
+    assert course["sections"][0]["sectionIntensity"] == 2 and course["sections"][2]["sectionIntensity"] == 2
+    assert "FC 142-159." in course["courseDescription"]
 
 
 @pytest.mark.parametrize("target, expected", [

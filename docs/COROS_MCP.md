@@ -259,6 +259,11 @@ once at generation, edit the day on adaptation). Decisions:
   in the description so he can set the treadmill. Pace sections for outdoor quality
   runs are a follow-up. Steps map 1:1 to time-target sections. No interval groups
   (Phoenix steps are a flat list).
+  **Revised 2026-11-12 with Alex** (`coros_watch.py` docstring): quality runs
+  (marathon pace, tempo, intervals, trial) are outdoors at a specific pace, so
+  their blocks target `pace_target` (s/km) with HR as a ceiling in the
+  description; repeated block+recovery pairs become one interval group;
+  warmup/recovery/cooldown target at least Z2; descriptions are Spanish.
 - **Stripped day:** overwrite with `Phoenix <slot> · CANCELLED — <enforced_reason>`,
   one free section, description "Don't train this. Delete it in the COROS app."
   Never an "optional easy" run: the enforcer stripped the day because running was

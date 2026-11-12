@@ -173,8 +173,14 @@ def cmd_dry_run(args):
             def _int(sec):
                 if "sectionIntensity" in sec:
                     return f"Z{sec['sectionIntensity']}"
-                return f"{sec.get('intensityValueStart')}-{sec.get('intensityValueEnd')}bpm"
-            secs = " · ".join(f"{s['sectionType']}:{s.get('targetValue', 'free')}s {_int(s)}" for s in course["sections"])
+                unit = "s/km" if sec.get("intensityType") == 2 else "bpm"
+                return f"{sec.get('intensityValueStart')}-{sec.get('intensityValueEnd')}{unit}"
+
+            def _sec(s):
+                if s.get("intervalGroup"):
+                    return f"{s['repeats']}x(" + " + ".join(_sec(m) for m in s["sets"]) + ")"
+                return f"{s['sectionType']}:{s.get('targetValue', 'free')}s {_int(s)}"
+            secs = " · ".join(_sec(s) for s in course["sections"])
             print(f"   plan  slot {slot}: {course['courseName']}  [{secs}]  hash {cw.course_hash(course)}")
         for err in dc.errors:
             print(f"   plan  REFUSED: {err}")

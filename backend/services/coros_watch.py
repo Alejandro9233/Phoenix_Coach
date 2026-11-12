@@ -12,15 +12,20 @@ This module is the pure half: a plan workout becomes a COROS course dict
 (`parse_training_schedule`). Nothing here talks to the network or the DB;
 `backend/services/coros_watch_sync.py` does.
 
-Encoding decisions (council answers to the athlete's open questions):
-- Intensity = heart rate on every section. The MAIN sections carry the
-  workout's `hr_target` as an absolute bpm range when it has one ("142-159
-  bpm" — the plan writes the athlete's real COROS zone there); otherwise the
-  step's `zone` n → `sectionIntensity` n. Warmup/recovery/cooldown keep the
-  step zone. Live plans showed every step zone as 1 (the LLM copies the
-  prompt's example) while `hr_target` was right, so the range is the truth.
-  `pace_target` goes into the description so the athlete can set the
-  treadmill; pace sections are a follow-up for outdoor quality runs.
+Encoding decisions (council answers to the athlete's open questions, revised
+with Alex 2026-11-12):
+- Quality runs (marathon pace, tempo, intervals, trial) are run outdoors at a
+  specific pace, so their MAIN sections target `pace_target` as an absolute
+  s/km range; the HR range becomes a ceiling in the description. HR lags 2-3
+  min into an 8-min rep, and an HR target there pushed him faster than MP.
+- Every other MAIN section carries the workout's `hr_target` as an absolute
+  bpm range when it has one ("142-159 bpm"); otherwise the step's `zone` n →
+  `sectionIntensity` n. Live plans showed every step zone as 1 (the LLM
+  copies the prompt's example) while `hr_target` was right.
+- Warmup/recovery/cooldown target at least Z2 on the watch: 2 min after an
+  8-min rep at 165 bpm the HR is nowhere near Z1, and a Z1 target alarmed the
+  whole recovery. The plan's own step zones stay as they are.
+- Repeated main+recovery pairs become one COROS interval group ("3 x").
 - Stripped day = course named "CANCELLED — <enforced_reason>", one free
   section, description says don't train and delete it in the COROS app.
   COROS cannot delete or move a scheduled workout through MCP.
@@ -44,7 +49,11 @@ NAME_PREFIX = "Phoenix"
 NAME_RE = re.compile(r"^Phoenix (\d+) · (.*)$")
 CANCELLED_MARK = "CANCELLED"
 MAX_NAME = 100
-PHOENIX_FOOTER = "Planned by Phoenix Coach. Edits made here are overwritten when the plan changes."
+PHOENIX_FOOTER = "Plan de Phoenix Coach. Si lo editas aquí, se reescribe cuando cambie el plan."
+# Run bands (pace_enforcer.classify_run_workout) whose main sections target pace.
+PACE_BANDS = {"marathon", "tempo", "interval", "trial"}
+EASY_SECTION_MIN_ZONE = 2
+SECTION_LABEL = {1: "Calentamiento", 2: "Bloque", 3: "Suave", 4: "Enfriamiento"}
 
 
 class CourseMappingError(ValueError):
@@ -94,33 +103,102 @@ def hr_target_range(workout: dict) -> tuple[int, int] | None:
     return lo, hi
 
 
+_PACE_RANGE_RE = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})\s*(?:/\s*km)?\s*$", re.I)
+
+
+def pace_target_range(workout: dict) -> tuple[int, int] | None:
+    """'4:39-4:49/km' → (279, 289) s/km within COROS's 120-1499 band, else None."""
+    m = _PACE_RANGE_RE.match(str(workout.get("pace_target") or ""))
+    if not m:
+        return None
+    lo, hi = int(m.group(1)) * 60 + int(m.group(2)), int(m.group(3)) * 60 + int(m.group(4))
+    if not (120 <= lo < hi <= 1499):
+        return None
+    return lo, hi
+
+
+def targets_pace(workout: dict) -> bool:
+    """A quality run with a usable pace range: its blocks target pace, not HR."""
+    from backend.services.pace_enforcer import classify_run_workout
+    return (workout.get("sport") == "running"
+            and classify_run_workout(workout.get("title") or "") in PACE_BANDS
+            and pace_target_range(workout) is not None)
+
+
 def course_name(slot: int, title: str) -> str:
     return f"{NAME_PREFIX} {slot} · {title.strip() or 'Workout'}"[:MAX_NAME]
 
 
-def course_description(workout: dict) -> str:
+def _mmss(seconds: int) -> str:
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def _section_text(s: dict) -> str:
+    label = SECTION_LABEL[s["sectionType"]]
+    if s["sectionType"] == 2 and s["intensityType"] != 2:
+        label = "Rodaje"
+    return f"{label} {_mmss(s['targetValue'])}"
+
+
+def course_description(workout: dict, sections: list[dict]) -> str:
+    """Short, Spanish, and matching what the watch targets."""
     parts = []
-    if workout.get("pace_target"):
-        parts.append(f"Pace target {workout['pace_target']}.")
+    hr = hr_target_range(workout)
+    if targets_pace(workout):
+        parts.append(f"Bloques a {workout['pace_target']}.")
+        if hr:
+            parts.append(f"FC techo {hr[1]}.")
+    elif hr:
+        parts.append(f"FC {hr[0]}-{hr[1]}.")
     dist = workout.get("distance_km")
     if isinstance(dist, (int, float)) and not isinstance(dist, bool) and dist > 0:
-        parts.append(f"About {dist:g} km.")
-    hr = workout.get("hr_target")
-    if hr and str(hr) != "--":
-        parts.append(f"HR target {hr}.")
+        parts.append(f"Unos {dist:g} km.")
     steps = []
-    for s in workout.get("steps") or []:
-        label = (s.get("type") or "main").capitalize()
-        steps.append(f"{label} {s.get('duration')} Z{s.get('zone')}")
+    for s in sections:
+        if s.get("intervalGroup"):
+            steps.append(f"{s['repeats']} × (" + " + ".join(_section_text(x) for x in s["sets"]) + ")")
+        else:
+            steps.append(_section_text(s))
     if steps:
         parts.append(" · ".join(steps) + ".")
     parts.append(PHOENIX_FOOTER)
     return " ".join(parts)
 
 
+def group_intervals(sections: list[dict]) -> list[dict]:
+    """Repeated identical main+recovery pairs → one interval group. A final
+    main with no recovery after it (main, rec, main, rec, main) joins the
+    group, and the recovery it gains comes off the cooldown so the session
+    keeps its length."""
+    out, i = [], 0
+    while i < len(sections):
+        work = sections[i]
+        if work["sectionType"] == 2 and i + 1 < len(sections) and sections[i + 1]["sectionType"] == 3:
+            rest = sections[i + 1]
+            j, reps = i, 0
+            while j + 1 < len(sections) and sections[j] == work and sections[j + 1] == rest:
+                reps, j = reps + 1, j + 2
+            tail = j < len(sections) and sections[j] == work
+            if tail:
+                reps, j = reps + 1, j + 1
+            if reps >= 2:
+                out.append({"intervalGroup": True, "repeats": reps, "sets": [dict(work), dict(rest)]})
+                nxt = sections[j] if j < len(sections) else None
+                if tail and nxt and nxt["sectionType"] == 4 and nxt["targetType"] == 2 \
+                        and nxt["targetValue"] - rest.get("targetValue", 0) >= 300:
+                    out.append({**nxt, "targetValue": nxt["targetValue"] - rest["targetValue"]})
+                    j += 1
+                i = j
+                continue
+        out.append(work)
+        i += 1
+    return out
+
+
 def workout_to_course(workout: dict, slot: int = 1) -> dict:
     """A normalized plan workout → a COROS course (createScheduledWorkout's
-    `course`). Steps map 1:1 to time-target sections with an HR zone."""
+    `course`). Steps map to time-target sections (pace on a quality run's
+    blocks, HR elsewhere); repeated block+recovery pairs become a group."""
     sport = workout.get("sport")
     if sport not in SPORT_TO_COURSE:
         raise CourseMappingError(f"{sport!r} can't be created on the watch (running/cycling only)")
@@ -128,25 +206,33 @@ def workout_to_course(workout: dict, slot: int = 1) -> dict:
     if not steps:
         raise CourseMappingError("workout has no steps")
     hr_range = hr_target_range(workout)
+    pace_range = pace_target_range(workout) if targets_pace(workout) else None
     sections = []
     for step in steps:
         section_type = STEP_TYPE_TO_SECTION.get(step.get("type"))
         if section_type is None:
             raise CourseMappingError(f"unknown step type {step.get('type')!r}")
+        zone = _zone(step)
         section = {
             "sectionType": section_type,
             "targetType": 2,
             "targetValue": _duration_seconds(step.get("duration")),
             "intensityType": 1,
         }
-        if section_type == 2 and hr_range:
+        if section_type == 2 and pace_range:
+            section["intensityType"] = 2
+            section["intensityValueStart"], section["intensityValueEnd"] = pace_range
+        elif section_type == 2 and hr_range:
             section["intensityValueStart"], section["intensityValueEnd"] = hr_range
+        elif section_type == 2:
+            section["sectionIntensity"] = zone
         else:
-            section["sectionIntensity"] = _zone(step)
+            section["sectionIntensity"] = max(zone, EASY_SECTION_MIN_ZONE)
         sections.append(section)
+    sections = group_intervals(sections)
     return {
         "courseName": course_name(slot, workout.get("title") or sport.capitalize()),
-        "courseDescription": course_description(workout),
+        "courseDescription": course_description(workout, sections),
         "sportType": SPORT_TO_COURSE[sport],
         "sections": sections,
     }
