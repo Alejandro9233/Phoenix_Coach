@@ -131,7 +131,7 @@ struct TodaySessionCard: View {
                 .accessibilityElement(children: .combine)
                 if !w.steps.isEmpty {
                     Rectangle().fill(Color.white.opacity(0.10)).frame(width: 1)
-                    stepTable(w.steps, workoutIndex: index)
+                    stepTable(w, workoutIndex: index)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -158,54 +158,90 @@ struct TodaySessionCard: View {
         }
     }
 
-    private func stepTable(_ steps: [WorkoutStep], workoutIndex: Int) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(SessionFormat.stepRows(steps)) { row in
-                // A group's recovery row hangs under its block: no rule between.
-                if row.index > 0 && !row.joinsPrevious { hairline }
-                let st = row.step
-                let id = workoutIndex * 100 + row.index
-                let open = revealed.contains(id)
-                Button {
-                    withAnimation(reduceMotion ? nil : DS.Animation.quick) {
-                        if open { revealed.remove(id) } else { revealed.insert(id) }
-                    }
-                } label: {
-                    VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-                        HStack(spacing: DS.Spacing.m) {
-                            if let reps = row.repeats {
-                                DS.MonoLabel(text: "\(reps)×", color: .white)
-                                    .frame(width: 22, alignment: .leading)
-                            } else if row.joinsPrevious {
-                                Color.clear.frame(width: 22)
-                            } else {
-                                DS.MonoLabel(text: st.zone.map { "Z\($0)" } ?? "", color: DS.Colors.zone(st.zone))
-                                    .frame(width: 22, alignment: .leading)
-                            }
-                            DS.MonoLabel(text: st.type, color: row.joinsPrevious ? DS.Colors.outline : .white)
-                            Spacer(minLength: DS.Spacing.s)
-                            Text(SessionFormat.tableDuration(st.duration))
-                                .font(.system(size: 13, weight: .light, design: .monospaced))
-                                .foregroundStyle(row.joinsPrevious ? DS.Colors.outline : .white)
-                        }
-                        if open, let d = st.description, !d.isEmpty {
-                            Text(d)
-                                .font(.system(size: 11))
-                                .foregroundStyle(DS.Colors.outline)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.leading, 22 + DS.Spacing.m)
-                                .transition(.opacity)
-                        }
-                    }
-                    .padding(.vertical, DS.Spacing.s)
-                    .contentShape(Rectangle())
+    private func stepTable(_ w: Workout, workoutIndex: Int) -> some View {
+        let rows = SessionFormat.stepRows(w.steps)
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(rows.filter { !$0.joinsPrevious }) { row in
+                if row.index > 0 { hairline }
+                if let reps = row.repeats,
+                   let rest = rows.first(where: { $0.joinsPrevious && $0.index == row.index + 1 }) {
+                    repeatGroup(reps: reps, block: row, rest: rest, workout: w, workoutIndex: workoutIndex)
+                } else {
+                    stepButton(row, label: SessionFormat.stepLabel(row.step.type), workoutIndex: workoutIndex)
                 }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityValue(open ? "Expanded" : "Collapsed")
-                .accessibilityAddTraits(.isButton)
             }
         }
+    }
+
+    /// Quality-run variants round, V1 (2026-11-12): the repeated block and its
+    /// recovery held by a bracket in the block's zone colour, "3×" beside it,
+    /// the block's pace (or zone) under its label.
+    private func repeatGroup(reps: Int, block: SessionFormat.StepRow, rest: SessionFormat.StepRow,
+                             workout w: Workout, workoutIndex: Int) -> some View {
+        let tint = DS.Colors.zone(block.step.zone)
+        let target = SessionFormat.paceTarget(of: w)?.replacingOccurrences(of: "/km", with: "")
+            ?? block.step.zone.map { "Z\($0)" }
+        return HStack(alignment: .center, spacing: DS.Spacing.s) {
+            DS.MonoLabel(text: "\(reps)×", color: tint)
+                .frame(minWidth: 16, alignment: .leading)
+                .fixedSize()
+            Rectangle().fill(tint).frame(width: 2)
+            VStack(alignment: .leading, spacing: 0) {
+                stepButton(block, label: "Block", sub: target, subColor: tint,
+                           lead: false, workoutIndex: workoutIndex)
+                stepButton(rest, label: "Easy", quiet: true, lead: false, workoutIndex: workoutIndex)
+            }
+        }
+        .padding(.vertical, DS.Spacing.xs)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Repeat \(reps) times")
+    }
+
+    private func stepButton(_ row: SessionFormat.StepRow, label: String, sub: String? = nil,
+                            subColor: Color = DS.Colors.outline, quiet: Bool = false,
+                            lead: Bool = true, workoutIndex: Int) -> some View {
+        let st = row.step
+        let id = workoutIndex * 100 + row.index
+        let open = revealed.contains(id)
+        // The group's 16pt "3×" + bracket + gaps line up with the 22pt zone column.
+        let indent: CGFloat = lead ? 22 + DS.Spacing.m : 0
+        return Button {
+            withAnimation(reduceMotion ? nil : DS.Animation.quick) {
+                if open { revealed.remove(id) } else { revealed.insert(id) }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                HStack(spacing: DS.Spacing.m) {
+                    if lead {
+                        DS.MonoLabel(text: st.zone.map { "Z\($0)" } ?? "", color: DS.Colors.zone(st.zone))
+                            .frame(width: 22, alignment: .leading)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        DS.MonoLabel(text: label, color: quiet ? DS.Colors.outline : .white)
+                        if let sub { DS.MonoLabel(text: sub, color: subColor) }
+                    }
+                    Spacer(minLength: DS.Spacing.s)
+                    Text(SessionFormat.tableDuration(st.duration))
+                        .font(.system(size: 13, weight: .light, design: .monospaced))
+                        .foregroundStyle(quiet ? DS.Colors.outline : .white)
+                }
+                if open, let d = st.description, !d.isEmpty {
+                    Text(d)
+                        .font(.system(size: 11))
+                        .foregroundStyle(DS.Colors.outline)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, indent)
+                        .transition(.opacity)
+                }
+            }
+            .padding(.vertical, quiet ? DS.Spacing.xs : DS.Spacing.s)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(open ? "Expanded" : "Collapsed")
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Key set (round-8 V4)
@@ -538,6 +574,15 @@ enum SessionFormat {
             i += 1
         }
         return rows
+    }
+
+    /// "warmup" → "Warm-up", "cooldown" → "Cool-down"; other types as written.
+    static func stepLabel(_ type: String) -> String {
+        switch type.lowercased().replacingOccurrences(of: "-", with: "").replacingOccurrences(of: " ", with: "") {
+        case "warmup": return "Warm-up"
+        case "cooldown": return "Cool-down"
+        default: return type
+        }
     }
 
     static func sportName(_ sport: String) -> String {

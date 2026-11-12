@@ -58,9 +58,10 @@ of this session's working tree; the pieces are reusable as-is.
 - **Quality runs** (2026-11-12, 554089c, matches the watch): a run whose main
   work is Z3+ leads with its pace band (zone colour) + `max 168 bpm` instead
   of "target Z3" + HR range, in the subtitle and the left column. Repeated
-  block + recovery pairs collapse to a `3×  MAIN  08:00` row with the
-  recovery hanging under it (outline, no hairline between); key set reads
-  `3 × 08:00 · 4:39–4:49/km`.
+  block + recovery pairs are held by a 2pt bracket in the block's zone
+  colour with `3×` beside it: `Block` + pace band, then `Easy` in outline
+  (quality-run variants round, V1, 2026-11-12). Key set reads
+  `3 × 08:00 · 4:39–4:49/km`. No repeats → plain rows, as before.
 - Rows stay tappable to reveal their description; no chevrons drawn.
 - **Coach opener** (last row): sparkles + one line in the coach's voice from
   the plan's `coach_note` ("Questions about the 4×10? Ask me.") + ↗. Tap
