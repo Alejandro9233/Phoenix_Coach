@@ -1018,6 +1018,14 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
     ).order_by(WeeklyPlan.id.desc()).first()
     carry = list((old_record.plan_json or {}).get("_revisions") or []) if old_record else None
 
+    # Mid-week, the days already lived stay as they were — the iOS alert
+    # promises "past completed activities are preserved". The full-week
+    # path replaced them with workouts that never happened and budgeted the
+    # whole week's km as if none of it had been run. replan-remaining locks
+    # them and credits what the watch recorded. Same response shape as here.
+    if old_record and today.weekday() > 0:
+        return replan_remaining_days(db)["plan"]
+
     # Delete without committing: if generation fails, the rollback below
     # brings the old plan back. Committing the delete first meant a failed
     # regenerate left the athlete with no week at all.

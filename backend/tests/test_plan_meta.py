@@ -269,3 +269,37 @@ def test_no_persist_path_bypasses_pipeline():
             assert calls_pipeline, (
                 f"{rel}:{func_name} writes plan_json without "
                 "run_plan_write_pipeline — a persist path skipped the pipeline")
+
+
+def test_midweek_regenerate_keeps_the_days_already_lived(client, test_db_session, monkeypatch):
+    """Regenerate after Monday replans today and on; the days before today
+    keep what they were (the iOS alert promises it). It used to rebuild the
+    whole week, past days included."""
+    import backend.main as main
+    today = get_local_today()
+    week_start = today - timedelta(days=today.weekday())
+    thursday = week_start + timedelta(days=3)
+    monkeypatch.setattr(main, "get_local_today", lambda: thursday)
+
+    test_db_session.add(WeeklyPlan(week_start=week_start, athlete_id=1, plan_json=normalize_plan({
+        "week_summary": {"focus": "f", "rationale": "r"},
+        "days": {d: _day("running", f"{d} Run", "45 min") for d in VALID_DAYS},
+    })))
+    test_db_session.commit()
+
+    def _full_week(self, *a, **kw):
+        raise AssertionError("mid-week regenerate rebuilt the whole week")
+    monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", _full_week)
+    remaining = VALID_DAYS[3:]
+    monkeypatch.setattr(
+        ResponseAgent, "generate_remaining_days",
+        lambda self, **kw: {"week_summary": {"focus": "f", "rationale": "r"},
+                            "days": {d: _day("running", "Replanned Run", "40 min")
+                                     for d in remaining}})
+
+    resp = client.post("/weekly-plan/regenerate")
+    assert resp.status_code == 200, resp.text
+    days = resp.json()["days"]   # the plan itself, as before
+    for d in VALID_DAYS[:3]:
+        assert days[d]["workouts"][0]["title"] == f"{d} Run"
+    assert days["Thursday"]["workouts"][0]["title"] == "Replanned Run"

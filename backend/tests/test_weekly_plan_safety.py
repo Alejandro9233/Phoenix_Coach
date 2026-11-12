@@ -90,6 +90,15 @@ def _week_start():
     return today - timedelta(days=today.weekday())
 
 
+def _monday_regenerate(monkeypatch):
+    """Regenerate runs the full-week path on Monday only; mid-week it
+    replans the remaining days. These tests are about the full-week path."""
+    import backend.main as main
+    today = get_local_today()
+    monday = today - timedelta(days=today.weekday())
+    monkeypatch.setattr(main, "get_local_today", lambda: monday)
+
+
 def _insert_real_week(session):
     athlete = session.query(Athlete).first()
     session.add(
@@ -131,6 +140,7 @@ def test_failed_regenerate_keeps_existing_week(client, test_db_session, monkeypa
 
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", boom)
 
+    _monday_regenerate(monkeypatch)
     response = client.post("/weekly-plan/regenerate")
 
     assert response.status_code == 502, response.text
@@ -169,6 +179,7 @@ def test_failed_regenerate_with_expired_injury_keeps_existing_week(client, test_
 
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", boom)
 
+    _monday_regenerate(monkeypatch)
     response = client.post("/weekly-plan/regenerate")
 
     assert response.status_code == 502, response.text
@@ -268,6 +279,7 @@ def test_regenerate_with_incomplete_profile_keeps_existing_week(client, test_db_
     _clear_race(test_db_session, "race_date", "race_distance")
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", _never_called)
 
+    _monday_regenerate(monkeypatch)
     response = client.post("/weekly-plan/regenerate")
 
     assert response.status_code == 409, response.text
