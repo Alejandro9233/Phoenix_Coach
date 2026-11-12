@@ -273,6 +273,8 @@ struct Workout: Codable {
     let steps: [WorkoutStep]
     let totalTime: String?
     let hrTarget: String?
+    /// Python-stamped pace band ("4:39-4:49/km", pace_enforcer).
+    var paceTarget: String?
     let muscleGroups: [String]?
     /// Python-computed carb/fluid line for long runs (fueling.stamp_fuel).
     var fuel: String?
@@ -285,6 +287,7 @@ struct Workout: Codable {
         case sport, title, steps, fuel
         case totalTime = "total_time"
         case hrTarget = "hr_target"
+        case paceTarget = "pace_target"
         case muscleGroups = "muscle_groups"
     }
 }

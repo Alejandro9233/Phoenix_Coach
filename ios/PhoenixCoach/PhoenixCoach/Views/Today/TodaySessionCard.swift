@@ -8,6 +8,10 @@ import SwiftUI
 /// line in the coach's voice that opens the chat. An adapted day puts a
 /// banner *above* the card in the readiness tint; the card itself does not
 /// change. Rows reveal their description on tap, no chevrons drawn.
+///
+/// The card tells the same story as the watch (backend coros_watch.py,
+/// Alex 2026-11-12): a quality run's target is its pace, with HR as a
+/// ceiling, and repeated block + recovery pairs read as one "3×" pair of rows.
 struct TodaySessionCard: View {
     let plan: DayPlan
     /// Readiness status, for the adapted banner's tint.
@@ -110,11 +114,18 @@ struct TodaySessionCard: View {
                     if let m = SessionFormat.minutes(w.totalTime) {
                         DS.HeroNumeral(value: "\(m)", unit: "min", size: 36)
                     }
-                    if let z = SessionFormat.zone(of: w) {
-                        DS.MonoLabel(text: "target Z\(z)", color: DS.Colors.zone(z))
-                    }
-                    if let hr = SessionFormat.heartRate(w.hrTarget) {
-                        DS.MonoLabel(text: hr)
+                    if let pace = SessionFormat.paceTarget(of: w) {
+                        DS.MonoLabel(text: pace, color: DS.Colors.zone(SessionFormat.zone(of: w)))
+                        if let cap = SessionFormat.heartRateCeiling(w.hrTarget) {
+                            DS.MonoLabel(text: cap)
+                        }
+                    } else {
+                        if let z = SessionFormat.zone(of: w) {
+                            DS.MonoLabel(text: "target Z\(z)", color: DS.Colors.zone(z))
+                        }
+                        if let hr = SessionFormat.heartRate(w.hrTarget) {
+                            DS.MonoLabel(text: hr)
+                        }
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -129,7 +140,7 @@ struct TodaySessionCard: View {
                 SessionSegmentBar(steps: w.steps)
             }
             if let key = keySet(of: w) {
-                keySetPanel(key)
+                keySetPanel(key, workout: w)
             }
             if let fuel = w.fuel, !fuel.isEmpty {
                 HStack(alignment: .center, spacing: DS.Spacing.s) {
@@ -149,9 +160,11 @@ struct TodaySessionCard: View {
 
     private func stepTable(_ steps: [WorkoutStep], workoutIndex: Int) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { i, st in
-                if i > 0 { hairline }
-                let id = workoutIndex * 100 + i
+            ForEach(SessionFormat.stepRows(steps)) { row in
+                // A group's recovery row hangs under its block: no rule between.
+                if row.index > 0 && !row.joinsPrevious { hairline }
+                let st = row.step
+                let id = workoutIndex * 100 + row.index
                 let open = revealed.contains(id)
                 Button {
                     withAnimation(reduceMotion ? nil : DS.Animation.quick) {
@@ -160,13 +173,20 @@ struct TodaySessionCard: View {
                 } label: {
                     VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                         HStack(spacing: DS.Spacing.m) {
-                            DS.MonoLabel(text: st.zone.map { "Z\($0)" } ?? "", color: DS.Colors.zone(st.zone))
-                                .frame(width: 22, alignment: .leading)
-                            DS.MonoLabel(text: st.type, color: .white)
+                            if let reps = row.repeats {
+                                DS.MonoLabel(text: "\(reps)×", color: .white)
+                                    .frame(width: 22, alignment: .leading)
+                            } else if row.joinsPrevious {
+                                Color.clear.frame(width: 22)
+                            } else {
+                                DS.MonoLabel(text: st.zone.map { "Z\($0)" } ?? "", color: DS.Colors.zone(st.zone))
+                                    .frame(width: 22, alignment: .leading)
+                            }
+                            DS.MonoLabel(text: st.type, color: row.joinsPrevious ? DS.Colors.outline : .white)
                             Spacer(minLength: DS.Spacing.s)
                             Text(SessionFormat.tableDuration(st.duration))
                                 .font(.system(size: 13, weight: .light, design: .monospaced))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(row.joinsPrevious ? DS.Colors.outline : .white)
                         }
                         if open, let d = st.description, !d.isEmpty {
                             Text(d)
@@ -203,11 +223,16 @@ struct TodaySessionCard: View {
         return step
     }
 
-    private func keySetPanel(_ step: WorkoutStep) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+    private func keySetPanel(_ step: WorkoutStep, workout w: Workout) -> some View {
+        // "3 × 08:00 · 4:39–4:49/km" for a grouped quality run, else "Z3 · 45 min".
+        let reps = SessionFormat.stepRows(w.steps).first { $0.repeats != nil }?.repeats
+        let duration = SessionFormat.stepDuration(step.duration)
+        let head = reps.map { "\($0) × \(duration)" } ?? duration
+        let target = SessionFormat.paceTarget(of: w) ?? step.zone.map { "Z\($0)" }
+        return VStack(alignment: .leading, spacing: DS.Spacing.xs) {
             HStack(spacing: DS.Spacing.s) {
                 DS.SectionLabel(text: "Key set")
-                DS.MonoLabel(text: [step.zone.map { "Z\($0)" }, SessionFormat.stepDuration(step.duration)]
+                DS.MonoLabel(text: (reps == nil ? [target, head] : [head, target])
                                 .compactMap { $0 }.joined(separator: " · "),
                              color: DS.Colors.zone(step.zone))
             }
@@ -274,11 +299,17 @@ struct TodaySessionCard: View {
 
     // MARK: - Helpers
 
-    /// "Run · Zone 2 · 140–150 bpm" — each part only when known.
+    /// "Run · Zone 2 · 140–150 bpm", or "Run · 4:39–4:49/km · max 168 bpm"
+    /// for a quality run — each part only when known.
     private func subtitle(_ w: Workout) -> String {
         var parts = [SessionFormat.sportName(w.sport)]
-        if let zone = SessionFormat.zone(of: w) { parts.append("Zone \(zone)") }
-        if let hr = SessionFormat.heartRate(w.hrTarget) { parts.append(hr) }
+        if let pace = SessionFormat.paceTarget(of: w) {
+            parts.append(pace)
+            if let cap = SessionFormat.heartRateCeiling(w.hrTarget) { parts.append(cap) }
+        } else {
+            if let zone = SessionFormat.zone(of: w) { parts.append("Zone \(zone)") }
+            if let hr = SessionFormat.heartRate(w.hrTarget) { parts.append(hr) }
+        }
         return parts.joined(separator: " · ")
     }
 
@@ -445,6 +476,68 @@ enum SessionFormat {
         let hasDigits = raw.rangeOfCharacter(from: .decimalDigits) != nil
         guard hasDigits else { return nil }
         return raw.lowercased().contains("bpm") ? raw : "\(raw) bpm"
+    }
+
+    /// The pace band when it is the session's target: a run whose main work
+    /// sits at Z3 or above (marathon pace, tempo, intervals). Easy and long
+    /// runs carry a pace band too, but their target stays heart rate.
+    static func paceTarget(of w: Workout) -> String? {
+        guard sportName(w.sport) == "Run", (zone(of: w) ?? 0) >= 3,
+              let raw = w.paceTarget?.trimmingCharacters(in: .whitespaces),
+              raw.range(of: #"^\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}"#, options: .regularExpression) != nil
+        else { return nil }
+        let band = raw.replacingOccurrences(of: "-", with: "–")
+        return band.lowercased().contains("/km") ? band : band + "/km"
+    }
+
+    /// "160-168 bpm" → "max 168 bpm": HR is the ceiling on a pace session.
+    static func heartRateCeiling(_ raw: String?) -> String? {
+        guard let hr = heartRate(raw) else { return nil }
+        let numbers = hr.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+        guard let top = numbers.max(), top >= 30 else { return nil }
+        return "max \(top) bpm"
+    }
+
+    /// One table row. A repeated block + recovery pair collapses to two rows:
+    /// the block carries `repeats`, the recovery hangs under it.
+    struct StepRow: Identifiable {
+        let index: Int
+        let step: WorkoutStep
+        var repeats: Int? = nil
+        var joinsPrevious = false
+        var id: Int { index }
+    }
+
+    /// Same grouping as the watch (coros_watch.group_intervals): identical
+    /// main + recovery pairs, plus a final identical main with no recovery.
+    static func stepRows(_ steps: [WorkoutStep]) -> [StepRow] {
+        func same(_ a: WorkoutStep, _ b: WorkoutStep) -> Bool {
+            a.type.lowercased() == b.type.lowercased() && a.duration == b.duration && a.zone == b.zone
+        }
+        func isMain(_ s: WorkoutStep) -> Bool { s.type.lowercased() == "main" }
+        func isRecovery(_ s: WorkoutStep) -> Bool { s.type.lowercased() == "recovery" }
+        var rows: [StepRow] = []
+        var i = 0
+        while i < steps.count {
+            let work = steps[i]
+            if isMain(work), i + 1 < steps.count, isRecovery(steps[i + 1]) {
+                let rest = steps[i + 1]
+                var j = i, reps = 0
+                while j + 1 < steps.count, same(steps[j], work), same(steps[j + 1], rest) {
+                    reps += 1; j += 2
+                }
+                if j < steps.count, same(steps[j], work) { reps += 1; j += 1 }
+                if reps >= 2 {
+                    rows.append(StepRow(index: i, step: work, repeats: reps))
+                    rows.append(StepRow(index: i + 1, step: rest, joinsPrevious: true))
+                    i = j
+                    continue
+                }
+            }
+            rows.append(StepRow(index: i, step: work))
+            i += 1
+        }
+        return rows
     }
 
     static func sportName(_ sport: String) -> String {
