@@ -2238,7 +2238,10 @@ def _build_chat_context(db: Session, summary: str, rag_context: str, extras: str
     # The engine emits 'phase' — reading 'current_phase' meant chat said
     # "TRAINING PHASE: Unknown" since forever (found 2026-08-31).
     context_str = f"TRAINING PHASE: {training_context.get('phase', 'Unknown')}\n"
-    context_str += f"WEEKS TO RACE: {training_context.get('weeks_to_race', 'N/A')}\n"
+    if training_context.get("race_done"):
+        context_str += "GOAL RACE: already run — no race on the calendar\n"
+    else:
+        context_str += f"WEEKS TO RACE: {training_context.get('weeks_to_race', 'N/A')}\n"
     
     today_day_name = get_local_now().strftime("%A")
     if plan_json and "days" in plan_json:

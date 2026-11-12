@@ -124,13 +124,24 @@ def build_constraint_block(ctx: dict) -> str:
 - For strength workouts, you MUST include a "muscle_groups" array selecting from: ["chest", "shoulders", "back", "legs", "arms"]."""
 
 
+def _journey(race, race_dist, weeks, race_done) -> str:
+    """The system prompt's "where is this athlete headed" clause. After the
+    goal race weeks_to_race is 0 (recovery) or 99 (no race), never a countdown."""
+    if race_done:
+        return f"back from {race} ({race_dist}), with no race on the calendar yet"
+    return f"toward {race} ({race_dist}) in {weeks} weeks"
+
+
 def _format_training_context(ctx: dict) -> str:
     """Format the TrainingContext dict as human-readable text for the LLM prompt."""
     lines = []
 
     # Race & timeline
     lines.append(f"Today: {ctx.get('current_date', 'unknown')}")
-    if ctx.get("race_name") and ctx.get("race_date"):
+    if ctx.get("race_name") and ctx.get("race_date") and ctx.get("race_done"):
+        lines.append(f"Goal Race: {ctx['race_name']} ({ctx.get('race_distance', '')}) "
+                     f"on {ctx['race_date']} — already run. No race on the calendar.")
+    elif ctx.get("race_name") and ctx.get("race_date"):
         lines.append(f"Goal Race: {ctx['race_name']} ({ctx.get('race_distance', '')}) on {ctx['race_date']}")
         lines.append(f"Weeks to race: {ctx.get('weeks_to_race', '?')}")
         if ctx.get("race_goals", {}).get("target_finish_time"):
@@ -550,7 +561,7 @@ Respond in valid JSON:
         race_type = ctx.get("race_type", "Triathlon")
         race_dist = ctx.get("race_distance", "Marathon")
         coach_style = "running" if race_type == "Running" else "triathlon"
-        system = f"""You are Phoenix, an elite {coach_style} coach. You are coaching an athlete toward {race} ({race_dist}) in {weeks} weeks.
+        system = f"""You are Phoenix, an elite {coach_style} coach. You are coaching an athlete {_journey(race, race_dist, weeks, ctx.get('race_done'))}.
 
 You are generating a 7-day training plan (Monday to Sunday). You make the COACHING DECISIONS:
 - Which workouts from the available menu to assign to which days
@@ -828,7 +839,7 @@ Respond ONLY with the JSON block. Do not write introductory or concluding conver
         days_list = ", ".join(days_to_plan)
         days_json_template = "\n".join([f'    "{d}": {{ ... }}' for d in days_to_plan])
 
-        system = f"""You are Phoenix, an elite {coach_style} coach. You are coaching an athlete toward {race} ({race_dist}) in {weeks} weeks.
+        system = f"""You are Phoenix, an elite {coach_style} coach. You are coaching an athlete {_journey(race, race_dist, weeks, training_context.get('race_done'))}.
 
 You are generating a PARTIAL training plan to fill in the remaining days of the current week.
 The athlete has already completed some training this week. You MUST account for the volume, 

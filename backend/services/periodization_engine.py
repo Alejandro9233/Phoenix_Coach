@@ -105,6 +105,18 @@ RACE_WEEK_EASY_CAP_KM = 14.0   # hard-cap headroom above the race distance
 # computed to exactly 30.0 km, one flat step instead of a ramp-down.
 TAPER_RUN_RETAIN = {3: 0.78, 2: 0.62, 1: 0.45}
 TAPER_LONG_RUN_MIN = {3: 110, 2: 80, 1: 50}
+# After the goal race: a 3-week reverse taper, then Foundation until a new
+# race date is set (Alex, 2026-11-12). Before this the engine clamped
+# weeks_to_race to 0 and kept the taper forever. Fractions of the best week
+# of the PRE_RACE_PEAK_WEEKS before race week, indexed by week after the race
+# (1 = the Monday after race day): off a 60 km peak, 12 / 27 / 36 km. The
+# 3-week window can't be the base — it holds the race week and then the
+# recovery weeks themselves. Easy running only; no deload, no comeback ladder
+# on top (a short first week would otherwise read as a break).
+POST_RACE_RUN_RETAIN = {1: 0.20, 2: 0.45, 3: 0.60}
+POST_RACE_LONG_RUN_MIN = {1: 40, 2: 60, 3: 75}
+POST_RACE_WEEKS = len(POST_RACE_RUN_RETAIN)
+PRE_RACE_PEAK_WEEKS = 4
 # Weekly run km Alex set by hand for the Dec 13 marathon build (2026-10-27).
 # Volume is the gap to sub-3:20 (Tanda), and the 8% ramp off a 35 km week
 # reaches ~50 km only by the taper. Replaces the ramp target and its hard
@@ -235,6 +247,46 @@ _TAPER_MENU = {
         "Strength (stop 7-10 days before race)",
     ],
     "reason": "Taper — cut volume hard, keep ONE short session at race pace. Fewer, never slower. Trust the process.",
+}
+
+# The weeks after the goal race, for every distance profile (POST_RACE_*).
+# Not in any profile's phase list: it is picked by date, not weeks_to_race.
+# run_km_range is only the no-history fallback — _get_weekly_run_target sets
+# the km off the pre-race peak. The hours band starts low so the gate's hours floor never pads it back up.
+_POST_RACE_MENU = {
+    "allowed": {
+        "running": ["Easy Run (short)", "Easy Run", "Long Run (Z1-Z2 only)",
+                    "Strides/Openers"],
+        "cycling": ["Endurance Ride (Z2)"],
+        "swimming": ["Technique Session"],
+        "strength": {
+            "types": ["Mobility + light full body"],
+            "available_muscle_groups": ["chest", "shoulders", "back", "arms", "core"],
+            "note": "Light only. No heavy leg work until week 3.",
+        },
+    },
+    "forbidden": list(_FOUNDATION_MENU["forbidden"]),
+    "reason": "Post-race recovery — the legs are still repairing. Easy running only, short, no intensity.",
+}
+_POST_RACE_PHASE = {
+    "id": "post_race",
+    "name": "Post-Race Recovery",
+    "total_weeks": POST_RACE_WEEKS,
+    "priorities": (
+        "Recover from the race. Week 1: rest the first days, then 2-3 short "
+        "easy runs; walks and easy cross-training are fine. Weeks 2-3: easy "
+        "runs only, strides allowed in week 3. No intensity, no hard long run."
+    ),
+    "hours_range": "1-4",
+    "run_km_range": (10, 40),
+    "intensity_split": "100/0",
+    "max_quality_sessions": 0,
+    "sport_sessions": {
+        "running": {"sessions": 3, "volume_note": "short easy runs only"},
+        "cycling": {"sessions": 1, "volume_note": "optional, 30-45 min easy Z2"},
+        "swimming": {"sessions": 1, "volume_note": "optional, easy technique"},
+        "strength": {"sessions": 1, "volume_note": "light mobility + upper body"},
+    },
 }
 
 
@@ -1296,20 +1348,41 @@ class PeriodizationEngine:
 
         # Phase
         start_of_week = today - timedelta(days=today.weekday())
-        phase_info = self._phase_for_week(
-            weeks_to_race, race_distance, start_of_week, athlete.race_date)
+        # The goal race is behind us: POST_RACE_WEEKS of recovery, then
+        # Foundation (weeks_to_race 99, as with no race) until a new date.
+        post_race_week = self._post_race_week(athlete.race_date, start_of_week)
+        in_post_race = 0 < post_race_week <= POST_RACE_WEEKS
+        if post_race_week > POST_RACE_WEEKS:
+            weeks_to_race = 99
+        if in_post_race:
+            phase_info = {
+                "phase": _POST_RACE_PHASE["id"],
+                "phase_name": _POST_RACE_PHASE["name"],
+                "phase_week": post_race_week,
+                "phase_total_weeks": POST_RACE_WEEKS,
+                "phase_priorities": _POST_RACE_PHASE["priorities"],
+            }
+        else:
+            phase_info = self._phase_for_week(
+                weeks_to_race, race_distance, start_of_week, athlete.race_date)
 
         # Coming back from a break? Replayed from the watch's runs each time.
-        comeback = self._detect_comeback(db, start_of_week)
+        # Not after the race: the recovery weeks are the comeback.
+        comeback = None if in_post_race else self._detect_comeback(db, start_of_week)
         comeback_active = bool(comeback and comeback["active"])
 
-        # Build/Recovery cycle — counted from the end of the last comeback
-        cycle_info = self._get_cycle_week(self._cycle_anchor(athlete, comeback), today)
+        # Build/Recovery cycle — counted from the end of the last comeback,
+        # or of the post-race recovery
+        recovered = (athlete.race_date - timedelta(days=athlete.race_date.weekday())
+                     + timedelta(weeks=POST_RACE_WEEKS + 1)) if post_race_week else None
+        cycle_info = self._get_cycle_week(
+            self._cycle_anchor(athlete, comeback, recovered), today)
 
         # Workout menu — from distance-specific profile, minus sports the
         # athlete has disabled (empty availability string = never)
         menus = profile["workout_menus"]
-        menu_info = menus.get(phase_info["phase"], menus.get("foundation", _FOUNDATION_MENU))
+        menu_info = (_POST_RACE_MENU if in_post_race else
+                     menus.get(phase_info["phase"], menus.get("foundation", _FOUNDATION_MENU)))
         menu_allowed = self._filter_by_availability(menu_info["allowed"], athlete)
         forbidden = list(menu_info["forbidden"])
         forbidden_reason = menu_info["reason"]
@@ -1343,8 +1416,9 @@ class PeriodizationEngine:
         # Nor inside a comeback (its reduced weeks already are the recovery),
         # the taper (the taper IS the recovery — they used to stack, 0.45 x
         # 0.75 of peak), or the week right before the taper, which is the
-        # last full week the athlete gets.
-        deload_week = self._deload_applies(
+        # last full week the athlete gets. Nor after the race: the
+        # post-race weeks already are the recovery.
+        deload_week = not in_post_race and self._deload_applies(
             cycle_info["is_recovery_week"], race_week, comeback_active,
             weeks_to_race, race_distance,
         )
@@ -1371,7 +1445,8 @@ class PeriodizationEngine:
         # race week.
         race_week_km = RACE_KM.get(race_distance) if race_week else None
         # The long-run path aims at the last week before the taper.
-        peak_long_run_km = profile.get("peak_long_run_km") if athlete.race_date else None
+        peak_long_run_km = (profile.get("peak_long_run_km")
+                            if athlete.race_date and not post_race_week else None)
         taper_top = next((p["weeks_range"][1] for p in profile["phases"]
                           if p["id"] == "taper"), None)
         weeks_to_peak = (weeks_to_race - taper_top - 1
@@ -1387,9 +1462,13 @@ class PeriodizationEngine:
             comeback=comeback,
             peak_long_run_km=peak_long_run_km, weeks_to_peak=weeks_to_peak,
             race_date=athlete.race_date,
+            post_race_week=post_race_week if in_post_race else None,
         )
         recovery_note = cycle_info["recovery_note"]
-        if comeback_active:
+        if in_post_race:
+            recovery_note = (f"Post-race recovery week {post_race_week} of "
+                             f"{POST_RACE_WEEKS}: easy running only.")
+        elif comeback_active:
             # Quality comes back once the athlete is back to the normal week.
             volume_refs["max_quality_sessions"] = 0
             recovery_note = (
@@ -1470,6 +1549,10 @@ class PeriodizationEngine:
             "weeks_to_race": weeks_to_race,
             "race_week": race_week,
             "race_day_name": athlete.race_date.strftime("%A") if race_week else None,
+            # The goal race is behind us; post_race_week is set during the
+            # recovery weeks only (1 = the week after race day).
+            "race_done": bool(post_race_week),
+            "post_race_week": post_race_week if in_post_race else None,
 
             # What phase?
             "phase": phase_info["phase"],
@@ -1848,15 +1931,44 @@ class PeriodizationEngine:
         }
 
     @staticmethod
-    def _cycle_anchor(athlete: Athlete, comeback: Optional[dict]) -> Optional[date]:
-        """The 3:1 cycle counts from the end of the last comeback. Its reduced
+    def _cycle_anchor(athlete: Athlete, comeback: Optional[dict],
+                      recovered: Optional[date] = None) -> Optional[date]:
+        """The 3:1 cycle counts from the end of the last comeback, or of the
+        post-race recovery (`recovered`, the Monday after it). Their reduced
         weeks already did a deload's job, and counting on from
         training_start_date could land a deload on the first full week back."""
-        ended = (comeback or {}).get("ended")
-        start = athlete.training_start_date
-        if ended and (start is None or ended > start):
-            return ended
-        return start
+        anchor = athlete.training_start_date
+        for ended in ((comeback or {}).get("ended"), recovered):
+            if ended and (anchor is None or ended > anchor):
+                anchor = ended
+        return anchor
+
+    @staticmethod
+    def _post_race_week(race_date: Optional[date], monday: date) -> int:
+        """Weeks since the goal race for the plan week starting `monday`:
+        0 up to and including race week, 1 for the week after it."""
+        if not race_date or monday <= race_date:
+            return 0
+        race_monday = race_date - timedelta(days=race_date.weekday())
+        return (monday - race_monday).days // 7
+
+    @staticmethod
+    def _pre_race_peak_km(db: Session, race_date: date) -> float:
+        """Best weekly run km of the PRE_RACE_PEAK_WEEKS before race week."""
+        race_monday = race_date - timedelta(days=race_date.weekday())
+        start = race_monday - timedelta(weeks=PRE_RACE_PEAK_WEEKS)
+        rows = db.query(Activity.start_time, Activity.distance_m).filter(
+            Activity.sport == "running",
+            Activity.start_time >= datetime.combine(start, datetime.min.time()),
+            Activity.start_time < datetime.combine(race_monday, datetime.min.time()),
+        ).all()
+        week_km: dict[int, float] = {}
+        for started, dist in rows:
+            if started:
+                day = started.date() if isinstance(started, datetime) else started
+                wk = (day - start).days // 7
+                week_km[wk] = week_km.get(wk, 0.0) + (dist or 0) / 1000
+        return max(week_km.values(), default=0.0)
 
     def _deload_applies(self, cycle_recovery: bool, race_week: bool,
                         comeback_active: bool, weeks_to_race: int,
@@ -1953,6 +2065,8 @@ class PeriodizationEngine:
     def _phase_def(profile: dict, phase_info: dict) -> dict:
         """The profile's phase definition for phase_info, falling back to the
         last phase (foundation) when the id is unknown."""
+        if phase_info["phase"] == _POST_RACE_PHASE["id"]:
+            return _POST_RACE_PHASE
         for p in profile["phases"]:
             if p["id"] == phase_info["phase"]:
                 return p
@@ -2156,7 +2270,7 @@ class PeriodizationEngine:
         phase_id: str = None, weeks_to_race: int = None,
         comeback=_DETECT,
         peak_long_run_km: float = None, weeks_to_peak: int = None,
-        race_date: date = None,
+        race_date: date = None, post_race_week: int = None,
     ) -> Optional[dict]:
         """THE weekly run-km target, derived from what the athlete actually ran.
 
@@ -2177,6 +2291,9 @@ class PeriodizationEngine:
         In LONG_RUN_PATH_PHASES the long run is at least the next step of a
         geometric path to peak_long_run_km, reached `weeks_to_peak` weeks from
         now (0 = this is the last week before the taper). See long_run_path.
+
+        In the weeks after the goal race (`post_race_week` 1..POST_RACE_WEEKS)
+        the target is POST_RACE_RUN_RETAIN x the pre-race peak week instead.
 
         Returns None when the phase has no run range (triathlon stubs without
         km in their volume_note) — callers and the prompt degrade to the
@@ -2330,6 +2447,19 @@ class PeriodizationEngine:
             basis = (
                 f"taper week {weeks_to_race} to go: {taper_pct:.0%} of the "
                 f"{ramp_base:.1f} km peak — volume down, pace unchanged"
+            )
+        post_pct = POST_RACE_RUN_RETAIN.get(post_race_week) if race_date else None
+        if post_pct:
+            peak = self._pre_race_peak_km(db, race_date)
+            target = peak * post_pct if peak > RUN_NOISE_FLOOR_KM else floor
+            hard_cap = target * 1.05
+            long_run = POST_RACE_LONG_RUN_MIN[post_race_week]
+            basis = (
+                f"post-race week {post_race_week} of {POST_RACE_WEEKS}: "
+                f"{post_pct:.0%} of the {peak:.1f} km pre-race peak — easy only"
+                if peak > RUN_NOISE_FLOOR_KM else
+                f"post-race week {post_race_week}: no pre-race history, "
+                f"phase floor {floor:g} km"
             )
         if comeback_active:
             # The taper reads the 3-week window, which may still hold the
