@@ -5,6 +5,10 @@ Rules locked in here:
   neither -> no-op.
 - main = the hr_target midpoint's zone; warmup/cooldown = 1; strides = 3.
 - Without a bpm range the title's band decides (tempo 4, long run 2).
+- hr_target stands within one zone of the title's band; an easy, long,
+  marathon or tempo run with a missing range or one 2+ zones off is
+  restamped to the band's zone. Unknown, recovery and interval titles keep
+  the LLM's range.
 - Running only; strength and rest are untouched; days scoping holds.
 - The pipeline stamps from the athlete row, so a persisted week never
   carries the LLM's copied "zone": 1.
@@ -91,6 +95,44 @@ def test_without_a_bpm_range_the_title_band_decides():
     plan, _ = enforce_zones(_plan({"Thursday": [tempo], "Sunday": [long_run]}), lthr=177)
     assert [s["zone"] for s in plan["days"]["Thursday"]["workouts"][0]["steps"]] == [1, 4, 1]
     assert plan["days"]["Sunday"]["workouts"][0]["steps"][0]["zone"] == 2
+
+
+def _hr_after(title, hr_target, **anchors):
+    run = {"sport": "running", "title": title, "total_time": "45 min",
+           "hr_target": hr_target, "steps": _steps(1, 2, 3, 1)}
+    plan, fixes = enforce_zones(_plan({"Tuesday": [run]}), **(anchors or {"hr_zones": HR_ZONES}))
+    hr_fixes = [f for f in fixes if f.get("field") == "hr_target"]
+    return plan["days"]["Tuesday"]["workouts"][0]["hr_target"], hr_fixes
+
+
+@pytest.mark.parametrize("title, given, expected", [
+    ("Easy Run", "165-178 bpm", "143-159 bpm"),       # a tempo range on an easy run
+    ("Long Run", "--", "143-159 bpm"),                # missing
+    ("Tempo Run", "120-140 bpm", "169-181 bpm"),      # an easy range on a tempo
+    ("Marathon Pace Long Run", "2", "160-168 bpm"),   # a bare zone number
+])
+def test_hr_target_far_from_the_band_is_restamped(title, given, expected):
+    hr, fixes = _hr_after(title, given)
+    assert hr == expected
+    assert fixes == [{"day": "Tuesday", "title": title, "step": None,
+                      "field": "hr_target", "found": given, "set": expected}]
+
+
+@pytest.mark.parametrize("title, given", [
+    ("Easy Run", "130-140 bpm"),       # Z1 on a Z2 run: one zone, the coach's call
+    ("Tempo Run", "160-168 bpm"),      # Z3 on a Z4 run
+    ("Recovery Run", "150-165 bpm"),   # recovery is left alone
+    ("VO2max Intervals", "--"),        # intervals run on pace
+    ("Hill Session", "--"),            # a title no band names
+])
+def test_hr_target_within_a_zone_or_outside_the_bands_stands(title, given):
+    hr, fixes = _hr_after(title, given)
+    assert hr == given and fixes == []
+
+
+def test_hr_target_restamp_on_lthr_fallback():
+    hr, _ = _hr_after("Easy Run", "--", lthr=177)
+    assert hr == "144-159 bpm"
 
 
 def test_strength_and_rest_are_untouched_and_days_scope_holds():
