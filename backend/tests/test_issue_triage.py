@@ -397,6 +397,25 @@ def test_apply_endpoint_updates_the_plan(client, db):
     assert db.query(InjuryLog).count() == 1
 
 
+def test_apply_pushes_the_changed_week_to_the_watch(client, db, monkeypatch):
+    """The watch used to catch up only at the next refresh: a run cancelled
+    for an injury stayed on it until then. A failed apply pushes nothing."""
+    import backend.main as main
+    pushed = []
+    monkeypatch.setattr(main, "_watch_sync_safe",
+                        lambda db, plan_json, week_start, days=None: pushed.append(plan_json))
+    monkeypatch.setattr(main, "get_local_today", lambda: FROZEN_TODAY)
+    _seed(db, **_all_week(_run))
+
+    client.post("/coach/issue/apply", json={"issue": _issue(), "choices": {"Wednesday": "rest"}})
+    assert len(pushed) == 1
+    assert [w["sport"] for w in pushed[0]["days"]["Wednesday"]["workouts"]] == ["rest"]
+
+    pushed.clear()
+    assert client.post("/coach/issue/apply", json={"choices": {}}).status_code == 400
+    assert pushed == []
+
+
 # ─── data_agent injury visibility ─────────────────────────────────────────────
 #
 # summarize() reads injuries through constraint_enforcer.get_active_injuries,

@@ -608,9 +608,11 @@ def apply_issue_endpoint(body: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="choices must be a map of day → 'swap'|'rest'")
 
     try:
-        return apply_issue(db, issue, choices)
+        result = apply_issue(db, issue, choices)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    _watch_sync_this_week(db)
+    return result
 
 
 @app.post("/coach/recovery/apply")
@@ -630,9 +632,11 @@ def apply_recovery_endpoint(body: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="injury_id is required")
 
     try:
-        return apply_recovery(db, injury_id, rebuild=bool((body or {}).get("rebuild", True)))
+        result = apply_recovery(db, injury_id, rebuild=bool((body or {}).get("rebuild", True)))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    _watch_sync_this_week(db)
+    return result
 
 
 @app.post("/coach/travel/apply")
@@ -652,9 +656,11 @@ def apply_travel_endpoint(body: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="dates is required")
 
     try:
-        return apply_travel(db, dates, note=str((body or {}).get("note") or ""))
+        result = apply_travel(db, dates, note=str((body or {}).get("note") or ""))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    _watch_sync_this_week(db)
+    return result
 
 
 @app.post("/sync")
@@ -795,6 +801,22 @@ _PLAN_GENERATION_LOCK = threading.Lock()
 def get_weekly_plan(db: Session = Depends(get_db)):
     """Retrieve the current week's training plan. Generates a new one if not found."""
     return _get_or_generate_weekly_plan(db)
+
+
+def _watch_sync_this_week(db):
+    """_watch_sync_safe for writes that edit this week's stored plan in
+    place (the triage applies): reload the row, push from today forward.
+    Before this the watch caught up only at the next refresh's backstop, so
+    a run cancelled for an injury stayed on the watch until then."""
+    from datetime import timedelta
+    today = get_local_today()
+    week_start = today - timedelta(days=today.weekday())
+    row = db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == week_start
+    ).order_by(WeeklyPlan.id.desc()).first()
+    if row:
+        return _watch_sync_safe(db, row.plan_json, week_start)
+    return None
 
 
 def _watch_sync_safe(db, plan_json, week_start, days=None):
