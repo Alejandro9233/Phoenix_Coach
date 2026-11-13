@@ -42,8 +42,19 @@ finalize_plan_write() cures two audit findings:
   held before the rewrite (capture_before(), taken at mutation start so the
   receipt also shows what enforcement stripped), and the stripped violations
   themselves — gate repairs included. Kept to the last MAX_REVISIONS entries.
+
+commit_plan_write() persists a mid-week write without erasing a concurrent
+one. Writers read the row, spend up to a minute on the LLM, then save — and
+used to save the whole week they read, so a background adapt-today could
+silently undo an injury swap accepted in chat meanwhile. The LLM still runs
+unlocked; only the save is serialized (milliseconds). If another write landed
+since this one read the row (its last receipt changed), the save rebases:
+fresh row + only this writer's days, re-enforced against the injuries as they
+stand now. Same day written twice: the later write wins that day.
 """
 
+import copy
+import threading
 from datetime import timedelta
 
 from backend.services.plan_normalizer import VALID_DAYS, normalize_plan
@@ -53,6 +64,10 @@ from backend.utils.timezone import get_local_today
 REVISIONS_KEY = "_revisions"
 MAX_REVISIONS = 40
 GATE_ATTEMPTS = 2  # 1 initial + 1 retry with numeric feedback
+
+# Held only across re-read -> merge -> commit, never across an LLM call.
+# One uvicorn process, so a module lock is the whole story.
+PLAN_WRITE_LOCK = threading.Lock()
 
 
 def week_sums(db, plan_json: dict, days_written) -> tuple[float, float]:
@@ -389,3 +404,78 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
         candidate["week_summary"]["expected_run_km"] = run_km
 
     return candidate, violations
+
+
+def _last_receipt(plan_json):
+    revisions = (plan_json or {}).get(REVISIONS_KEY) or []
+    return (len(revisions), revisions[-1] if revisions else None)
+
+
+def commit_plan_write(db, plan_record, plan_json: dict, *, days, source: str,
+                      availability: dict, reason: str = None,
+                      gate_ctx: dict = None, inputs: dict = None,
+                      carry_summary: bool = False, columns: dict = None):
+    """Save a pipeline-built plan onto plan_record without erasing a write
+    that landed since the row was read. Returns (plan_json, violations) —
+    the plan actually persisted, and anything the rebase stripped.
+
+    `days` are the days this write owns (what it passed to the pipeline).
+    `carry_summary` also carries week_summary's focus/rationale (the replan
+    rewrites them). `columns` are row fields to set in the same commit.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    # The row as this writer read it. Writers mutate shared day dicts, but
+    # finalize copies the receipt list, so the receipts are still as read.
+    read = _last_receipt(plan_record.plan_json)
+    violations = []
+    with PLAN_WRITE_LOCK:
+        db.refresh(plan_record)
+        if _last_receipt(plan_record.plan_json) != read:
+            print(f"🔀 [{source}] Plan changed since it was read — rebasing {list(days)}")
+            plan_json, violations = _rebase(
+                db, plan_record.plan_json, plan_json, days=days, source=source,
+                availability=availability, reason=reason, gate_ctx=gate_ctx,
+                inputs=inputs, carry_summary=carry_summary)
+        plan_record.plan_json = plan_json
+        for name, value in (columns or {}).items():
+            setattr(plan_record, name, value)
+        flag_modified(plan_record, "plan_json")
+        db.commit()
+    return plan_json, violations
+
+
+def _rebase(db, fresh, written, *, days, source, availability, reason,
+            gate_ctx, inputs, carry_summary):
+    """The stored plan with only this write's days laid over it, through the
+    ungated pipeline: no LLM (the lock is held), enforcement against the
+    injuries committed by now, fresh sums and one receipt."""
+    from backend.models.database import Athlete
+    from backend.services.constraint_enforcer import get_active_injuries
+
+    merged = normalize_plan(copy.deepcopy(fresh))
+    before = capture_before(merged, days=days)
+    for day_name in days:
+        day = (written.get("days") or {}).get(day_name)
+        if day is not None:
+            merged["days"][day_name] = copy.deepcopy(day)
+    if carry_summary:
+        for key in ("focus", "rationale"):
+            text = (written.get("week_summary") or {}).get(key)
+            if text:
+                merged.setdefault("week_summary", {})[key] = text
+
+    athlete = db.query(Athlete).first()
+    return run_plan_write_pipeline(
+        db, merged,
+        source=source,
+        availability=availability,
+        # commit=False: the commit below is the only one, inside the lock.
+        active_injuries=(get_active_injuries(db, athlete.id, commit=False)
+                         if athlete else []),
+        days=list(days),
+        reason=reason,
+        before=before,
+        gate_ctx=gate_ctx,
+        inputs=inputs,
+    )

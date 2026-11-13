@@ -322,8 +322,6 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
 
     Returns a summary of what changed.
     """
-    from sqlalchemy.orm.attributes import flag_modified
-
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
     from backend.models.database import Athlete, InjuryLog, WeeklyPlan
@@ -527,10 +525,13 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
             before=before,
         )
 
-    plan_record.plan_json = plan_json
-    plan_record.last_adapted = None
-    flag_modified(plan_record, "plan_json")
-    db.commit()
+    from backend.services.plan_meta import commit_plan_write
+    plan_json, rebased = commit_plan_write(
+        db, plan_record, plan_json,
+        days=enforce_days, source="apply_issue", availability=availability,
+        reason=pipeline_reason, columns={"last_adapted": None},
+    )
+    violations = list(violations) + rebased
 
     return {
         "status": "applied",
@@ -744,8 +745,6 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     rebuild leaves the plan untouched and reports `rebuild_error` — the athlete
     can replan later; their injury is not resurrected.
     """
-    from sqlalchemy.orm.attributes import flag_modified
-
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
     from backend.models.database import Athlete, InjuryLog, WeeklyPlan
@@ -805,6 +804,13 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     from backend.services.constraint_enforcer import get_travel_day_names
     from backend.services.volume_gate import completed_week_actuals
 
+    availability = {
+        "swim_days": athlete.swim_days,
+        "bike_days": athlete.bike_days,
+        "run_days": athlete.run_days,
+        "strength_days": athlete.strength_days,
+        "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
+    }
     regenerated = []
     try:
         engine = PeriodizationEngine()
@@ -858,13 +864,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
             completed_run_km=completed_run_km,
             completed_hours=completed_hours,
             source="apply_recovery",
-            availability={
-                "swim_days": athlete.swim_days,
-                "bike_days": athlete.bike_days,
-                "run_days": athlete.run_days,
-                "strength_days": athlete.strength_days,
-                "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
-            },
+            availability=availability,
             active_injuries=get_active_injuries(db, athlete.id),
             days=rebuild_days,
             reason=f"Recovered from {injury.body_part}",
@@ -876,12 +876,14 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
         result["rebuild_days_pending"] = rebuild_days
         return result
 
-    plan_json = new_plan_json
-
-    plan_record.plan_json = plan_json
-    plan_record.last_adapted = None
-    flag_modified(plan_record, "plan_json")
-    db.commit()
+    from backend.services.plan_meta import commit_plan_write
+    plan_json, rebased = commit_plan_write(
+        db, plan_record, new_plan_json,
+        days=rebuild_days, source="apply_recovery", availability=availability,
+        reason=f"Recovered from {injury.body_part}",
+        columns={"last_adapted": None},
+    )
+    violations = list(violations) + rebased
 
     result["rebuilt_days"] = sorted(regenerated)
     result["violations"] = violations
@@ -1054,8 +1056,6 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
     still blocks the days (rows written, blocked days rested, enforcer armed)
     and reports `rebuild_error`; only the rebalancing waits for a replan.
     """
-    from sqlalchemy.orm.attributes import flag_modified
-
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
     from backend.models.database import Athlete, TravelDay, WeeklyPlan
@@ -1285,10 +1285,14 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
         ),
     }
 
-    plan_record.plan_json = plan_json
-    plan_record.last_adapted = None
-    flag_modified(plan_record, "plan_json")
-    db.commit()
+    from backend.services.plan_meta import commit_plan_write
+    plan_json, rebased = commit_plan_write(
+        db, plan_record, plan_json,
+        days=(blocked + rebuild_days) if pipelined else blocked,
+        source="apply_travel", availability=availability,
+        reason=pipeline_reason, columns={"last_adapted": None},
+    )
+    violations = list(violations) + rebased
 
     result["rebuilt_days"] = sorted(regenerated, key=VALID_DAYS.index)
     result["violations"] = violations

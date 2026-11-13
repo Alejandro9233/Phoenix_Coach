@@ -370,7 +370,9 @@ def _reenforce_current_week(db, athlete):
         get_active_injuries,
         get_travel_day_names,
     )
-    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    from backend.services.plan_meta import (
+        capture_before, commit_plan_write, run_plan_write_pipeline,
+    )
     from backend.services.plan_normalizer import VALID_DAYS, normalize_plan
 
     today = get_local_today()
@@ -385,26 +387,27 @@ def _reenforce_current_week(db, athlete):
     plan_json = normalize_plan(plan_record.plan_json)
     before = capture_before(plan_json, days=days)
 
+    availability = {
+        "swim_days": athlete.swim_days,
+        "bike_days": athlete.bike_days,
+        "run_days": athlete.run_days,
+        "strength_days": athlete.strength_days,
+        "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
+    }
+    reason = "Availability changed in Profile"
     plan_json, violations = run_plan_write_pipeline(
         db, plan_json,
         source="profile_reenforce",
-        availability={
-            "swim_days": athlete.swim_days,
-            "bike_days": athlete.bike_days,
-            "run_days": athlete.run_days,
-            "strength_days": athlete.strength_days,
-            "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
-        },
+        availability=availability,
         active_injuries=get_active_injuries(db, athlete.id),
         days=days,
-        reason="Availability changed in Profile",
+        reason=reason,
         before=before,
     )
     if violations:
-        from sqlalchemy.orm.attributes import flag_modified
-        plan_record.plan_json = plan_json
-        flag_modified(plan_record, "plan_json")
-        db.commit()
+        commit_plan_write(db, plan_record, plan_json, days=days,
+                          source="profile_reenforce",
+                          availability=availability, reason=reason)
     return {"stripped": len(violations), "details": violations}
 
 
@@ -1268,11 +1271,18 @@ def replan_remaining_days(db: Session = Depends(get_db)):
             detail=f"Plan generation failed; existing plan left untouched: {e}"
         )
 
-    from sqlalchemy.orm.attributes import flag_modified
-    plan_record.plan_json = plan_json
-    plan_record.last_adapted = None  # Reset adaptation flag since we replanned
-    flag_modified(plan_record, "plan_json")
-    db.commit()
+    from backend.services.plan_meta import commit_plan_write
+    plan_json, rebase_violations = commit_plan_write(
+        db, plan_record, plan_json,
+        days=days_to_replan,
+        source="replan_remaining",
+        availability=training_context.get("availability", {}),
+        reason="The athlete requested a mid-week replan.",
+        gate_ctx=training_context,
+        carry_summary=True,
+        columns={"last_adapted": None},  # Reset adaptation flag since we replanned
+    )
+    violations = list(violations) + rebase_violations
 
     print(f"✅ Replanned {len(days_to_replan)} days: {days_to_replan}")
     _watch_sync_safe(db, plan_json, start_of_week, days=list(days_to_replan))
@@ -1612,31 +1622,36 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     # violation the original plan didn't have.
     from backend.services.constraint_enforcer import get_active_injuries
     from backend.services.plan_meta import run_plan_write_pipeline
+    from backend.services.plan_meta import commit_plan_write
     athlete_row = db.query(Athlete).first()
+    reason = (f"Second opinion — {supersede_reason} since today's earlier adaptation."
+              if supersede_reason
+              else "Today's workout adapted to recovery metrics.")
+    inputs = None if is_simulated else _recovery_inputs(db)
     plan_json, violations = run_plan_write_pipeline(
         db, plan_json,
         source="adapt_today",
         availability=training_context.get("availability", {}),
         active_injuries=get_active_injuries(db, athlete_row.id) if athlete_row else [],
         days=[today_day_name],
-        reason=(f"Second opinion — {supersede_reason} since today's earlier adaptation."
-                if supersede_reason
-                else "Today's workout adapted to recovery metrics."),
+        reason=reason,
         before=before,
-        inputs=None if is_simulated else _recovery_inputs(db),
+        inputs=inputs,
+    )
+
+    plan_json, _ = commit_plan_write(
+        db, plan_record, plan_json,
+        days=[today_day_name],
+        source="adapt_today",
+        availability=training_context.get("availability", {}),
+        reason=reason,
+        inputs=inputs,
+        # Athlete-local clock, naive (the column is tz-naive). datetime.now() was
+        # UTC on Render: an evening adapt stamped tomorrow's date, so the guard
+        # missed the rest of the evening and wrongly blocked the next morning.
+        columns={"last_adapted": get_local_now().replace(tzinfo=None)},
     )
     adapted_day = plan_json["days"][today_day_name]
-
-    # We must explicitly flag the JSON as modified for SQLAlchemy to update it
-    from sqlalchemy.orm.attributes import flag_modified
-    plan_record.plan_json = plan_json
-    # Athlete-local clock, naive (the column is tz-naive). datetime.now() was
-    # UTC on Render: an evening adapt stamped tomorrow's date, so the guard
-    # missed the rest of the evening and wrongly blocked the next morning.
-    plan_record.last_adapted = get_local_now().replace(tzinfo=None)
-    flag_modified(plan_record, "plan_json")
-    
-    db.commit()
 
     # Today's course on the watch follows the adapted day (update in place).
     _watch_sync_safe(db, plan_json, start_of_week, days=[today_day_name])
@@ -1655,7 +1670,9 @@ def use_original_today(db: Session = Depends(get_db)):
     from backend.models.database import WeeklyPlan
     from backend.services.constraint_enforcer import get_active_injuries
     from backend.services.periodization_engine import PeriodizationEngine
-    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    from backend.services.plan_meta import (
+        capture_before, commit_plan_write, run_plan_write_pipeline,
+    )
     from backend.services.plan_normalizer import normalize_plan
     from backend.utils.timezone import get_local_now, get_local_today
 
@@ -1689,20 +1706,23 @@ def use_original_today(db: Session = Depends(get_db)):
     # other write.
     training_context = PeriodizationEngine().compute_context(db)
     athlete_row = db.query(Athlete).first()
+    reason = "Athlete override — original workout restored over today's adaptation."
     plan_json, violations = run_plan_write_pipeline(
         db, plan_json,
         source="use_original",
         availability=training_context.get("availability", {}),
         active_injuries=get_active_injuries(db, athlete_row.id) if athlete_row else [],
         days=[today_day_name],
-        reason="Athlete override — original workout restored over today's adaptation.",
+        reason=reason,
         before=before,
     )
-
-    from sqlalchemy.orm.attributes import flag_modified
-    plan_record.plan_json = plan_json
-    flag_modified(plan_record, "plan_json")
-    db.commit()
+    plan_json, _ = commit_plan_write(
+        db, plan_record, plan_json,
+        days=[today_day_name],
+        source="use_original",
+        availability=training_context.get("availability", {}),
+        reason=reason,
+    )
     # The watch follows the athlete's override too: today's course goes back
     # to the original in place (same slot), unless COROS has locked it.
     _watch_sync_safe(db, plan_json, start_of_week, days=[today_day_name])
@@ -2063,7 +2083,9 @@ async def _run_smart_refresh(db: Session, progress=None):
                 return None
 
             before_at = _last_adapt_at()
-            adapt_today_workout(body=None, db=db)
+            # Off the event loop: the adapt's Groq call takes seconds, and on
+            # the loop it froze every other request until it returned.
+            await asyncio.to_thread(adapt_today_workout, body=None, db=db)
             after_at = _last_adapt_at()
             if after_at is not None and after_at != before_at:
                 adapted = True

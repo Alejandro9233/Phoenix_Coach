@@ -303,3 +303,110 @@ def test_midweek_regenerate_keeps_the_days_already_lived(client, test_db_session
     for d in VALID_DAYS[:3]:
         assert days[d]["workouts"][0]["title"] == f"{d} Run"
     assert days["Thursday"]["workouts"][0]["title"] == "Replanned Run"
+
+
+def test_no_path_saves_plan_json_by_hand():
+    """Mid-week writers save through commit_plan_write, which rebases onto a
+    write that landed meanwhile. Only first generation inserts a row."""
+    for rel in ("backend/main.py", "backend/services/issue_triage.py"):
+        tree = ast.parse((REPO_ROOT / rel).read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    assert not (isinstance(target, ast.Attribute)
+                                and target.attr == "plan_json"), (
+                        f"{rel}:{node.lineno} assigns .plan_json — save through "
+                        "plan_meta.commit_plan_write")
+
+
+def _seed_week(session):
+    week_start = get_local_today() - timedelta(days=get_local_today().weekday())
+    row = WeeklyPlan(week_start=week_start, athlete_id=1, plan_json=normalize_plan({
+        "week_summary": {"focus": "f", "rationale": "r"},
+        "days": {d: _day("running", f"{d} Run", "45 min") for d in VALID_DAYS},
+        "_revisions": [{"at": "2026-11-09T06:00:00", "source": "generate", "days": VALID_DAYS}],
+    }))
+    session.add(row)
+    session.commit()
+    return row.id
+
+
+def _write_day(session, row_id, day_name, workout_day, source):
+    """One mid-week writer: read the row, build its day, run the pipeline,
+    but don't save yet — the save is the caller's next step."""
+    from backend.services.plan_meta import run_plan_write_pipeline
+
+    row = session.get(WeeklyPlan, row_id)
+    plan = normalize_plan(row.plan_json)
+    plan["days"][day_name] = workout_day
+    plan, _ = run_plan_write_pipeline(
+        session, plan, source=source, availability={},
+        active_injuries=[], days=[day_name], reason=source)
+    return row, plan
+
+
+def test_a_slow_write_does_not_erase_one_that_landed_meanwhile(test_db_session):
+    """The bug: adapt-today read the week, spent a minute on the LLM, and
+    saved the whole stale week over a change accepted in chat meanwhile."""
+    from backend.services.plan_meta import commit_plan_write
+
+    other = sessionmaker(bind=test_db_session.get_bind())()
+    row_id = _seed_week(test_db_session)
+
+    # The slow writer reads first...
+    slow_row, slow_plan = _write_day(
+        test_db_session, row_id, "Thursday",
+        _day("running", "Adapted Easy Run", "30 min"), "adapt_today")
+    # ...a fast one reads, writes and saves while it waits on the LLM...
+    fast_row, fast_plan = _write_day(
+        other, row_id, "Friday", _day("cycling", "Swap Ride", "45 min"), "apply_issue")
+    commit_plan_write(other, fast_row, fast_plan, days=["Friday"],
+                      source="apply_issue", availability={})
+    # ...then the slow one saves.
+    saved, _ = commit_plan_write(test_db_session, slow_row, slow_plan,
+                                 days=["Thursday"], source="adapt_today",
+                                 availability={})
+
+    other.close()
+    stored = test_db_session.get(WeeklyPlan, row_id).plan_json
+    assert stored == saved
+    assert stored["days"]["Thursday"]["workouts"][0]["title"] == "Adapted Easy Run"
+    assert stored["days"]["Friday"]["workouts"][0]["title"] == "Swap Ride"
+    assert [r["source"] for r in stored["_revisions"]] == [
+        "generate", "apply_issue", "adapt_today"]
+
+
+def test_the_rebase_enforces_an_injury_logged_after_the_read(test_db_session):
+    """The slow writer built today's run before the injury existed. Its
+    save lands after the injury (and its plan write), so the rebase must
+    strip the run — enforcement reads the injuries as they stand now."""
+    from backend.models.database import InjuryLog
+    from backend.services.plan_meta import commit_plan_write
+
+    other = sessionmaker(bind=test_db_session.get_bind())()
+    row_id = _seed_week(test_db_session)
+    today_name = VALID_DAYS[get_local_today().weekday()]
+    later = VALID_DAYS[(get_local_today().weekday() + 1) % 7]
+
+    slow_row, slow_plan = _write_day(
+        test_db_session, row_id, today_name,
+        _day("running", "Adapted Easy Run", "30 min"), "adapt_today")
+
+    other.add(InjuryLog(athlete_id=1, date_reported=get_local_today(),
+                        body_part="Calf", status="Active",
+                        affected_sports="running",
+                        expected_recovery_date=get_local_today() + timedelta(days=5)))
+    other.commit()
+    fast_row, fast_plan = _write_day(
+        other, row_id, later, _day("rest", "Rest", "00:00"), "apply_issue")
+    commit_plan_write(other, fast_row, fast_plan, days=[later],
+                      source="apply_issue", availability={})
+    other.close()
+
+    saved, stripped = commit_plan_write(
+        test_db_session, slow_row, slow_plan, days=[today_name],
+        source="adapt_today", availability={})
+
+    titles = [w.get("title") for w in saved["days"][today_name]["workouts"]]
+    assert "Adapted Easy Run" not in titles
+    assert any(v["title"] == "Adapted Easy Run" for v in stripped)
