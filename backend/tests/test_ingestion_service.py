@@ -364,6 +364,23 @@ def test_mcp_day_without_a_key_preserves_the_column(temp_db_url):
     assert snap.ati == 46 and snap.sleep_quality_score == 82 and snap.hrv_ms == 52
 
 
+def test_two_runs_on_one_day_both_land_from_the_scraper(temp_db_url, mock_coros_json):
+    """The widget rows carry midnight of the day, not the start time. The
+    +-10 s start-time match made the second run of a double day a
+    "duplicate" of the first, and it was dropped."""
+    from datetime import datetime as _dt, timezone as _tz
+    midnight = int(_dt(2026, 11, 10, tzinfo=_tz.utc).timestamp())
+    payload = dict(mock_coros_json)
+    payload["activities"] = [
+        {"labelId": 1001, "timestamp": midnight, "duration": 1800,
+         "distance": 5000, "sportType": 100, "avgSpeed": 360},
+        {"labelId": 1002, "timestamp": midnight, "duration": 2400,
+         "distance": 7000, "sportType": 100, "avgSpeed": 343},
+    ]
+    assert IngestionService(db_url=temp_db_url).ingest_coros_data(payload) == ["1001", "1002"]
+    assert IngestionService(db_url=temp_db_url).ingest_coros_data(payload) == []
+
+
 def test_mcp_activity_uses_local_start_time_name_calories_source(temp_db_url):
     from datetime import datetime as _dt
     act = {"labelId": "900000000000000001", "sportType": 101, "timestamp": 1772996400,

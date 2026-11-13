@@ -55,12 +55,18 @@ class IngestionService:
                     start_dt = datetime.fromisoformat(act["startTimeLocal"])
                 else:
                     start_dt = datetime.utcfromtimestamp(act["timestamp"])
-                start_window_start = start_dt - timedelta(seconds=10)
-                start_window_end = start_dt + timedelta(seconds=10)
-                existing = session.query(Activity).filter(
-                    (Activity.id == str(act["labelId"])) | 
-                    ((Activity.start_time >= start_window_start) & (Activity.start_time <= start_window_end) & (Activity.sport_code == act.get("sportType")))
-                ).first()
+                # The start-time match is only for a real clock time: at
+                # midnight-only, a second run on the same day matched the
+                # first and was silently dropped.
+                match = Activity.id == str(act["labelId"])
+                if act.get("startTimeLocal") or start_dt.time() != datetime.min.time():
+                    start_window_start = start_dt - timedelta(seconds=10)
+                    start_window_end = start_dt + timedelta(seconds=10)
+                    match = match | (
+                        (Activity.start_time >= start_window_start)
+                        & (Activity.start_time <= start_window_end)
+                        & (Activity.sport_code == act.get("sportType")))
+                existing = session.query(Activity).filter(match).first()
                 
                 if existing:
                     # Update existing with COROS-specific metrics if missing
