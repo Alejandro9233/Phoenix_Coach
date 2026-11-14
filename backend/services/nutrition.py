@@ -22,8 +22,9 @@ the day before the half". No stored plan: the calendar's guess, labelled.
 Reads the stored plan only; never generates one. A menu card must not start
 an LLM run, and a failed generation must not take the menu down with it.
 
-Every meal belongs to its calendar date: the bedtime snack sits at 11:59 PM
-(was 1:00 AM; moved 2026-10-21 so no meal crosses midnight). The loader
+Every meal belongs to its calendar date: the bedtime snack sat at 11:59 PM
+(was 1:00 AM; moved 2026-10-21 so no meal crosses midnight) until Alex
+dropped it on 2026-11-14 — dinner is now the last meal. The loader
 rejects a package whose meal times don't run forward through the day, so a
 regenerated file that brings 1:00 AM back fails loudly instead of showing
 the snack as the first meal of the morning.

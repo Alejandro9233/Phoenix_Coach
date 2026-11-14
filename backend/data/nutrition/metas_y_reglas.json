@@ -208,7 +208,7 @@
     },
     {
       "id": "freno",
-      "regla": "Si la HRV o la FC durmiendo empeoran dos semanas seguidas: una semana casi a mantenimiento (agregar plátano 120 g al desayuno y miel 42 g a la toma de la noche)."
+      "regla": "Si la HRV o la FC durmiendo empeoran dos semanas seguidas: una semana casi a mantenimiento (agregar plátano 120 g al desayuno y miel 42 g en la cena; la toma de antes de dormir se quitó el 14 nov 2026)."
     },
     {
       "id": "sin_deficit",
@@ -264,10 +264,10 @@
           "mar",
           "mié"
         ],
-        "pollo_crudo_g": 366,
-        "carne_molida_cruda_g": 410,
-        "arroz_cocido_g": 100,
-        "pasta_cocida_g": 790
+        "pollo_crudo_g": 530,
+        "carne_molida_cruda_g": 490,
+        "arroz_cocido_g": 170,
+        "pasta_cocida_g": 925
       },
       {
         "dia": "miércoles",
@@ -276,10 +276,10 @@
           "vie",
           "sáb"
         ],
-        "pollo_crudo_g": 566,
+        "pollo_crudo_g": 800,
         "carne_molida_cruda_g": 90,
-        "arroz_cocido_g": 260,
-        "pasta_cocida_g": 230
+        "arroz_cocido_g": 410,
+        "pasta_cocida_g": 275
       }
     ],
     "nota": "Cantidades para una semana con calidad martes y jueves. Lo cocido dura 3–4 días en refrigeración. Overnight oats: avena, chía, moras y leche en frasco la noche anterior; plátano y miel al servir."

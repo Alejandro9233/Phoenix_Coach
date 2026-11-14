@@ -1583,7 +1583,7 @@
         "peso": 30
       },
       "nota": "Micronutrientes declarados en la etiqueta (fortificado). Lo que la etiqueta no declara sale del cereal de avena con malvaviscos del USDA (SR 169039).",
-      "en_plan": true
+      "en_plan": false
     },
     {
       "id": "groovies",

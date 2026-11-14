@@ -46,19 +46,20 @@ def test_whole_foods_come_in_whole_pieces():
     chicken = _item(_menu("B"), "Cena", "pollo")
     swaps = {s["food_id"]: s for s in chicken["alternatives"]}
     assert (swaps["atun_tuny"]["amount"], swaps["atun_tuny"]["pieces"], swaps["atun_tuny"]["whole"]) == (220, 1.0, True)
-    assert (swaps["pollo_empanizado_kirkland"]["pieces"], swaps["pollo_empanizado_kirkland"]["whole"]) == (1.0, True)
     assert swaps["camaron"]["whole"] is False
+    # Two breaded breasts overshoot the day and one falls short on protein: not offered.
+    assert "pollo_empanizado_kirkland" not in swaps
 
 
 def test_a_swap_says_what_it_does_to_the_day():
     tuna = next(s for s in _item(_menu("B"), "Cena", "pollo")["alternatives"] if s["food_id"] == "atun_tuny")
-    # 133 g raw chicken (129 kcal, 29.3 g protein) -> one 220 g can (205 kcal, 46.2 g)
-    assert tuna["delta"] == {"kcal": 76, "protein_g": 16.9, "carbs_g": 0.0, "fat_g": 0.9}
+    # 185 g raw chicken (179 kcal, 40.7 g protein) -> one 220 g can (205 kcal, 46.2 g)
+    assert tuna["delta"] == {"kcal": 25, "protein_g": 5.5, "carbs_g": 0.0, "fat_g": 0.4}
 
 
 def test_estimated_foods_are_flagged():
     swaps = {s["food_id"]: s["estimate"] for s in _item(_menu("B"), "Cena", "pollo")["alternatives"]}
-    assert swaps == {"pollo_empanizado_kirkland": True, "atun_tuny": False, "camaron": False}
+    assert swaps == {"atun_tuny": False, "camaron": False}
     dates = next(s for s in _item(_menu("A"), "Merienda", "platano")["alternatives"] if s["food_id"] == "datiles_medjool")
     assert dates["estimate"] is True   # the label's own carbohydrate is doubted
 
@@ -78,14 +79,15 @@ def test_session_fuel_gels_and_supplements_have_no_swaps():
         assert not any("alternatives" in i for i in menu["supplements"])
 
 
-def test_long_run_day_stays_under_the_calcium_ceiling_with_every_swap():
-    # Dates for the banana on day C would cross it; the authoring script leaves them out.
-    t = copy.deepcopy(PKG["types"]["C"])
-    banana = next(i for m in t["comidas"] for i in m["items"] if i["food_id"] == "platano" and i.get("alternativas"))
-    banana["alternativas"].append({"food_id": "datiles_medjool", "cantidad": 40})
-    shake = next(i for m in t["comidas"] if m["nombre"].startswith("Licuado") for i in m["items"] if i["food_id"] == "miel")
-    shake["alternativas"] = [{"food_id": "datiles_medjool", "cantidad": 60}]
-    assert any("calcio_mg" in p for p in swap_problems(t, PKG["foods"], RULES))
+def test_upper_limits_count_every_swap_of_the_day_at_once():
+    # Day A has two chicken meals. A can of tuna (146 µg of selenium) at lunch
+    # is fine; a second one at dinner crosses the 400 µg ceiling. The authoring
+    # script offers the can at lunch only.
+    t = copy.deepcopy(PKG["types"]["A"])
+    dinner = next(i for m in t["comidas"] if m["nombre"].startswith("Cena") for i in m["items"] if i["food_id"] == "pollo")
+    assert "atun_tuny" not in [s["food_id"] for s in dinner["alternativas"]]
+    dinner["alternativas"] = dinner["alternativas"] + [{"food_id": "atun_tuny", "cantidad": 220}]
+    assert any("selenio_ug" in p for p in swap_problems(t, PKG["foods"], RULES))
 
 
 def test_broken_swaps_are_caught():

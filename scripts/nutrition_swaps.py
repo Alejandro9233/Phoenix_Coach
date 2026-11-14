@@ -25,9 +25,10 @@ SWAPS = {
     "miel": ["datiles_medjool"],
     "avena": ["avena_generica"],
 }
-# Day C sits 107 mg under the calcium ceiling and amaranth for oats already
-# spends 71 of them: dates (64 mg per 100 g) on top would cross it.
-SKIP = {"C": {"datiles_medjool"}}
+# (day, meal name starts with) -> foods not offered there.
+# Day A has two chicken meals, and a can of tuna (146 µg of selenium) in each
+# would cross the 400 µg ceiling: the can is offered at lunch only.
+SKIP = {("A", "Cena"): {"atun_tuny"}}
 
 D = Path(sys.argv[1])
 foods = {f["id"]: f for f in json.loads((D / "alimentos.json").read_text(encoding="utf-8"))["alimentos"]}
@@ -54,7 +55,8 @@ for t in doc["tipos_de_dia"]:
                 continue
             kept = []
             for new_id in SWAPS[item["food_id"]]:
-                if new_id in SKIP.get(t["codigo"], ()):
+                if any(new_id in foods_out for (code, starts), foods_out in SKIP.items()
+                       if code == t["codigo"] and meal["nombre"].startswith(starts)):
                     continue
                 swap = {"food_id": new_id, "cantidad": amount(orig, item["cantidad"], foods[new_id])}
                 # each swap is judged alone here; the day-wide limits are judged at the end

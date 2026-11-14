@@ -180,18 +180,24 @@ def test_next_meal_progression():
     assert _next(9, 0) == "12:30 PM"
     assert _next(12, 59) == "12:30 PM"      # inside the 30-min grace
     assert _next(13, 1) == "3:30 PM"
-    assert _next(23, 0) == "11:59 PM"
+    assert _next(22, 0) == "10:00 PM"
+    assert _next(23, 0) is None             # dinner is the last meal: the day is done
 
 
-def test_bedtime_snack_is_last_meal_of_its_day():
+def test_no_bedtime_meal():
+    # Alex, 2026-11-14: "no quiero la toma". Cereal and milk at 11:59 PM are
+    # gone from all four days; their protein went to the chicken and beef, and
+    # on C and D their carbs to the pasta and rice.
     for code, t in PKG["types"].items():
-        timed = [m for m in t["comidas"] if m["hora"] != "Diario"]
-        assert timed[-1]["hora"] == "11:59 PM", code
+        assert not any(m["nombre"] == "Antes de dormir" for m in t["comidas"]), code
+        assert t["totales"]["proteina_g"] >= 2.0 * 74.3, code
+    assert PKG["types"]["C"]["totales"]["carbohidrato_g"] >= 559
+    assert PKG["types"]["D"]["totales"]["carbohidrato_g"] >= 379
 
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2198.0
+    assert menu["totals"]["kcal"] == 2083.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     pollo = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "pollo")
@@ -202,11 +208,11 @@ def test_menu_shape():
 
 
 def test_alternatives_are_carb_matched():
-    # Oats (Bob's Red Mill) 43 g -> amaranth 40 g; Lucky Charms 30 g -> Groovies 48 g.
+    # Oats (Bob's Red Mill) 43 g -> amaranth 40 g.
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
     alts = {i["food_id"]: (i["amount"], i["alternative"]["food_id"], i["alternative"]["amount"])
             for m in menu["meals"] for i in m["items"] if "alternative" in i}
-    assert alts == {"avena": (43, "amaranto", 40), "lucky": (30, "groovies", 48)}
+    assert alts == {"avena": (43, "amaranto", 40)}
 
 
 def test_pre_workout_is_one_slice_of_oroweat():
