@@ -160,7 +160,7 @@ def test_chat_history_sent_to_the_model_is_capped(client, test_db_session, monke
     session would eventually 429 the stream, so only the newest
     CHAT_HISTORY_MESSAGES go to the model (council 2026-10-08)."""
     import backend.core.llm_client
-    from backend.main import CHAT_HISTORY_MESSAGES
+    from backend.services.chat import CHAT_HISTORY_MESSAGES
     seen = {}
 
     def mock_chat_completion(messages):

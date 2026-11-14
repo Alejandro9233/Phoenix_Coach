@@ -107,6 +107,8 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
   week's plan: generate, regenerate, replan, adapt-today, use-original.
 - `backend/services/refresh_job.py` — the smart refresh (pull COROS → ingest →
   adapt) and its background job.
+- `backend/services/chat.py` — chat sessions, the context the model sees, and
+  the SSE and one-shot reply paths.
 - `week_plan(db, monday)` in `models/database.py` is the one lookup for a week's
   plan row; `sport_days(athlete)` in `constraint_enforcer.py` is the one read of
   the training-day schedule. Don't write either out by hand (tests fail).

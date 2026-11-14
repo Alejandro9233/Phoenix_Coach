@@ -16,12 +16,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import backend.main as main_mod
 from backend.models.database import Athlete, Base, RecoverySnapshot, WeeklyPlan
 from backend.services.pace_enforcer import enforce_paces
 from backend.services import volume_gate
 from backend.utils.timezone import get_local_today
-from backend.services import plan_flows, refresh_job
+from backend.services import chat, plan_flows, refresh_job
 
 
 @pytest.fixture
@@ -246,7 +245,7 @@ def test_fresh_snapshot_says_today(db):
 # --- Fix 4b: chat knows the phase -----------------------------------------
 
 def test_chat_context_carries_real_phase(db):
-    text = main_mod._build_chat_context(db, "summary", "")
+    text = chat.build_chat_context(db, "summary", "")
     line = next(l for l in text.splitlines() if l.startswith("TRAINING PHASE:"))
     assert "Unknown" not in line
 

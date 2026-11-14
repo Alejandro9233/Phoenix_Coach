@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta
 from backend.models.database import Base, Athlete, Activity, WeeklyPlan
 from backend.agents.data_agent import DataAgent
 from backend.agents.response_agent import _format_training_context, _format_workout_menu
-from backend.main import _build_chat_context
+from backend.services.chat import build_chat_context
 from backend.services.periodization_engine import DISTANCE_PROFILES, PeriodizationEngine
 from backend.utils.timezone import get_local_today
 import json
@@ -41,7 +41,7 @@ def test_data_agent_zones(temp_db_session):
     assert "Z1 <150W" in summary
     assert "Power Zones (FTP 200.0W)" in summary
 
-def test_build_chat_context(temp_db_session):
+def testbuild_chat_context(temp_db_session):
     # Test that _build_chat_context injects the weekly plan correctly
     today = date.today()
     start_of_week = today - timedelta(days=today.weekday())
@@ -65,7 +65,7 @@ def test_build_chat_context(temp_db_session):
     summary = "SUMMARY_TEXT"
     rag_context = "RAG_TEXT"
     
-    system_prompt = _build_chat_context(temp_db_session, summary, rag_context)
+    system_prompt = build_chat_context(temp_db_session, summary, rag_context)
     
     assert "SUMMARY_TEXT" in system_prompt
     assert "RAG_TEXT" in system_prompt
