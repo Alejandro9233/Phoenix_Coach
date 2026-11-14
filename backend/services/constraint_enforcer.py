@@ -205,6 +205,26 @@ def enforce_constraints(
     return plan_json, violations
 
 
+# What an unset days field means. One place: these used to be spelled out in
+# 13 dicts that disagreed — the plan paths used the lists below, the triage
+# paths passed None through, which the enforcer reads as "any day".
+DEFAULT_SPORT_DAYS = {
+    "swim_days": "wed,sat,sun",
+    "bike_days": "mon,tue,wed,thu,fri,sat,sun",
+    "run_days": "mon,tue,wed,thu,fri,sat,sun",
+    "strength_days": "mon,wed,fri",
+}
+
+
+def sport_days(athlete) -> dict:
+    """The athlete's four `*_days` fields with unset ones defaulted — the
+    sport half of `availability`, and what the prompts' profile carries."""
+    return {
+        key: default if getattr(athlete, key, None) is None else getattr(athlete, key)
+        for key, default in DEFAULT_SPORT_DAYS.items()
+    }
+
+
 def get_travel_day_names(db, athlete_id: int, week_start) -> list:
     """
     Full day names ("Friday") the athlete is traveling during the week that

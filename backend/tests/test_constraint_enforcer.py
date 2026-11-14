@@ -273,3 +273,33 @@ def test_resolved_injuries_are_ignored(db, athlete):
     _log_injury(db, athlete.id, recovery_offset_days=2, status="Resolved")
 
     assert get_active_injuries(db, athlete.id) == []
+
+
+def test_sport_days_defaults_only_the_unset_fields():
+    from types import SimpleNamespace
+
+    from backend.services.constraint_enforcer import DEFAULT_SPORT_DAYS, sport_days
+
+    athlete = SimpleNamespace(swim_days=None, bike_days="", run_days="tue,thu",
+                              strength_days=None)
+    assert sport_days(athlete) == {
+        "swim_days": DEFAULT_SPORT_DAYS["swim_days"],
+        "bike_days": "",          # set to "no days" on purpose — not defaulted
+        "run_days": "tue,thu",
+        "strength_days": DEFAULT_SPORT_DAYS["strength_days"],
+    }
+    assert sport_days(None) == DEFAULT_SPORT_DAYS
+
+
+def test_no_file_spells_out_the_sport_days_itself():
+    """The four *_days fields are read through sport_days(); 13 hand-written
+    dicts used to disagree on what an unset field means."""
+    import re
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parents[1]
+    for path in backend.rglob("*.py"):
+        if "tests" in path.parts:
+            continue
+        assert not re.search(r'"swim_days": athlete\.', path.read_text()), (
+            f"{path.name} builds the sport days by hand — use sport_days(athlete)")

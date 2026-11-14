@@ -145,6 +145,7 @@ def get_kb():
 
 
 from backend.core.llm_client import check_llm_available
+from backend.services.constraint_enforcer import sport_days
 
 
 @asynccontextmanager
@@ -338,10 +339,7 @@ def get_athlete_profile(db: Session = Depends(get_db)):
         "race_type": athlete.race_type or "Triathlon",
         "race_distance": athlete.race_distance,
         "race_date": str(athlete.race_date) if athlete.race_date else None,
-        "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
-        "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri",
+        **sport_days(athlete),
         "target_finish_time": athlete.target_finish_time,
         "training_start_date": str(athlete.training_start_date) if athlete.training_start_date else None,
         "timezone": athlete.timezone,
@@ -388,10 +386,7 @@ def _reenforce_current_week(db, athlete):
     before = capture_before(plan_json, days=days)
 
     availability = {
-        "swim_days": athlete.swim_days,
-        "bike_days": athlete.bike_days,
-        "run_days": athlete.run_days,
-        "strength_days": athlete.strength_days,
+        **sport_days(athlete),
         "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
     }
     reason = "Availability changed in Profile"
@@ -931,10 +926,7 @@ def _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason):
         "race_name": athlete.race_name,
         "race_distance": athlete.race_distance,
         "race_date": str(athlete.race_date) if athlete.race_date else None,
-        "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
-        "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri"
+        **sport_days(athlete),
     } if athlete else {}
     
     # Compute Training Context using PeriodizationEngine
@@ -1173,10 +1165,7 @@ def replan_remaining_days(db: Session = Depends(get_db)):
         "race_name": athlete.race_name,
         "race_distance": athlete.race_distance,
         "race_date": str(athlete.race_date) if athlete.race_date else None,
-        "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
-        "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri"
+        **sport_days(athlete),
     } if athlete else {}
     
     # Get training context and athlete summary

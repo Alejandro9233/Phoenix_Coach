@@ -31,6 +31,7 @@ from typing import Optional
 from backend.services.constraint_enforcer import (
     SPORT_TO_INJURY_TOKENS,
     get_active_injuries,
+    sport_days,
 )
 from backend.services.plan_normalizer import VALID_DAYS, map_sport, normalize_plan
 from backend.utils.timezone import get_local_today
@@ -225,10 +226,7 @@ def build_proposal(db, issue: dict) -> Optional[dict]:
 
     athlete = db.query(Athlete).first()
     availability = {
-        "swim_days": athlete.swim_days if athlete and athlete.swim_days is not None else "wed,sat,sun",
-        "bike_days": athlete.bike_days if athlete and athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "run_days": athlete.run_days if athlete and athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-        "strength_days": athlete.strength_days if athlete and athlete.strength_days is not None else "mon,wed,fri",
+        **sport_days(athlete),
     }
 
     blocked_sports = _canonical_blocked_sports(issue["affected_sports"])
@@ -418,10 +416,7 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
     from backend.services.constraint_enforcer import get_travel_day_names
     from backend.services.volume_gate import completed_week_actuals
     availability = {
-        "swim_days": athlete.swim_days,
-        "bike_days": athlete.bike_days,
-        "run_days": athlete.run_days,
-        "strength_days": athlete.strength_days,
+        **sport_days(athlete),
         "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
     }
     pipeline_reason = f"{injury.body_part} reported (severity {injury.severity}/10)"
@@ -440,10 +435,7 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
             "race_name": athlete.race_name,
             "race_distance": athlete.race_distance,
             "race_date": str(athlete.race_date) if athlete.race_date else None,
-            "swim_days": athlete.swim_days,
-            "bike_days": athlete.bike_days,
-            "run_days": athlete.run_days,
-            "strength_days": athlete.strength_days,
+            **sport_days(athlete),
         }
         summary_lines = [
             f"The athlete reported: {injury.body_part} "
@@ -805,10 +797,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     from backend.services.volume_gate import completed_week_actuals
 
     availability = {
-        "swim_days": athlete.swim_days,
-        "bike_days": athlete.bike_days,
-        "run_days": athlete.run_days,
-        "strength_days": athlete.strength_days,
+        **sport_days(athlete),
         "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
     }
     regenerated = []
@@ -819,10 +808,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
             "race_name": athlete.race_name,
             "race_distance": athlete.race_distance,
             "race_date": str(athlete.race_date) if athlete.race_date else None,
-            "swim_days": athlete.swim_days,
-            "bike_days": athlete.bike_days,
-            "run_days": athlete.run_days,
-            "strength_days": athlete.strength_days,
+            **sport_days(athlete),
         }
         summary_lines = [
             f"The athlete has RECOVERED from: {injury.body_part} "
@@ -1158,10 +1144,7 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
     from backend.services.hand_set_guard import restrict_rebuild_days
     rebuild_days = restrict_rebuild_days(start_of_week, rebuild_days, affected=[])
     availability = {
-        "swim_days": athlete.swim_days,
-        "bike_days": athlete.bike_days,
-        "run_days": athlete.run_days,
-        "strength_days": athlete.strength_days,
+        **sport_days(athlete),
         "travel_day_names": travel_day_names,
     }
     active_injuries = get_active_injuries(db, athlete.id)
@@ -1191,10 +1174,7 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
                 "race_name": athlete.race_name,
                 "race_distance": athlete.race_distance,
                 "race_date": str(athlete.race_date) if athlete.race_date else None,
-                "swim_days": athlete.swim_days,
-                "bike_days": athlete.bike_days,
-                "run_days": athlete.run_days,
-                "strength_days": athlete.strength_days,
+                **sport_days(athlete),
             }
             summary_lines = [
                 f"The athlete is TRAVELING on: {', '.join(blocked)} — those days "

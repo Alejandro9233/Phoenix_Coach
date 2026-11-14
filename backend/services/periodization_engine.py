@@ -50,7 +50,7 @@ from sqlalchemy import func
 from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyPlan
 from backend.services.constraint_enforcer import (
     SPORT_TO_AVAILABILITY_KEY, _injury_blocked_sports, get_active_injuries,
-    get_travel_day_names, parse_day_list,
+    get_travel_day_names, parse_day_list, sport_days,
 )
 from backend.services.long_run_day import LONG_RUN_DAY
 from backend.services.pace_enforcer import _band_seconds, km_for_minutes
@@ -1526,10 +1526,7 @@ class PeriodizationEngine:
 
         # Sport availability
         availability = {
-            "swim_days": athlete.swim_days if athlete.swim_days is not None else "wed,sat,sun",
-            "bike_days": athlete.bike_days if athlete.bike_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-            "run_days": athlete.run_days if athlete.run_days is not None else "mon,tue,wed,thu,fri,sat,sun",
-            "strength_days": athlete.strength_days if athlete.strength_days is not None else "mon,wed,fri",
+            **sport_days(athlete),
         }
 
         # Travel days for the week being planned (context is always computed
