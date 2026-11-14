@@ -410,3 +410,31 @@ def test_the_rebase_enforces_an_injury_logged_after_the_read(test_db_session):
     titles = [w.get("title") for w in saved["days"][today_name]["workouts"]]
     assert "Adapted Easy Run" not in titles
     assert any(v["title"] == "Adapted Easy Run" for v in stripped)
+
+
+def test_week_plan_reads_the_newest_row(test_db_session):
+    """A week can hold two rows. Every reader takes the newest; last week's
+    review took the oldest (its lookup had no ordering)."""
+    from backend.models.database import week_plan
+
+    monday = get_local_today() - timedelta(days=get_local_today().weekday())
+    for title in ("old", "new"):
+        test_db_session.add(WeeklyPlan(week_start=monday, athlete_id=1, plan_json=normalize_plan({
+            "days": {"Monday": _day("running", title, "30 min")}})))
+        test_db_session.commit()
+
+    row = week_plan(test_db_session, monday)
+    assert row.plan_json["days"]["Monday"]["workouts"][0]["title"] == "new"
+    assert week_plan(test_db_session, monday - timedelta(days=7)) is None
+
+
+def test_the_week_lookup_is_written_once():
+    """week_plan() is the lookup; a hand-written copy is how one of 25 lost
+    its ordering."""
+    import re
+    for path in (REPO_ROOT / "backend").rglob("*.py"):
+        if "tests" in path.parts or path.name == "database.py":
+            continue
+        assert not re.search(r"WeeklyPlan\.week_start ==[^\n]*\n?[^\n]*\.first\(\)",
+                             path.read_text()), (
+            f"{path.name} looks up a week's plan by hand — use week_plan(db, monday)")

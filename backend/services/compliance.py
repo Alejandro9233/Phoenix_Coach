@@ -13,7 +13,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
-from backend.models.database import Activity, Athlete, WeeklyPlan
+from backend.models.database import Activity, Athlete, week_plan
 from backend.utils.timezone import get_local_today
 
 
@@ -218,9 +218,7 @@ def get_weekly_plan_status(db: Session) -> Optional[dict]:
     end_of_week = start_of_week + timedelta(days=6)  # Sunday
 
     # Get the weekly plan
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
 
     if not plan_record:
         return None

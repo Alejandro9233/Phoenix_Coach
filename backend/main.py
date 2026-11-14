@@ -146,6 +146,7 @@ def get_kb():
 
 from backend.core.llm_client import check_llm_available
 from backend.services.constraint_enforcer import sport_days
+from backend.models.database import week_plan
 
 
 @asynccontextmanager
@@ -363,7 +364,6 @@ def _reenforce_current_week(db, athlete):
     """
     from datetime import timedelta
 
-    from backend.models.database import WeeklyPlan
     from backend.services.constraint_enforcer import (
         get_active_injuries,
         get_travel_day_names,
@@ -375,9 +375,7 @@ def _reenforce_current_week(db, athlete):
 
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if not plan_record:
         return None
 
@@ -774,10 +772,9 @@ def _stored_week_plan(db, day):
     """The stored plan_json for the week holding `day`, or None. Read-only:
     nutrition never triggers a generation."""
     from datetime import timedelta
-    from backend.models.database import WeeklyPlan
 
     week_start = day - timedelta(days=day.weekday())
-    record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == week_start).order_by(WeeklyPlan.id.desc()).first()
+    record = week_plan(db, week_start)
     return record.plan_json if record else None
 
 
@@ -809,9 +806,7 @@ def _watch_sync_this_week(db):
     from datetime import timedelta
     today = get_local_today()
     week_start = today - timedelta(days=today.weekday())
-    row = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == week_start
-    ).order_by(WeeklyPlan.id.desc()).first()
+    row = week_plan(db, week_start)
     if row:
         return _watch_sync_safe(db, row.plan_json, week_start)
     return None
@@ -842,7 +837,6 @@ def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
     plan's _revisions before the pipeline, so a regenerated week keeps its
     receipt history (finalize appends the new receipt on top and trims)."""
     from datetime import timedelta
-    from backend.models.database import WeeklyPlan
     from backend.services.plan_normalizer import normalize_plan
 
     today = get_local_today()
@@ -850,7 +844,7 @@ def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
     start_of_week = today - timedelta(days=today.weekday())
 
     # Fast path: the week already has a plan.
-    plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if plan_record:
         return normalize_plan(plan_record.plan_json)
 
@@ -880,7 +874,7 @@ def _get_or_generate_weekly_plan(db, carry_revisions=None, source="generate",
     # the re-check. (regenerate arrives here with its delete pending in the
     # same session, so its re-check still sees "no plan" — by design.)
     with _PLAN_GENERATION_LOCK:
-        plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+        plan_record = week_plan(db, start_of_week)
         if plan_record:
             return normalize_plan(plan_record.plan_json)
         new_plan = _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason)
@@ -936,7 +930,7 @@ def _generate_weekly_plan(db, start_of_week, carry_revisions, source, reason):
     # Check if is_recovery_week changed from last week → log it
     try:
         last_monday = start_of_week - timedelta(days=7)
-        last_plan = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == last_monday).order_by(WeeklyPlan.id.desc()).first()
+        last_plan = week_plan(db, last_monday)
         if last_plan and last_plan.plan_json and "_context" in last_plan.plan_json:
             was_recovery_week = last_plan.plan_json["_context"].get("is_recovery_week", False)
             is_recovery_week = training_context.get("is_recovery_week", False)
@@ -1030,9 +1024,7 @@ def regenerate_weekly_plan(db: Session = Depends(get_db)):
     start_of_week = today - timedelta(days=today.weekday())
 
     # Receipt history must survive a regenerate — grab it before the delete.
-    old_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    old_record = week_plan(db, start_of_week)
     carry = list((old_record.plan_json or {}).get("_revisions") or []) if old_record else None
 
     # Mid-week, the days already lived stay as they were — the iOS alert
@@ -1070,7 +1062,7 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     and generates fresh plans only for today and future days.
     """
     from datetime import date, timedelta, datetime
-    from backend.models.database import WeeklyPlan, Activity, Athlete
+    from backend.models.database import Activity, Athlete
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
     from backend.services.periodization_engine import PeriodizationEngine
@@ -1085,9 +1077,7 @@ def replan_remaining_days(db: Session = Depends(get_db)):
     today_idx = day_names_ordered.index(today_name) if today_name in day_names_ordered else 0
     
     # Get the current plan
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     
     if not plan_record:
         raise HTTPException(status_code=404, detail="No weekly plan found. Fetch /weekly-plan first.")
@@ -1358,16 +1348,14 @@ def _todays_training_done(db) -> bool:
     counts as not-done — there is nothing to guard."""
     from datetime import datetime, timedelta
 
-    from backend.models.database import Activity, WeeklyPlan
+    from backend.models.database import Activity
     from backend.services.compliance import day_training_done
     from backend.services.plan_normalizer import normalize_plan
     from backend.utils.timezone import get_local_now, get_local_today
 
     today = get_local_today()
     week_start = today - timedelta(days=today.weekday())
-    plan_row = (db.query(WeeklyPlan)
-                .filter(WeeklyPlan.week_start == week_start)
-                .order_by(WeeklyPlan.id.desc()).first())
+    plan_row = week_plan(db, week_start)
     if not plan_row:
         return False
     day = normalize_plan(plan_row.plan_json).get("days", {}).get(
@@ -1437,7 +1425,7 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
     from datetime import date, timedelta, datetime
     from backend.utils.timezone import get_local_now, get_local_today
-    from backend.models.database import WeeklyPlan, Activity
+    from backend.models.database import Activity
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
     from backend.services.periodization_engine import PeriodizationEngine
@@ -1446,7 +1434,7 @@ def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     start_of_week = today - timedelta(days=today.weekday())
     today_day_name = get_local_now().strftime("%A")  # Monday, Tuesday, etc.
     
-    plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if not plan_record:
         raise HTTPException(status_code=404, detail="Weekly plan not found for this week. Please fetch /weekly-plan first.")
     
@@ -1656,7 +1644,6 @@ def use_original_today(db: Session = Depends(get_db)):
     trigger math."""
     from datetime import timedelta
 
-    from backend.models.database import WeeklyPlan
     from backend.services.constraint_enforcer import get_active_injuries
     from backend.services.periodization_engine import PeriodizationEngine
     from backend.services.plan_meta import (
@@ -1669,9 +1656,7 @@ def use_original_today(db: Session = Depends(get_db)):
     start_of_week = today - timedelta(days=today.weekday())
     today_day_name = get_local_now().strftime("%A")
 
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if not plan_record:
         raise HTTPException(status_code=404, detail="Weekly plan not found for this week.")
 
@@ -2063,9 +2048,7 @@ async def _run_smart_refresh(db: Session, progress=None):
             # afternoon's no-op refresh would durably claim the morning's
             # plan change as its own and corrupt the History fold.
             def _last_adapt_at():
-                plan_row = db.query(WeeklyPlan).filter(
-                    WeeklyPlan.week_start == week_start_local
-                ).order_by(WeeklyPlan.id.desc()).first()
+                plan_row = week_plan(db, week_start_local)
                 revs = ((plan_row.plan_json or {}).get("_revisions") or []) if plan_row else []
                 if revs and revs[-1].get("source") == "adapt_today":
                     return revs[-1].get("at")
@@ -2127,7 +2110,7 @@ async def _run_smart_refresh(db: Session, progress=None):
             from datetime import timedelta as _wtd
             _today = get_local_today()
             _ws = _today - _wtd(days=_today.weekday())
-            _plan_row = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == _ws).order_by(WeeklyPlan.id.desc()).first()
+            _plan_row = week_plan(db, _ws)
             if _plan_row:
                 watch = await asyncio.wait_for(
                     asyncio.to_thread(_watch_sync_safe, db, _plan_row.plan_json, _ws), timeout=90)
@@ -2251,7 +2234,6 @@ CHAT_HISTORY_MESSAGES = 20   # newest messages sent to the model
 def _build_chat_context(db: Session, summary: str, rag_context: str, extras: str = "") -> str:
     from backend.services.periodization_engine import PeriodizationEngine
     from backend.services.plan_normalizer import normalize_plan
-    from backend.models.database import WeeklyPlan
     from datetime import timedelta
     from backend.utils.timezone import get_local_now, get_local_today
     import json
@@ -2261,7 +2243,7 @@ def _build_chat_context(db: Session, summary: str, rag_context: str, extras: str
     
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
-    plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     plan_json = {}
     if plan_record:
         plan_json = normalize_plan(plan_record.plan_json)
@@ -2689,7 +2671,7 @@ def submit_feedback(body: dict, db: Session = Depends(get_db)):
 def get_activity_analysis(activity_id: str, db: Session = Depends(get_db)):
     """Analyze a specific activity and return AI coach feedback."""
     from datetime import timedelta
-    from backend.models.database import Activity, AthleteFeedback, WeeklyPlan
+    from backend.models.database import Activity, AthleteFeedback
     from backend.agents.response_agent import ResponseAgent
     from backend.services.periodization_engine import PeriodizationEngine
     from backend.services.compliance import _compute_workout_compliance, _normalize_sport
@@ -2707,7 +2689,7 @@ def get_activity_analysis(activity_id: str, db: Session = Depends(get_db)):
     if activity.start_time:
         activity_date = activity.start_time.date()
         start_of_week = activity_date - timedelta(days=activity_date.weekday())
-        plan_record = db.query(WeeklyPlan).filter(WeeklyPlan.week_start == start_of_week).order_by(WeeklyPlan.id.desc()).first()
+        plan_record = week_plan(db, start_of_week)
         
         if plan_record and plan_record.plan_json:
             day_name = activity.start_time.strftime("%A")

@@ -47,7 +47,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyPlan
+from backend.models.database import Athlete, Activity, RecoverySnapshot, WeeklyPlan, week_plan
 from backend.services.constraint_enforcer import (
     SPORT_TO_AVAILABILITY_KEY, _injury_blocked_sports, get_active_injuries,
     get_travel_day_names, parse_day_list, sport_days,
@@ -2701,9 +2701,7 @@ class PeriodizationEngine:
         # Plan lookup happens before the no-activities return: a week where a
         # plan existed but zero activities synced is real non-compliance (0%),
         # not "no plan on record".
-        last_plan = db.query(WeeklyPlan).filter(
-            WeeklyPlan.week_start == last_monday
-        ).first()
+        last_plan = week_plan(db, last_monday)
 
         sessions_planned = 0
         missed = []

@@ -28,6 +28,7 @@ import re
 from datetime import date, timedelta
 from typing import Optional
 
+from backend.models.database import week_plan
 from backend.services.constraint_enforcer import (
     SPORT_TO_INJURY_TOKENS,
     get_active_injuries,
@@ -210,14 +211,12 @@ def build_proposal(db, issue: dict) -> Optional[dict]:
     Returns None when the issue collides with nothing in the plan — there is no
     point showing a confirmation card that proposes no edits.
     """
-    from backend.models.database import Athlete, WeeklyPlan
+    from backend.models.database import Athlete
 
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
 
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if not plan_record:
         return None
 
@@ -322,7 +321,7 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
     """
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
-    from backend.models.database import Athlete, InjuryLog, WeeklyPlan
+    from backend.models.database import Athlete, InjuryLog
     from backend.services.periodization_engine import PeriodizationEngine
 
     today = get_local_today()
@@ -332,9 +331,7 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
     if not athlete:
         raise ValueError("No athlete on record")
 
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if not plan_record:
         raise ValueError("No weekly plan for this week")
 
@@ -700,15 +697,12 @@ def build_recovery_proposal(db, injury) -> dict:
     Always returns a proposal — even with nothing to rebuild, resolving the
     injury is worth a card (it unblocks future planning).
     """
-    from backend.models.database import WeeklyPlan
 
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
 
     rebuild_days = []
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if plan_record:
         plan_json = normalize_plan(plan_record.plan_json)
         rebuild_days = _injury_rest_days(plan_json.get("days") or {}, injury, today)
@@ -739,7 +733,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     """
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
-    from backend.models.database import Athlete, InjuryLog, WeeklyPlan
+    from backend.models.database import Athlete, InjuryLog
     from backend.services.periodization_engine import PeriodizationEngine
 
     injury = db.query(InjuryLog).filter(InjuryLog.id == injury_id).first()
@@ -770,9 +764,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     if not rebuild:
         return result
 
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if not plan_record:
         return result
 
@@ -982,15 +974,12 @@ def build_travel_proposal(db, day_names: list) -> dict:
     Lists what each travel day currently holds so the card can show what is
     displaced, and which open days would be rebuilt around the trip.
     """
-    from backend.models.database import WeeklyPlan
 
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
 
     affected = []
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     days_dict = {}
     if plan_record:
         days_dict = normalize_plan(plan_record.plan_json).get("days") or {}
@@ -1044,7 +1033,7 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
     """
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
-    from backend.models.database import Athlete, TravelDay, WeeklyPlan
+    from backend.models.database import Athlete, TravelDay
     from backend.services.constraint_enforcer import get_travel_day_names
     from backend.services.periodization_engine import PeriodizationEngine
 
@@ -1090,9 +1079,7 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
         "violations": [],
     }
 
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == start_of_week
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, start_of_week)
     if not plan_record:
         return result
 

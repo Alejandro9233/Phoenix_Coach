@@ -259,3 +259,17 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     session = relationship("ChatSession", back_populates="messages")
+
+
+def week_plan(db, week_start):
+    """The plan row for the week starting `week_start` (a Monday), or None.
+
+    The newest row wins: a week can hold more than one (shadow rows from the
+    2026-08-31 double generation still exist). This lookup was written out 25
+    times, and the one copy without the ordering read the oldest row.
+    Takes the date, never reads the clock — callers resolve "today" through
+    their own get_local_today().
+    """
+    return db.query(WeeklyPlan).filter(
+        WeeklyPlan.week_start == week_start
+    ).order_by(WeeklyPlan.id.desc()).first()

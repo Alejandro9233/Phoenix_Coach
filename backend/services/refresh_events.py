@@ -24,7 +24,7 @@ The history feed (history_feed.py) merges these with plan receipts.
 """
 from datetime import datetime, timedelta
 
-from backend.models.database import Activity, RecoverySnapshot, RefreshEvent
+from backend.models.database import Activity, RecoverySnapshot, RefreshEvent, week_plan
 from backend.utils.timezone import get_local_now, get_local_today
 
 SCHEMA_VERSION = 4  # 3: coros_source (mcp | scraper); 4: watch (COROS watch push report) — docs/COROS_MCP.md
@@ -45,7 +45,6 @@ def _activity_summary(db, activity) -> dict:
         _compute_workout_compliance, _normalize_sport,
     )
     from backend.services.plan_normalizer import normalize_plan
-    from backend.models.database import WeeklyPlan
 
     summary = {
         "activity_id": activity.id,
@@ -61,9 +60,7 @@ def _activity_summary(db, activity) -> dict:
         return summary
     act_day = activity.start_time.date()
     week_start = act_day - timedelta(days=act_day.weekday())
-    plan_record = db.query(WeeklyPlan).filter(
-        WeeklyPlan.week_start == week_start
-    ).order_by(WeeklyPlan.id.desc()).first()
+    plan_record = week_plan(db, week_start)
     if not plan_record:
         return summary
 
