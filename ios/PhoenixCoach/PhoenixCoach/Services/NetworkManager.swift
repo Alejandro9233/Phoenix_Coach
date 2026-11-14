@@ -13,7 +13,7 @@ class NetworkManager: ObservableObject {
         }
     }
     @Published var isConnected: Bool = false
-    @Published var isOllamaConnected: Bool = false
+    @Published var isLLMConnected: Bool = false
     
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -62,14 +62,14 @@ class NetworkManager: ObservableObject {
                     let llmStatus = llmObj?["status"] as? String
                     await MainActor.run {
                         isConnected = true
-                        isOllamaConnected = llmStatus == "connected"
+                        isLLMConnected = llmStatus == "connected"
                     }
                     return
                 }
             }
             await MainActor.run {
                 isConnected = true
-                isOllamaConnected = false
+                isLLMConnected = false
             }
         } catch {
             // Cutover safety net: Render stays alive during the parallel week
@@ -87,7 +87,7 @@ class NetworkManager: ObservableObject {
                             await MainActor.run {
                                 self.baseURL = fallbackURL
                                 isConnected = true
-                                isOllamaConnected = llmStatus == "connected"
+                                isLLMConnected = llmStatus == "connected"
                             }
                             return
                         }
@@ -99,7 +99,7 @@ class NetworkManager: ObservableObject {
             
             await MainActor.run {
                 isConnected = false
-                isOllamaConnected = false
+                isLLMConnected = false
             }
         }
     }
@@ -757,7 +757,6 @@ enum NetworkError: LocalizedError {
     case invalidURL
     case serverError
     case decodingError
-    case ollamaOffline
     /// Backend 409: no race_date/race_distance yet, so no plan can be generated.
     case profileIncomplete
     /// The backend answered with an error body; the string is its `detail`
@@ -770,7 +769,6 @@ enum NetworkError: LocalizedError {
         case .invalidURL: return "Invalid server URL"
         case .serverError: return "Server error"
         case .decodingError: return "Failed to parse response"
-        case .ollamaOffline: return "Ollama is not running on your Mac"
         case .profileIncomplete: return "Set your race in Profile to get your first plan"
         case .backendError(let detail): return detail
         }

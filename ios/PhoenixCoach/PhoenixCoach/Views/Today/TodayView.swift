@@ -1494,7 +1494,7 @@ struct ConnectionSettingsSheet: View {
                         Text(network.isConnected ? "Connection Stable" : "Connection Offline")
                             .font(.title2.bold())
                         
-                        Text("Phoenix Coach relies on a local FastAPI server running on your Mac for periodization, scraping, and LLM planning.")
+                        Text("Phoenix Coach talks to its server in the cloud for the plan, the COROS sync and the coach.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -1569,8 +1569,7 @@ struct ConnectionSettingsSheet: View {
                             .foregroundStyle(.secondary)
                         
                         statusRow(title: "Backend FastAPI", status: network.isConnected ? "Online" : "Offline", isOk: network.isConnected)
-                        statusRow(title: "Mac Ollama API", status: network.isConnected ? (network.isOllamaConnected ? "Running" : "Offline") : "N/A", isOk: network.isConnected && network.isOllamaConnected)
-                        statusRow(title: "Device Local LLM", status: "Ready", isOk: true)
+                        statusRow(title: "Coach AI (Groq)", status: network.isConnected ? (network.isLLMConnected ? "Connected" : "Offline") : "N/A", isOk: network.isConnected && network.isLLMConnected)
                     }
                     .padding()
                     .background(Color(.secondarySystemGroupedBackground))
@@ -1581,9 +1580,9 @@ struct ConnectionSettingsSheet: View {
                         Text("Troubleshooting Guide")
                             .font(.headline)
                         
-                        bulletPoint("Make sure your Mac backend is running via the command `PYTHONPATH=. python3 backend/main.py` in the workspace.")
-                        bulletPoint("Ensure both your iPhone/device and Mac are connected to the exact same Wi-Fi network.")
-                        bulletPoint("Check that the app has internet access. You can test in your Mac browser at `https://phoenix-coach.onrender.com/health`.")
+                        bulletPoint("Check that the phone has internet access.")
+                        bulletPoint("Open `https://phoenix-coach.duckdns.org/health` in a browser. If it does not answer, the server is down.")
+                        bulletPoint("The first request after a quiet spell can take up to a minute.")
                     }
                     .padding(.horizontal, 4)
                 }
