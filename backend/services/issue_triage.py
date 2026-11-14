@@ -307,6 +307,74 @@ def build_proposal(db, issue: dict) -> Optional[dict]:
     }
 
 
+def _rebuild_days(db, athlete, plan_json, *, training_context, days_to_plan,
+                  summary_lines, llm_reason, source, reason, pipeline_days,
+                  availability, active_injuries, before, start_of_week, today,
+                  required_run_km=None):
+    """Ask the coach to rebuild `days_to_plan` and run the result through the
+    gated pipeline. Returns (plan_json, violations, rebuilt day names).
+
+    The one LLM rebuild behind the three applies (injury swap, recovery,
+    travel). They differ only in what they tell the coach (`summary_lines`,
+    `llm_reason`) and which days the pipeline enforces (`pipeline_days`); the
+    profile, the week's actuals, the merge and the gate were three copies.
+    Raises whatever generation raises — each apply has its own fallback.
+    """
+    import copy
+
+    from backend.agents.data_agent import DataAgent
+    from backend.agents.response_agent import ResponseAgent
+    from backend.services.plan_meta import run_plan_write_pipeline
+    from backend.services.volume_gate import completed_week_actuals
+
+    profile = {
+        "race_name": athlete.race_name,
+        "race_distance": athlete.race_distance,
+        "race_date": str(athlete.race_date) if athlete.race_date else None,
+        **sport_days(athlete),
+    }
+    completed_run_km, completed_hours = completed_week_actuals(db, start_of_week, today)
+    regenerated = []
+
+    def _generate(feedback=None):
+        new_days = ResponseAgent().generate_remaining_days(
+            athlete_summary=DataAgent(db).summarize(),
+            profile=profile,
+            training_context=training_context,
+            completed_days_summary="\n".join(summary_lines),
+            days_to_plan=days_to_plan,
+            reason=llm_reason,
+            feedback=feedback,
+        ).get("days") or {}
+        # A fresh copy per attempt, so a rejected one can't leak into the retry.
+        merged = copy.deepcopy(plan_json)
+        regenerated.clear()
+        for day_name, new_day in new_days.items():
+            if day_name not in days_to_plan or not isinstance(new_day, dict):
+                continue
+            new_day.pop("adaptation", None)
+            new_day.pop("original_workouts", None)
+            merged["days"][day_name] = new_day
+            regenerated.append(day_name)
+        return merged
+
+    plan, violations = run_plan_write_pipeline(
+        db,
+        generate=_generate,
+        gate_ctx=training_context,
+        completed_run_km=completed_run_km,
+        completed_hours=completed_hours,
+        required_run_km=required_run_km,
+        source=source,
+        availability=availability,
+        active_injuries=active_injuries,
+        days=pipeline_days,
+        reason=reason,
+        before=before,
+    )
+    return plan, violations, regenerated
+
+
 def apply_issue(db, issue: dict, choices: dict) -> dict:
     """
     Commit a confirmed proposal: log the injury, then rebuild the affected days.
@@ -319,8 +387,6 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
 
     Returns a summary of what changed.
     """
-    from backend.agents.data_agent import DataAgent
-    from backend.agents.response_agent import ResponseAgent
     from backend.models.database import Athlete, InjuryLog
     from backend.services.periodization_engine import PeriodizationEngine
 
@@ -411,7 +477,6 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
     enforce_days = sorted(set(window_days) | set(rest_days) | set(swap_days))
 
     from backend.services.constraint_enforcer import get_travel_day_names
-    from backend.services.volume_gate import completed_week_actuals
     availability = {
         **sport_days(athlete),
         "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
@@ -422,18 +487,11 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
     #    summary, and whatever it returns still has to clear the enforcer and
     #    the volume gate (which skips the run floor while running is blocked —
     #    an injured week legitimately under-runs).
-    import copy as _copy
     regenerated = []
     pipelined = False
     if swap_days:
         engine = PeriodizationEngine()
         training_context = engine.compute_context(db)
-        profile = {
-            "race_name": athlete.race_name,
-            "race_distance": athlete.race_distance,
-            "race_date": str(athlete.race_date) if athlete.race_date else None,
-            **sport_days(athlete),
-        }
         summary_lines = [
             f"The athlete reported: {injury.body_part} "
             f"(severity {injury.severity}/10). Avoid loading it.",
@@ -442,44 +500,22 @@ def apply_issue(db, issue: dict, choices: dict) -> dict:
             "Replace the affected sessions with equivalent-load training in a SAFE sport. "
             "Keep the athlete's weekly volume as close to target as the injury allows.",
         ]
-        completed_run_km, completed_hours = completed_week_actuals(
-            db, start_of_week, today
-        )
 
-        def _generate(feedback=None):
-            gen_result = ResponseAgent().generate_remaining_days(
-                athlete_summary=DataAgent(db).summarize(),
-                profile=profile,
-                training_context=training_context,
-                completed_days_summary="\n".join(summary_lines),
-                days_to_plan=swap_days,
-                reason="The athlete reported an injury; the affected days are being rebuilt.",
-                feedback=feedback,
-            )
-            merged = _copy.deepcopy(plan_json)
-            regenerated.clear()
-            for day_name, new_day in (gen_result.get("days") or {}).items():
-                if day_name not in swap_days or not isinstance(new_day, dict):
-                    continue
-                new_day.pop("adaptation", None)
-                new_day.pop("original_workouts", None)
-                merged["days"][day_name] = new_day
-                regenerated.append(day_name)
-            return merged
 
         try:
-            plan_json, violations = run_plan_write_pipeline(
-                db,
-                generate=_generate,
-                gate_ctx=training_context,
-                completed_run_km=completed_run_km,
-                completed_hours=completed_hours,
+            plan_json, violations, regenerated = _rebuild_days(
+                db, athlete, plan_json,
+                training_context=training_context,
+                days_to_plan=swap_days,
+                summary_lines=summary_lines,
+                llm_reason="The athlete reported an injury; the affected days are being rebuilt.",
                 source="apply_issue",
+                reason=pipeline_reason,
+                pipeline_days=enforce_days,
                 availability=availability,
                 active_injuries=get_active_injuries(db, athlete.id),
-                days=enforce_days,
-                reason=pipeline_reason,
                 before=before,
+                start_of_week=start_of_week, today=today,
             )
             pipelined = True
         except Exception as e:
@@ -731,8 +767,6 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     rebuild leaves the plan untouched and reports `rebuild_error` — the athlete
     can replan later; their injury is not resurrected.
     """
-    from backend.agents.data_agent import DataAgent
-    from backend.agents.response_agent import ResponseAgent
     from backend.models.database import Athlete, InjuryLog
     from backend.services.periodization_engine import PeriodizationEngine
 
@@ -775,7 +809,7 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
         return result
 
     # Receipt snapshot — taken before the rebuild rewrites the rest days.
-    from backend.services.plan_meta import capture_before, run_plan_write_pipeline
+    from backend.services.plan_meta import capture_before
     before = capture_before(plan_json, days=rebuild_days)
 
     athlete = db.query(Athlete).first()
@@ -783,10 +817,8 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     # 2. Rebuild through the normal replan path — the coach sees the injury is
     #    gone (resolved above) and whatever it returns clears the enforcer and
     #    the volume gate (which can retry the rebuild once with numbers).
-    import copy as _copy
 
     from backend.services.constraint_enforcer import get_travel_day_names
-    from backend.services.volume_gate import completed_week_actuals
 
     availability = {
         **sport_days(athlete),
@@ -796,12 +828,6 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
     try:
         engine = PeriodizationEngine()
         training_context = engine.compute_context(db)
-        profile = {
-            "race_name": athlete.race_name,
-            "race_distance": athlete.race_distance,
-            "race_date": str(athlete.race_date) if athlete.race_date else None,
-            **sport_days(athlete),
-        }
         summary_lines = [
             f"The athlete has RECOVERED from: {injury.body_part} "
             f"(reported {injury.date_reported}, now resolved).",
@@ -810,43 +836,21 @@ def apply_recovery(db, injury_id: int, rebuild: bool = True) -> dict:
             "Rebuild them as normal training days for this phase. "
             "Ease the first session back — nothing maximal on day one after an injury.",
         ]
-        completed_run_km, completed_hours = completed_week_actuals(
-            db, start_of_week, today
-        )
 
-        def _generate(feedback=None):
-            new_days = ResponseAgent().generate_remaining_days(
-                athlete_summary=DataAgent(db).summarize(),
-                profile=profile,
-                training_context=training_context,
-                completed_days_summary="\n".join(summary_lines),
-                days_to_plan=rebuild_days,
-                reason="An injury resolved; its rest days are being rebuilt as training days.",
-                feedback=feedback,
-            ).get("days") or {}
-            merged = _copy.deepcopy(plan_json)
-            regenerated.clear()
-            for day_name, new_day in new_days.items():
-                if day_name not in rebuild_days or not isinstance(new_day, dict):
-                    continue
-                new_day.pop("adaptation", None)
-                new_day.pop("original_workouts", None)
-                merged["days"][day_name] = new_day
-                regenerated.append(day_name)
-            return merged
 
-        new_plan_json, violations = run_plan_write_pipeline(
-            db,
-            generate=_generate,
-            gate_ctx=training_context,
-            completed_run_km=completed_run_km,
-            completed_hours=completed_hours,
+        new_plan_json, violations, regenerated = _rebuild_days(
+            db, athlete, plan_json,
+            training_context=training_context,
+            days_to_plan=rebuild_days,
+            summary_lines=summary_lines,
+            llm_reason="An injury resolved; its rest days are being rebuilt as training days.",
             source="apply_recovery",
+            reason=f"Recovered from {injury.body_part}",
+            pipeline_days=rebuild_days,
             availability=availability,
             active_injuries=get_active_injuries(db, athlete.id),
-            days=rebuild_days,
-            reason=f"Recovered from {injury.body_part}",
             before=before,
+            start_of_week=start_of_week, today=today,
         )
     except Exception as e:
         print(f"⚠️ Recovery rebuild failed, plan left as-is: {e}")
@@ -1031,8 +1035,6 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
     still blocks the days (rows written, blocked days rested, enforcer armed)
     and reports `rebuild_error`; only the rebalancing waits for a replan.
     """
-    from backend.agents.data_agent import DataAgent
-    from backend.agents.response_agent import ResponseAgent
     from backend.models.database import Athlete, TravelDay
     from backend.services.constraint_enforcer import get_travel_day_names
     from backend.services.periodization_engine import PeriodizationEngine
@@ -1143,7 +1145,6 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
     # capped by what the open days can physically hold (no single day should
     # carry more than ~45% of the weekly cap). 0 = check skipped, still
     # reported.
-    import copy as _copy
     open_days = volume_gate._open_run_days(rebuild_days, availability, active_injuries)
     required_km = 0.0
 
@@ -1157,12 +1158,6 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
             cap = budget.get("run_km_hard_cap")
             if open_days > 0 and cap:
                 required_km = round(min(pre_km, open_days * 0.45 * cap), 1)
-            profile = {
-                "race_name": athlete.race_name,
-                "race_distance": athlete.race_distance,
-                "race_date": str(athlete.race_date) if athlete.race_date else None,
-                **sport_days(athlete),
-            }
             summary_lines = [
                 f"The athlete is TRAVELING on: {', '.join(blocked)} — those days "
                 "are now rest and must stay rest.",
@@ -1182,44 +1177,22 @@ def apply_travel(db, dates: list, note: str = "") -> dict:
                     f"The rebuilt open days must include at least "
                     f"{required_km} km of running (the system checks this)."
                 )
-            completed_run_km, completed_hours = volume_gate.completed_week_actuals(
-                db, start_of_week, today
-            )
 
-            def _generate(feedback=None):
-                new_days = ResponseAgent().generate_remaining_days(
-                    athlete_summary=DataAgent(db).summarize(),
-                    profile=profile,
-                    training_context=training_context,
-                    completed_days_summary="\n".join(summary_lines),
-                    days_to_plan=rebuild_days,
-                    reason="Travel days were added; the open days are being rebuilt around them.",
-                    feedback=feedback,
-                ).get("days") or {}
-                merged = _copy.deepcopy(plan_json)
-                regenerated.clear()
-                for day_name, new_day in new_days.items():
-                    if day_name not in rebuild_days or not isinstance(new_day, dict):
-                        continue
-                    new_day.pop("adaptation", None)
-                    new_day.pop("original_workouts", None)
-                    merged["days"][day_name] = new_day
-                    regenerated.append(day_name)
-                return merged
 
-            plan_json, violations = run_plan_write_pipeline(
-                db,
-                generate=_generate,
-                gate_ctx=training_context,
-                completed_run_km=completed_run_km,
-                completed_hours=completed_hours,
-                required_run_km=required_km or None,
+            plan_json, violations, regenerated = _rebuild_days(
+                db, athlete, plan_json,
+                training_context=training_context,
+                days_to_plan=rebuild_days,
+                summary_lines=summary_lines,
+                llm_reason="Travel days were added; the open days are being rebuilt around them.",
                 source="apply_travel",
+                reason=pipeline_reason,
+                pipeline_days=blocked + rebuild_days,
                 availability=availability,
                 active_injuries=active_injuries,
-                days=blocked + rebuild_days,
-                reason=pipeline_reason,
                 before=before,
+                start_of_week=start_of_week, today=today,
+                required_run_km=required_km or None,
             )
             pipelined = True
         except Exception as e:
