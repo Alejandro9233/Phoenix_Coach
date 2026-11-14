@@ -137,7 +137,7 @@
       "fuente_micros": "usda",
       "pieza": null,
       "nota": "P032, etiqueta del 28 oct 2026. Pesar en seco. Micronutrientes de la avena del USDA.",
-      "en_plan": true,
+      "en_plan": false,
       "id_producto": "P032",
       "categoria": "Pan y cereales",
       "marca": "Bob's Red Mill",
@@ -158,7 +158,7 @@
     },
     {
       "id": "avena_generica",
-      "nombre": "Avena en hojuelas común (USDA; Granvita u otra)",
+      "nombre": "Avena Granvita",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
@@ -199,8 +199,8 @@
       "fuente_macros": "usda",
       "fuente_micros": "usda",
       "pieza": null,
-      "nota": "Para avena común como Granvita, cuya etiqueta solo da valores preparada con agua. Gramos del plan con esta avena: A 30, B 40, D 60, C 70.",
-      "en_plan": false
+      "nota": "Avena en hojuelas común: valores del USDA, porque la etiqueta de Granvita solo los da ya mezclada con agua. Pesar en seco. Es la avena del plan desde el 14 nov 2026 (antes Bob's Red Mill).",
+      "en_plan": true
     },
     {
       "id": "amaranto",

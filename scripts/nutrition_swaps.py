@@ -23,7 +23,6 @@ SWAPS = {
     "tostada": ["tortilla"],
     "platano": ["datiles_medjool", "mango"],
     "miel": ["datiles_medjool"],
-    "avena": ["avena_generica"],
 }
 # (day, meal name starts with) -> foods not offered there.
 # Day A has two chicken meals, and a can of tuna (146 µg of selenium) in each

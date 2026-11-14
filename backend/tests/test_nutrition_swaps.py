@@ -67,9 +67,13 @@ def test_estimated_foods_are_flagged():
 
 
 def test_old_single_alternative_still_goes_out_first():
-    oats = _item(_menu("B"), "Desayuno", "avena")
-    assert oats["alternative"]["food_id"] == "amaranto"
-    assert [s["food_id"] for s in oats["alternatives"]] == ["amaranto", "avena_generica"]
+    pkg = copy.deepcopy(PKG)
+    oats = next(i for m in pkg["types"]["D"]["comidas"] for i in m["items"] if i["food_id"] == "platano" and i.get("alternativas"))
+    oats["alternativa"] = {"food_id": "naranja", "cantidad": 260}
+    pkg["calendar"] = {"2026-10-28": {"fecha": "2026-10-28", "tipo_dia": "D"}}
+    banana = _item(today_menu(date(2026, 10, 28), NOON, None, pkg), "Desayuno", "platano")
+    assert banana["alternative"]["food_id"] == "naranja"
+    assert [s["food_id"] for s in banana["alternatives"]] == ["naranja", "datiles_medjool", "mango"]
 
 
 def test_session_fuel_gels_and_supplements_have_no_swaps():

@@ -112,8 +112,10 @@ def _day_problems(code: str, base: dict, d: dict, protein_floor: float, fat_floo
         out.append(f"day A falls to {kcal:.0f} kcal")
     if base["proteina_g"] + d["proteina_g"] < protein_floor:
         out.append(f"day protein falls to {base['proteina_g'] + d['proteina_g']:.0f} g")
-    # day C sits under the fat floor already (its gels are pure carbohydrate)
-    if base["grasa_g"] * 9 / base["kcal"] * 100 >= fat_floor > (base["grasa_g"] + d["grasa_g"]) * 9 / kcal * 100:
+    # Only a change that takes fat out can break the fat floor: a day sitting
+    # on the line is not broken by 10 g more carbohydrate. Day C sits under
+    # it already (its gels are pure carbohydrate).
+    if d["grasa_g"] <= -1 and base["grasa_g"] * 9 / base["kcal"] * 100 >= fat_floor > (base["grasa_g"] + d["grasa_g"]) * 9 / kcal * 100:
         out.append(f"day fat falls under {fat_floor}% of kcal")
     return out
 

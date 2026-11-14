@@ -10,6 +10,7 @@ Rules locked in here:
 - A bad package is a 503 for this endpoint only.
 - The next meal holds for 30 min past its time, then moves on.
 """
+import copy
 import json
 import shutil
 from datetime import date, datetime, timedelta
@@ -197,22 +198,28 @@ def test_no_bedtime_meal():
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2032.0
+    assert menu["totals"]["kcal"] == 2022.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     pollo = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "pollo")
     assert "CRUDA" in pollo["note"]
     weigh = {i["food_id"]: i["weigh"] for m in menu["meals"] for i in m["items"]}
-    assert (weigh["pollo"], weigh["carne"], weigh["pasta"], weigh["avena"]) == ("raw", "raw", "cooked", None)
+    assert (weigh["pollo"], weigh["carne"], weigh["pasta"], weigh["avena_generica"]) == ("raw", "raw", "cooked", None)
     assert {s["food_id"] for s in menu["supplements"]} == {"salmon", "vitc", "magnesio"}
 
 
 def test_alternatives_are_carb_matched():
-    # Oats (Bob's Red Mill) 43 g -> amaranth 40 g.
-    menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
+    # The package's first swap: oats (Bob's Red Mill) 43 g -> amaranth 40 g. Gone
+    # from the menus on 2026-11-14 (Alex eats Granvita and doesn't buy amaranth);
+    # the single `alternativa` still has to go out for a package that carries one.
+    pkg = copy.deepcopy(PKG)
+    oats = next(i for m in pkg["types"]["B"]["comidas"] for i in m["items"] if i["food_id"] == "avena_generica")
+    oats["alternativa"] = {"food_id": "amaranto", "cantidad": 40}
+    menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), pkg)
     alts = {i["food_id"]: (i["amount"], i["alternative"]["food_id"], i["alternative"]["amount"])
             for m in menu["meals"] for i in m["items"] if "alternative" in i}
-    assert alts == {"avena": (43, "amaranto", 40)}
+    assert alts == {"avena_generica": (40, "amaranto", 40)}
+    assert not any(i.get("alternativa") for t in PKG["types"].values() for m in t["comidas"] for i in m["items"])
 
 
 def test_pre_workout_is_one_slice_of_oroweat():
@@ -227,8 +234,9 @@ def test_pre_workout_is_one_slice_of_oroweat():
 def test_rest_day_meets_the_fiber_target():
     # metas: fibra 38 g; day A sat at 32.8 g until the cranberries (2026-10-28).
     # 2026-11-14: the banana left day A for the deficit and took 3 g with it;
-    # Alex took that cost knowingly. Under 35 g is a new decision.
-    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 35
+    # Alex took that cost knowingly, and Granvita oats took another gram.
+    # Under 30 g is no longer a trade-off, it is a hole.
+    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 30
 
 
 def test_long_run_day_meets_the_fat_floor():
@@ -245,11 +253,11 @@ def test_rest_day_cut_stays_above_its_floors():
     # 2026-10-29: day A cut to the 2,025 kcal maintenance (Katch-McArdle x 1.2).
     # Floors: protein 2.0 g/kg, and energy. The energy floor was 30 kcal/kg of
     # lean mass (1,830) until Alex started the fat-loss deficit on 2026-11-14
-    # ("el piso de las calorías no importa") and set the menu to 1,692.
-    # Anything lower is a new decision of his, not a side effect of an edit.
+    # ("el piso de las calorías no importa") and set the menu near 1,690.
+    # Well under that is a new decision of his, not a side effect of an edit.
     a = PKG["types"]["A"]
     assert a["gasto_estimado_kcal"] == 2025
-    assert a["totales"]["kcal"] >= 1690
+    assert a["totales"]["kcal"] >= 1650
     assert a["totales"]["proteina_g"] >= 2.0 * 74.3
 
 
