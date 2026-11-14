@@ -135,6 +135,10 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
   Expected — iOS handles it with a 180s timeout. Don't "fix" it.
 - **COROS scraping fails** → check auth first, not the parser. Login breaks on
   auto-redirects. Run `scripts/scraper_health_check.py`.
+- **One server process, by design.** The plan-write lock, the generation lock
+  and the refresh job's state live in memory (`plan_meta`, `plan_flows`,
+  `refresh_job`). A second uvicorn worker or a second VM would each have their
+  own copy: lost plan writes and two refreshes at once. Don't add workers.
 - **No migration framework** — `main.py` does `ALTER TABLE` on startup in
   `_ensure_columns()`. New columns must be nullable.
 - **Plan day keys are full English names** (`"Sunday"`), from `strftime("%A")`. iOS
