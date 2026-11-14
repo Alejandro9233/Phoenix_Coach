@@ -437,7 +437,8 @@
       "fuente_micros": "usda",
       "pieza": {
         "nombre": "huevo",
-        "peso": 50
+        "peso": 50,
+        "entera": true
       },
       "nota": null,
       "en_plan": true
@@ -879,7 +880,8 @@
       "fuente_micros": "label+usda",
       "pieza": {
         "nombre": "tostada",
-        "peso": 12
+        "peso": 12,
+        "entera": true
       },
       "nota": null,
       "en_plan": true
@@ -1253,7 +1255,8 @@
       "fuente_micros": "usda",
       "pieza": {
         "nombre": "bagel",
-        "peso": 90
+        "peso": 90,
+        "entera": true
       },
       "nota": "P029, etiqueta del 28 oct 2026; 90 g por bagel (confirmado por Alex). Lleva jarabe de maíz de alta fructosa, grasa vegetal hidrogenada y azodicarbonamida. Micronutrientes del bagel del USDA.",
       "en_plan": true,
@@ -1385,7 +1388,8 @@
       "fuente_micros": "estimate",
       "pieza": {
         "nombre": "paquete",
-        "peso": 200
+        "peso": 200,
+        "entera": true
       },
       "nota": "Etiqueta de atún ya escurrido. Micronutrientes estimados como 50% atún / 50% camarón (proporción real pendiente).",
       "en_plan": true
@@ -1500,7 +1504,8 @@
       "fuente_micros": "usda",
       "pieza": {
         "nombre": "sobre preparado",
-        "peso": 585
+        "peso": 585,
+        "entera": true
       },
       "nota": "Valores por 100 g de sopa PREPARADA (1 sobre de 85 g + 500 ml de agua = 585 g).",
       "en_plan": true
@@ -2308,7 +2313,8 @@
       "fuente_micros": "estimate",
       "pieza": {
         "nombre": "pechuga",
-        "peso": 140
+        "peso": 140,
+        "entera": true
       },
       "nota": "P038, etiqueta del 13 nov 2026. Ya viene cocido: pesar tal como viene, antes de recalentar. El empanizado lleva claras de huevo. 680 mg de sodio por 100 g. Micronutrientes estimados por ingredientes (USDA): 64 g de pechuga, 14 g de harina de trigo y 4 g de aceite de canola por 100 g.",
       "en_plan": false,
@@ -2440,7 +2446,8 @@
       "fuente_micros": "usda",
       "pieza": {
         "nombre": "lata",
-        "peso": 220
+        "peso": 220,
+        "entera": true
       },
       "nota": "P040, etiqueta del 13 nov 2026. Valores de atún escurrido; 1 lata = 220 g drenados. Micronutrientes del atún claro en agua del USDA (SR 171986), ajustados a la proteína de la etiqueta.",
       "en_plan": false,
@@ -2507,7 +2514,8 @@
       "fuente_micros": "label+usda",
       "pieza": {
         "nombre": "dátil",
-        "peso": 20
+        "peso": 20,
+        "entera": true
       },
       "nota": "P041, etiqueta del 13 nov 2026. La etiqueta declara más azúcar (65 g) que carbohidrato (62 g); el USDA da ~68 g de carbohidrato disponible. Peso por dátil estimado (20 a 24 g). Micronutrientes del dátil Medjool del USDA (SR 168191), salvo el potasio de la etiqueta.",
       "en_plan": false,

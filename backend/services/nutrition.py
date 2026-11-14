@@ -41,6 +41,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from backend.services.pace_enforcer import classify_run_workout
+from backend.services.nutrition_swaps import delta, is_whole, item_swaps
 from backend.services.plan_normalizer import map_sport
 from backend.services.volume_gate import is_quality, parse_minutes
 
@@ -101,8 +102,7 @@ def load_package(data_dir: Path = DATA_DIR) -> dict:
         last = None
         for meal in t.get("comidas") or []:
             for item in meal.get("items") or []:
-                alt = (item.get("alternativa") or {}).get("food_id")
-                for fid in (item.get("food_id"), alt):
+                for fid in (item.get("food_id"), *(s.get("food_id") for s in item_swaps(item))):
                     if fid is not None and fid not in foods:
                         raise NutritionPackageError(f"day {code}: unknown food {fid!r}")
             if meal.get("hora") == "Diario":
@@ -250,6 +250,34 @@ def _item_view(item: dict, foods: dict) -> dict:
         alt_food = foods[alt["food_id"]]
         out["alternative"] = {"food_id": alt["food_id"], "name": alt_food.get("nombre"),
                               "amount": alt.get("cantidad"), "unit": alt_food.get("unidad")}
+    swaps = [_swap_view(food, amount, foods[s["food_id"]], s["cantidad"]) for s in item_swaps(item)]
+    if swaps:
+        out["alternatives"] = swaps
+    return out
+
+
+def _swap_view(food: dict, amount, new: dict, new_amount) -> dict:
+    """One swap for a menu item, with what it does to the day. The grams and
+    the rules it passed are the package's (services/nutrition_swaps.py);
+    nothing is matched here. `alternative` above is the same thing for the
+    app builds that only know one."""
+    d = delta(food, amount, new, new_amount)
+    pieza = new.get("pieza") or {}
+    out = {
+        "food_id": new["id"],
+        "name": new.get("nombre"),
+        "amount": new_amount,
+        "unit": new.get("unidad"),
+        "weigh": weigh_state(new.get("nota")),
+        "whole": is_whole(new),
+        "delta": {"kcal": round(d["kcal"]), "protein_g": round(d["proteina_g"], 1),
+                  "carbs_g": round(d["carbohidrato_disponible_g"], 1), "fat_g": round(d["grasa_g"], 1)},
+        # label numbers the package itself doubts, or micronutrients worked out from a similar food
+        "estimate": new.get("fuente_micros") == "estimate" or bool(new.get("datos_dudosos")),
+    }
+    if pieza.get("peso"):
+        out["pieces"] = round(new_amount / pieza["peso"], 1)
+        out["piece_name"] = pieza.get("nombre")
     return out
 
 

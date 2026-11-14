@@ -27,7 +27,13 @@
               "alternativa": {
                 "food_id": "amaranto",
                 "cantidad": 40
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "avena_generica",
+                  "cantidad": 40
+                }
+              ]
             },
             {
               "food_id": "chia",
@@ -325,7 +331,13 @@
                 "grasa_saturada_g": 0.3,
                 "fibra_g": 2.9,
                 "sodio_mg": 107.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "tortilla",
+                  "cantidad": 80
+                }
+              ]
             },
             {
               "food_id": "pollo",
@@ -339,7 +351,21 @@
                 "grasa_saturada_g": 0.0,
                 "fibra_g": 0.0,
                 "sodio_mg": 239.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "pollo_empanizado_kirkland",
+                  "cantidad": 140
+                },
+                {
+                  "food_id": "atun_tuny",
+                  "cantidad": 220
+                },
+                {
+                  "food_id": "camaron",
+                  "cantidad": 250
+                }
+              ]
             },
             {
               "food_id": "aguacate",
@@ -692,7 +718,13 @@
               "alternativa": {
                 "food_id": "amaranto",
                 "cantidad": 30
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "avena_generica",
+                  "cantidad": 30
+                }
+              ]
             },
             {
               "food_id": "chia",
@@ -748,7 +780,17 @@
                 "grasa_saturada_g": 0.1,
                 "fibra_g": 3.1,
                 "sodio_mg": 1.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "datiles_medjool",
+                  "cantidad": 40
+                },
+                {
+                  "food_id": "mango",
+                  "cantidad": 180
+                }
+              ]
             },
             {
               "food_id": "leche",
@@ -847,7 +889,17 @@
                 "grasa_saturada_g": 0.0,
                 "fibra_g": 0.0,
                 "sodio_mg": 239.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "atun_tuny",
+                  "cantidad": 220
+                },
+                {
+                  "food_id": "camaron",
+                  "cantidad": 250
+                }
+              ]
             },
             {
               "food_id": "arroz",
@@ -861,7 +913,21 @@
                 "grasa_saturada_g": 0.1,
                 "fibra_g": 0.3,
                 "sodio_mg": 1.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "pasta",
+                  "cantidad": 65
+                },
+                {
+                  "food_id": "camote",
+                  "cantidad": 130
+                },
+                {
+                  "food_id": "tortilla",
+                  "cantidad": 65
+                }
+              ]
             },
             {
               "food_id": "aguacate",
@@ -932,7 +998,13 @@
                 "grasa_saturada_g": 0.2,
                 "fibra_g": 1.9,
                 "sodio_mg": 71.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "tortilla",
+                  "cantidad": 50
+                }
+              ]
             },
             {
               "food_id": "pollo",
@@ -946,7 +1018,13 @@
                 "grasa_saturada_g": 0.0,
                 "fibra_g": 0.0,
                 "sodio_mg": 180.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "camaron",
+                  "cantidad": 190
+                }
+              ]
             },
             {
               "food_id": "aguacate",
@@ -1158,7 +1236,13 @@
               "alternativa": {
                 "food_id": "amaranto",
                 "cantidad": 69
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "avena_generica",
+                  "cantidad": 70
+                }
+              ]
             },
             {
               "food_id": "chia",
@@ -1200,7 +1284,13 @@
                 "grasa_saturada_g": 0.1,
                 "fibra_g": 3.1,
                 "sodio_mg": 1.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "mango",
+                  "cantidad": 180
+                }
+              ]
             },
             {
               "food_id": "leche",
@@ -1441,7 +1531,13 @@
                 "grasa_saturada_g": 0.1,
                 "fibra_g": 3.1,
                 "sodio_mg": 1.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "mango",
+                  "cantidad": 180
+                }
+              ]
             },
             {
               "food_id": "miel",
@@ -1498,7 +1594,13 @@
                 "grasa_saturada_g": 0.2,
                 "fibra_g": 0.0,
                 "sodio_mg": 457.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "atun_tuny",
+                  "cantidad": 220
+                }
+              ]
             }
           ],
           "totales": {
@@ -1795,7 +1897,13 @@
               "alternativa": {
                 "food_id": "amaranto",
                 "cantidad": 59
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "avena_generica",
+                  "cantidad": 60
+                }
+              ]
             },
             {
               "food_id": "chia",
@@ -1837,7 +1945,17 @@
                 "grasa_saturada_g": 0.1,
                 "fibra_g": 3.1,
                 "sodio_mg": 1.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "datiles_medjool",
+                  "cantidad": 40
+                },
+                {
+                  "food_id": "mango",
+                  "cantidad": 180
+                }
+              ]
             },
             {
               "food_id": "miel",
@@ -2135,7 +2253,13 @@
                 "grasa_saturada_g": 0.4,
                 "fibra_g": 3.8,
                 "sodio_mg": 143.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "tortilla",
+                  "cantidad": 105
+                }
+              ]
             },
             {
               "food_id": "pollo",
@@ -2149,7 +2273,21 @@
                 "grasa_saturada_g": 0.0,
                 "fibra_g": 0.0,
                 "sodio_mg": 180.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "pollo_empanizado_kirkland",
+                  "cantidad": 140
+                },
+                {
+                  "food_id": "atun_tuny",
+                  "cantidad": 220
+                },
+                {
+                  "food_id": "camaron",
+                  "cantidad": 190
+                }
+              ]
             },
             {
               "food_id": "arroz",
@@ -2163,7 +2301,21 @@
                 "grasa_saturada_g": 0.1,
                 "fibra_g": 0.4,
                 "sodio_mg": 1.0
-              }
+              },
+              "alternativas": [
+                {
+                  "food_id": "pasta",
+                  "cantidad": 80
+                },
+                {
+                  "food_id": "camote",
+                  "cantidad": 160
+                },
+                {
+                  "food_id": "tortilla",
+                  "cantidad": 80
+                }
+              ]
             },
             {
               "food_id": "aguacate",
