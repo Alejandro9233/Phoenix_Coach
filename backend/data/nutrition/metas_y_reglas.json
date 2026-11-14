@@ -236,7 +236,7 @@
     },
     {
       "id": "pesar",
-      "regla": "Carne y pollo se pesan crudos; arroz y pasta, ya cocidos."
+      "regla": "La carne molida se pesa cruda; el pollo, el arroz y la pasta, ya cocidos."
     }
   ],
   "geles_tirada": {
@@ -278,7 +278,7 @@
         ],
         "pollo_crudo_g": 800,
         "carne_molida_cruda_g": 90,
-        "arroz_cocido_g": 410,
+        "arroz_cocido_g": 460,
         "pasta_cocida_g": 275
       }
     ],

@@ -198,13 +198,14 @@ def test_no_bedtime_meal():
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2022.0
+    assert menu["totals"]["kcal"] == 2024.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
-    pollo = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "pollo")
-    assert "CRUDA" in pollo["note"]
+    # Alex weighs his chicken cooked (2026-11-14); the ground beef stays raw.
+    pollo = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "pollo_cocido")
+    assert "COCIDO" in pollo["note"]
     weigh = {i["food_id"]: i["weigh"] for m in menu["meals"] for i in m["items"]}
-    assert (weigh["pollo"], weigh["carne"], weigh["pasta"], weigh["avena_generica"]) == ("raw", "raw", "cooked", None)
+    assert (weigh["pollo_cocido"], weigh["carne"], weigh["pasta"], weigh["avena_generica"]) == ("cooked", "raw", "cooked", None)
     assert {s["food_id"] for s in menu["supplements"]} == {"salmon", "vitc", "magnesio"}
 
 

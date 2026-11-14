@@ -17,17 +17,18 @@ from backend.services.nutrition_swaps import factor, is_whole, main_macro, swap_
 
 # original food -> foods that may replace it, in the order the app shows them
 SWAPS = {
-    "pollo": ["pollo_empanizado_kirkland", "atun_tuny", "camaron"],
+    "pollo_cocido": ["pollo_empanizado_kirkland", "atun_tuny", "camaron"],
     "atun": ["atun_tuny"],
     "arroz": ["pasta", "camote", "tortilla"],
     "tostada": ["tortilla"],
     "platano": ["datiles_medjool", "mango"],
     "miel": ["datiles_medjool"],
 }
-# (day, meal name starts with) -> foods not offered there.
-# Day A has two chicken meals, and a can of tuna (146 µg of selenium) in each
-# would cross the 400 µg ceiling: the can is offered at lunch only.
-SKIP = {("A", "Cena"): {"atun_tuny"}}
+# (day, meal name starts with) -> foods not offered there. Empty today; day A
+# had two chicken meals until 2026-11-14 and the tuna can was kept to one.
+SKIP = {}
+# Nobody eats 600 g of shrimp for a bowl's worth of chicken.
+MAX_GRAMS = 400
 
 D = Path(sys.argv[1])
 foods = {f["id"]: f for f in json.loads((D / "alimentos.json").read_text(encoding="utf-8"))["alimentos"]}
@@ -58,6 +59,8 @@ for t in doc["tipos_de_dia"]:
                        if code == t["codigo"] and meal["nombre"].startswith(starts)):
                     continue
                 swap = {"food_id": new_id, "cantidad": amount(orig, item["cantidad"], foods[new_id])}
+                if swap["cantidad"] > MAX_GRAMS and not is_whole(foods[new_id]):
+                    continue
                 # each swap is judged alone here; the day-wide limits are judged at the end
                 trial = copy.deepcopy(t)
                 for m in trial["comidas"]:

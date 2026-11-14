@@ -5,7 +5,7 @@
       "codigo": "B",
       "nombre": "Carrera suave",
       "gasto_estimado_kcal": 2450,
-      "deficit_kcal": 428.0,
+      "deficit_kcal": 426.0,
       "comidas": [
         {
           "hora": "12:30 PM",
@@ -330,17 +330,17 @@
               ]
             },
             {
-              "food_id": "pollo",
-              "cantidad": 185,
+              "food_id": "pollo_cocido",
+              "cantidad": 140,
               "unidad": "g",
               "macros": {
-                "kcal": 179.0,
-                "proteina_g": 40.7,
+                "kcal": 181.0,
+                "proteina_g": 41.1,
                 "carbohidrato_g": 0.0,
                 "grasa_g": 1.9,
                 "grasa_saturada_g": 0.0,
                 "fibra_g": 0.0,
-                "sodio_mg": 333.0
+                "sodio_mg": 336.0
               },
               "alternativas": [
                 {
@@ -349,7 +349,7 @@
                 },
                 {
                   "food_id": "camaron",
-                  "cantidad": 350
+                  "cantidad": 355
                 }
               ]
             },
@@ -411,13 +411,13 @@
             }
           ],
           "totales": {
-            "kcal": 590.0,
-            "proteina_g": 52.0,
+            "kcal": 592.0,
+            "proteina_g": 52.4,
             "carbohidrato_g": 39.9,
             "grasa_g": 22.6,
             "grasa_saturada_g": 3.8,
             "fibra_g": 16.0,
-            "sodio_mg": 1026.0
+            "sodio_mg": 1029.0
           },
           "variantes": [
             {
@@ -579,38 +579,38 @@
         }
       ],
       "totales": {
-        "kcal": 2022.0,
-        "proteina_g": 154.8,
+        "kcal": 2024.0,
+        "proteina_g": 155.1,
         "carbohidrato_g": 198.9,
         "grasa_g": 63.2,
         "grasa_saturada_g": 21.5,
         "fibra_g": 35.2,
-        "sodio_mg": 2207.0
+        "sodio_mg": 2210.0
       },
-      "proteina_g_por_kg": 2.08,
+      "proteina_g_por_kg": 2.09,
       "carbohidrato_g_por_kg": 2.68,
       "grasa_pct_kcal": 28.1,
       "micros_totales": {
-        "vitA_ug": 1346.64,
+        "vitA_ug": 1346.78,
         "vitC_mg": 1166.99,
         "vitD_ug": 16.48,
-        "vitE_mg": 12.24,
+        "vitE_mg": 12.25,
         "vitK_ug": 158.16,
         "tiamina_mg": 2.08,
         "riboflavina_mg": 2.79,
-        "niacina_mg": 46.14,
-        "b6_mg": 3.64,
-        "folato_ug": 889.97,
-        "b12_ug": 8.29,
-        "colina_mg": 420.81,
-        "calcio_mg": 1567.31,
-        "hierro_mg": 15.56,
-        "magnesio_mg": 834.15,
-        "fosforo_mg": 2098.06,
-        "potasio_mg": 4248.31,
-        "zinc_mg": 22.55,
+        "niacina_mg": 46.29,
+        "b6_mg": 3.65,
+        "folato_ug": 890.11,
+        "b12_ug": 8.3,
+        "colina_mg": 422.07,
+        "calcio_mg": 1567.38,
+        "hierro_mg": 15.57,
+        "magnesio_mg": 834.58,
+        "fosforo_mg": 2101.33,
+        "potasio_mg": 4253.44,
+        "zinc_mg": 22.57,
         "cobre_mg": 2.1,
-        "selenio_ug": 174.52,
+        "selenio_ug": 174.87,
         "manganeso_mg": 4.73,
         "ala_g": 2.5,
         "epa_g": 0.61,
@@ -622,7 +622,7 @@
       "codigo": "A",
       "nombre": "Descanso o fuerza ligera",
       "gasto_estimado_kcal": 2025,
-      "deficit_kcal": 339.0,
+      "deficit_kcal": 360.0,
       "comidas": [
         {
           "hora": "12:30 PM",
@@ -876,76 +876,180 @@
             "grasa_saturada_g": 2.9,
             "fibra_g": 20.4,
             "sodio_mg": 249.0
-          }
-        },
-        {
-          "hora": "6:00 PM",
-          "nombre": "Comida: pollo con arroz",
-          "items": [
+          },
+          "variantes": [
             {
-              "food_id": "pollo",
-              "cantidad": 175,
-              "unidad": "g",
-              "macros": {
-                "kcal": 170.0,
-                "proteina_g": 38.5,
-                "carbohidrato_g": 0.0,
-                "grasa_g": 1.8,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 0.0,
-                "sodio_mg": 315.0
-              },
-              "alternativas": [
+              "nombre": "Medio bagel con queso crema y moras",
+              "items": [
                 {
-                  "food_id": "atun_tuny",
-                  "cantidad": 220
+                  "food_id": "bagel",
+                  "cantidad": 51.5,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 137.0,
+                    "proteina_g": 5.6,
+                    "carbohidrato_g": 27.2,
+                    "grasa_g": 0.6,
+                    "grasa_saturada_g": 0.1,
+                    "fibra_g": 0.9,
+                    "sodio_mg": 243.0
+                  }
                 },
                 {
-                  "food_id": "camaron",
-                  "cantidad": 330
+                  "food_id": "queso_crema_reny_picot",
+                  "cantidad": 20,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 54.0,
+                    "proteina_g": 1.2,
+                    "carbohidrato_g": 0.8,
+                    "grasa_g": 5.2,
+                    "grasa_saturada_g": 3.6,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 56.0
+                  }
+                },
+                {
+                  "food_id": "moras",
+                  "cantidad": 126,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 40.0,
+                    "proteina_g": 1.3,
+                    "carbohidrato_g": 8.8,
+                    "grasa_g": 0.0,
+                    "grasa_saturada_g": 0.0,
+                    "fibra_g": 6.3,
+                    "sodio_mg": 1.0
+                  }
+                },
+                {
+                  "food_id": "kefir",
+                  "cantidad": 150,
+                  "unidad": "ml",
+                  "macros": {
+                    "kcal": 57.0,
+                    "proteina_g": 5.8,
+                    "carbohidrato_g": 5.6,
+                    "grasa_g": 1.3,
+                    "grasa_saturada_g": 0.9,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 77.0
+                  }
+                },
+                {
+                  "food_id": "whey",
+                  "cantidad": 15,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 53.0,
+                    "proteina_g": 12.1,
+                    "carbohidrato_g": 0.0,
+                    "grasa_g": 0.2,
+                    "grasa_saturada_g": 0.0,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 92.0
+                  }
+                },
+                {
+                  "food_id": "espresso",
+                  "cantidad": 60,
+                  "unidad": "ml",
+                  "macros": {
+                    "kcal": 5.0,
+                    "proteina_g": 0.1,
+                    "carbohidrato_g": 1.0,
+                    "grasa_g": 0.1,
+                    "grasa_saturada_g": 0.1,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 8.0
+                  }
+                },
+                {
+                  "food_id": "leche",
+                  "cantidad": 100,
+                  "unidad": "ml",
+                  "macros": {
+                    "kcal": 44.0,
+                    "proteina_g": 5.4,
+                    "carbohidrato_g": 3.4,
+                    "grasa_g": 1.0,
+                    "grasa_saturada_g": 0.6,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 33.0
+                  }
                 }
-              ]
+              ],
+              "totales": {
+                "kcal": 391.0,
+                "proteina_g": 31.5,
+                "carbohidrato_g": 46.8,
+                "grasa_g": 8.5,
+                "grasa_saturada_g": 5.3,
+                "fibra_g": 7.2,
+                "sodio_mg": 510.0
+              }
+            }
+          ]
+        },
+        {
+          "hora": "8:00 PM",
+          "nombre": "Cena: bowl de pollo, arroz y aguacate",
+          "items": [
+            {
+              "food_id": "pollo_cocido",
+              "cantidad": 240,
+              "unidad": "g",
+              "macros": {
+                "kcal": 310.0,
+                "proteina_g": 70.4,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 3.2,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 576.0
+              }
             },
             {
               "food_id": "arroz",
-              "cantidad": 80,
+              "cantidad": 145,
               "unidad": "g",
               "macros": {
-                "kcal": 104.0,
-                "proteina_g": 2.2,
-                "carbohidrato_g": 22.2,
-                "grasa_g": 0.2,
+                "kcal": 188.0,
+                "proteina_g": 3.9,
+                "carbohidrato_g": 40.3,
+                "grasa_g": 0.4,
                 "grasa_saturada_g": 0.1,
-                "fibra_g": 0.3,
+                "fibra_g": 0.6,
                 "sodio_mg": 1.0
               },
               "alternativas": [
                 {
                   "food_id": "pasta",
-                  "cantidad": 65
+                  "cantidad": 115
                 },
                 {
                   "food_id": "camote",
-                  "cantidad": 130
+                  "cantidad": 230
                 },
                 {
                   "food_id": "tortilla",
-                  "cantidad": 65
+                  "cantidad": 120
                 }
               ]
             },
             {
               "food_id": "aguacate",
-              "cantidad": 50,
+              "cantidad": 80,
               "unidad": "g",
               "macros": {
-                "kcal": 80.0,
-                "proteina_g": 1.0,
-                "carbohidrato_g": 0.9,
-                "grasa_g": 7.3,
-                "grasa_saturada_g": 1.1,
-                "fibra_g": 3.4,
-                "sodio_mg": 4.0
+                "kcal": 128.0,
+                "proteina_g": 1.6,
+                "carbohidrato_g": 1.4,
+                "grasa_g": 11.8,
+                "grasa_saturada_g": 1.7,
+                "fibra_g": 5.4,
+                "sodio_mg": 6.0
               }
             },
             {
@@ -992,97 +1096,128 @@
             }
           ],
           "totales": {
-            "kcal": 437.0,
-            "proteina_g": 48.7,
-            "carbohidrato_g": 29.9,
-            "grasa_g": 11.9,
-            "grasa_saturada_g": 3.0,
-            "fibra_g": 5.8,
-            "sodio_mg": 404.0
-          }
-        },
-        {
-          "hora": "10:00 PM",
-          "nombre": "Cena: tostadas de pollo",
-          "items": [
+            "kcal": 710.0,
+            "proteina_g": 83.0,
+            "carbohidrato_g": 48.5,
+            "grasa_g": 17.9,
+            "grasa_saturada_g": 3.7,
+            "fibra_g": 8.1,
+            "sodio_mg": 668.0
+          },
+          "variantes": [
             {
-              "food_id": "tostada",
-              "cantidad": 24,
-              "unidad": "g",
-              "macros": {
-                "kcal": 89.0,
-                "proteina_g": 1.8,
-                "carbohidrato_g": 17.7,
-                "grasa_g": 1.2,
-                "grasa_saturada_g": 0.2,
-                "fibra_g": 1.9,
-                "sodio_mg": 71.0
-              },
-              "alternativas": [
+              "nombre": "Bowl con Susalias",
+              "items": [
                 {
-                  "food_id": "tortilla",
-                  "cantidad": 50
-                }
-              ]
-            },
-            {
-              "food_id": "pollo",
-              "cantidad": 145,
-              "unidad": "g",
-              "macros": {
-                "kcal": 141.0,
-                "proteina_g": 31.9,
-                "carbohidrato_g": 0.0,
-                "grasa_g": 1.4,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 0.0,
-                "sodio_mg": 261.0
-              },
-              "alternativas": [
+                  "food_id": "pollo_cocido",
+                  "cantidad": 240,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 310.0,
+                    "proteina_g": 70.4,
+                    "carbohidrato_g": 0.0,
+                    "grasa_g": 3.2,
+                    "grasa_saturada_g": 0.0,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 576.0
+                  }
+                },
                 {
-                  "food_id": "camaron",
-                  "cantidad": 275
+                  "food_id": "arroz",
+                  "cantidad": 80,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 104.0,
+                    "proteina_g": 2.2,
+                    "carbohidrato_g": 22.2,
+                    "grasa_g": 0.2,
+                    "grasa_saturada_g": 0.1,
+                    "fibra_g": 0.3,
+                    "sodio_mg": 1.0
+                  }
+                },
+                {
+                  "food_id": "papas_susalia",
+                  "cantidad": 30,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 81.0,
+                    "proteina_g": 0.9,
+                    "carbohidrato_g": 12.0,
+                    "grasa_g": 3.3,
+                    "grasa_saturada_g": 0.9,
+                    "fibra_g": 1.8,
+                    "sodio_mg": 240.0
+                  }
+                },
+                {
+                  "food_id": "aguacate",
+                  "cantidad": 80,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 128.0,
+                    "proteina_g": 1.6,
+                    "carbohidrato_g": 1.4,
+                    "grasa_g": 11.8,
+                    "grasa_saturada_g": 1.7,
+                    "fibra_g": 5.4,
+                    "sodio_mg": 6.0
+                  }
+                },
+                {
+                  "food_id": "lechuga",
+                  "cantidad": 100,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 17.0,
+                    "proteina_g": 1.2,
+                    "carbohidrato_g": 1.2,
+                    "grasa_g": 0.3,
+                    "grasa_saturada_g": 0.0,
+                    "fibra_g": 2.1,
+                    "sodio_mg": 8.0
+                  }
+                },
+                {
+                  "food_id": "spray",
+                  "cantidad": 1,
+                  "unidad": "g",
+                  "macros": {
+                    "kcal": 9.0,
+                    "proteina_g": 0.0,
+                    "carbohidrato_g": 0.0,
+                    "grasa_g": 1.0,
+                    "grasa_saturada_g": 0.9,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 0.0
+                  }
+                },
+                {
+                  "food_id": "kefir",
+                  "cantidad": 150,
+                  "unidad": "ml",
+                  "macros": {
+                    "kcal": 57.0,
+                    "proteina_g": 5.8,
+                    "carbohidrato_g": 5.6,
+                    "grasa_g": 1.3,
+                    "grasa_saturada_g": 0.9,
+                    "fibra_g": 0.0,
+                    "sodio_mg": 77.0
+                  }
                 }
-              ]
-            },
-            {
-              "food_id": "aguacate",
-              "cantidad": 30,
-              "unidad": "g",
-              "macros": {
-                "kcal": 48.0,
-                "proteina_g": 0.6,
-                "carbohidrato_g": 0.5,
-                "grasa_g": 4.4,
-                "grasa_saturada_g": 0.6,
-                "fibra_g": 2.0,
-                "sodio_mg": 2.0
-              }
-            },
-            {
-              "food_id": "lechuga",
-              "cantidad": 100,
-              "unidad": "g",
-              "macros": {
-                "kcal": 17.0,
-                "proteina_g": 1.2,
-                "carbohidrato_g": 1.2,
-                "grasa_g": 0.3,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 2.1,
-                "sodio_mg": 8.0
+              ],
+              "totales": {
+                "kcal": 707.0,
+                "proteina_g": 82.1,
+                "carbohidrato_g": 42.4,
+                "grasa_g": 21.1,
+                "grasa_saturada_g": 4.5,
+                "fibra_g": 9.6,
+                "sodio_mg": 907.0
               }
             }
-          ],
-          "totales": {
-            "kcal": 294.0,
-            "proteina_g": 35.5,
-            "carbohidrato_g": 19.4,
-            "grasa_g": 7.3,
-            "grasa_saturada_g": 0.9,
-            "fibra_g": 6.0,
-            "sodio_mg": 342.0
-          }
+          ]
         },
         {
           "hora": "Diario",
@@ -1143,40 +1278,40 @@
         }
       ],
       "totales": {
-        "kcal": 1686.0,
-        "proteina_g": 160.3,
-        "carbohidrato_g": 155.5,
-        "grasa_g": 42.5,
-        "grasa_saturada_g": 11.9,
-        "fibra_g": 34.6,
-        "sodio_mg": 1816.0
+        "kcal": 1665.0,
+        "proteina_g": 159.0,
+        "carbohidrato_g": 154.6,
+        "grasa_g": 41.2,
+        "grasa_saturada_g": 11.7,
+        "fibra_g": 30.9,
+        "sodio_mg": 1737.0
       },
-      "proteina_g_por_kg": 2.16,
-      "carbohidrato_g_por_kg": 2.09,
-      "grasa_pct_kcal": 22.7,
+      "proteina_g_por_kg": 2.14,
+      "carbohidrato_g_por_kg": 2.08,
+      "grasa_pct_kcal": 22.3,
       "micros_totales": {
-        "vitA_ug": 2156.56,
-        "vitC_mg": 1049.43,
+        "vitA_ug": 1720.56,
+        "vitC_mg": 1045.43,
         "vitD_ug": 12.95,
-        "vitE_mg": 16.48,
-        "vitK_ug": 278.0,
-        "tiamina_mg": 1.87,
-        "riboflavina_mg": 3.49,
-        "niacina_mg": 48.11,
-        "b6_mg": 3.86,
-        "folato_ug": 834.33,
+        "vitE_mg": 16.27,
+        "vitK_ug": 175.5,
+        "tiamina_mg": 1.81,
+        "riboflavina_mg": 3.41,
+        "niacina_mg": 48.15,
+        "b6_mg": 3.71,
+        "folato_ug": 723.39,
         "b12_ug": 5.14,
-        "colina_mg": 710.15,
-        "calcio_mg": 1649.25,
-        "hierro_mg": 13.71,
-        "magnesio_mg": 750.85,
-        "fosforo_mg": 2090.92,
-        "potasio_mg": 3916.37,
-        "zinc_mg": 13.13,
-        "cobre_mg": 1.43,
-        "selenio_ug": 192.58,
-        "manganeso_mg": 4.12,
-        "ala_g": 2.44,
+        "colina_mg": 696.24,
+        "calcio_mg": 1532.75,
+        "hierro_mg": 13.02,
+        "magnesio_mg": 715.53,
+        "fosforo_mg": 2022.46,
+        "potasio_mg": 3616.91,
+        "zinc_mg": 12.21,
+        "cobre_mg": 1.37,
+        "selenio_ug": 194.59,
+        "manganeso_mg": 4.14,
+        "ala_g": 2.32,
         "epa_g": 0.61,
         "dha_g": 0.47,
         "epa_dha_g": 1.08
@@ -2181,8 +2316,8 @@
               ]
             },
             {
-              "food_id": "pollo",
-              "cantidad": 160,
+              "food_id": "pollo_cocido",
+              "cantidad": 120,
               "unidad": "g",
               "macros": {
                 "kcal": 155.0,
@@ -2522,10 +2657,10 @@
         "niacina_mg": 47.65,
         "b6_mg": 4.42,
         "folato_ug": 1285.71,
-        "b12_ug": 6.89,
+        "b12_ug": 6.88,
         "colina_mg": 413.65,
         "calcio_mg": 1700.34,
-        "hierro_mg": 19.65,
+        "hierro_mg": 19.64,
         "magnesio_mg": 970.8,
         "fosforo_mg": 2282.45,
         "potasio_mg": 5116.16,

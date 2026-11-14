@@ -1002,6 +1002,52 @@
       "fuente_micros": "usda",
       "pieza": null,
       "nota": "Valores por 100 g CRUDA (congelada, con 8% de solución salina). Pesar en crudo y descongelada.",
+      "en_plan": false
+    },
+    {
+      "id": "pollo_cocido",
+      "nombre": "Pechuga de pollo Kirkland (cocida)",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 129.33,
+        "proteina_g": 29.33,
+        "carbohidrato_disponible_g": 0.0,
+        "grasa_g": 1.33,
+        "grasa_saturada_g": 0.0,
+        "fibra_g": 0.0,
+        "sodio_mg": 240.0
+      },
+      "micros": {
+        "vitA_ug": 11.04,
+        "vitC_mg": 0.0,
+        "vitD_ug": 0.0,
+        "vitE_mg": 0.687,
+        "vitK_ug": 0.0,
+        "tiamina_mg": 0.115,
+        "riboflavina_mg": 0.217,
+        "niacina_mg": 11.776,
+        "b6_mg": 0.995,
+        "folato_ug": 11.04,
+        "b12_ug": 0.257,
+        "colina_mg": 100.709,
+        "calcio_mg": 6.133,
+        "hierro_mg": 0.453,
+        "magnesio_mg": 34.347,
+        "fosforo_mg": 261.28,
+        "potasio_mg": 409.707,
+        "zinc_mg": 0.835,
+        "cobre_mg": 0.049,
+        "selenio_ug": 27.968,
+        "manganeso_mg": 0.013,
+        "ala_g": 0.016,
+        "epa_g": 0.004,
+        "dha_g": 0.005
+      },
+      "fuente_macros": "estimate",
+      "fuente_micros": "usda",
+      "pieza": null,
+      "nota": "Valores por 100 g COCIDO: los de la etiqueta Kirkland (pollo sin cocer) entre 0.75 (la pechuga rinde ~75 % de su peso al cocerse; estimado, sin medir). Pesar ya cocido. Es la fila del plan desde el 14 nov 2026: Alex pesa el pollo cocido.",
       "en_plan": true
     },
     {
@@ -1283,7 +1329,8 @@
         "nombre": "bagel",
         "peso": 103,
         "entera": true,
-        "plural": "bagels"
+        "plural": "bagels",
+        "paso": 0.5
       },
       "nota": "Etiqueta del 14 nov 2026; 103 g por bagel pesado por Alex (la etiqueta dice 91.5 g). Reemplaza al New York Deli (P029). Micronutrientes de la etiqueta (%VNR) y, lo que no declara, del bagel del USDA.",
       "en_plan": true,

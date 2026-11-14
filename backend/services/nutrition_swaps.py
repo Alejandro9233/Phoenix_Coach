@@ -54,6 +54,14 @@ def is_whole(food: dict) -> bool:
     return bool((food.get("pieza") or {}).get("entera"))
 
 
+def in_whole_pieces(food: dict, qty: float) -> bool:
+    """A whole-piece food comes in whole pieces — or in the step its pieza
+    allows (a bagel halves: `paso` 0.5; a can of tuna does not)."""
+    pieza = food["pieza"]
+    n = qty / pieza["peso"] / pieza.get("paso", 1)
+    return n > 0.99 and abs(n - round(n)) <= 0.01
+
+
 def pieces_label(food: dict, qty) -> str | None:
     """"3 tostadas", "1 lata" — only for a food eaten whole, in whole pieces.
     Everything else is weighed and shown in grams (the pieces-first sheet for
@@ -61,13 +69,14 @@ def pieces_label(food: dict, qty) -> str | None:
     pieza = food.get("pieza") or {}
     if not pieza.get("entera") or not isinstance(qty, (int, float)):
         return None
-    n = qty / pieza["peso"]
-    if n < 0.99 or abs(n - round(n)) > 0.01:
+    if not in_whole_pieces(food, qty):
         return None
+    n = round(qty / pieza["peso"] * 2) / 2
     name = pieza["nombre"]
-    if round(n) != 1:
+    if n > 1:
         name = pieza.get("plural") or (name + ("s" if name[-1] in "aeiouáéíóú" else "es"))
-    return f"{round(n)} {name}"
+    count = ("" if n < 1 else str(int(n))) + ("½" if n % 1 else "")
+    return f"{count} {name}"
 
 
 def swappable(meal: dict, food: dict) -> bool:
@@ -141,7 +150,7 @@ def swap_problems(day_type: dict, foods: dict, rules: dict) -> list:
                     out.append(f"{tag}: this item is never swapped")
                 if swap["food_id"] in BANNED or new["valores_por"] == "1 unidad" or swap["food_id"] == "whey":
                     out.append(f"{tag}: not a food to swap in")
-                if is_whole(new) and abs(swap["cantidad"] / new["pieza"]["peso"] - round(swap["cantidad"] / new["pieza"]["peso"])) > 0.01:
+                if is_whole(new) and not in_whole_pieces(new, swap["cantidad"]):
                     out.append(f"{tag}: {new['pieza']['nombre']} is eaten whole")
                 d = delta(orig, item["cantidad"], new, swap["cantidad"])
                 macro = main_macro(orig)
@@ -158,12 +167,14 @@ def swap_problems(day_type: dict, foods: dict, rules: dict) -> list:
             if meal.get("hora") == DAILY or (meal.get("nombre") or "").lower().startswith(SESSION_MEALS):
                 out.append(f"{tag}: this meal is never swapped")
             d = {}
+            already = {i["food_id"] for i in meal["items"]}   # what the meal has anyway is not "swapped in"
             for sign, items in ((-1, meal["items"]), (1, var["items"])):
                 for item in items:
                     food = foods[item["food_id"]]
-                    if sign == 1 and (item["food_id"] in BANNED or food["valores_por"] == "1 unidad" or item["food_id"] == "whey"):
+                    if sign == 1 and item["food_id"] not in already and (
+                            item["food_id"] in BANNED or food["valores_por"] == "1 unidad" or item["food_id"] == "whey"):
                         out.append(f"{tag}: {item['food_id']} is not a food to swap in")
-                    if sign == 1 and is_whole(food) and abs(item["cantidad"] / food["pieza"]["peso"] - round(item["cantidad"] / food["pieza"]["peso"])) > 0.01:
+                    if sign == 1 and is_whole(food) and not in_whole_pieces(food, item["cantidad"]):
                         out.append(f"{tag}: {food['pieza']['nombre']} is eaten whole")
                     k = factor(food, item["cantidad"])
                     for key, v in {**food["macros"], **(food.get("micros") or {})}.items():
