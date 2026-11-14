@@ -25,16 +25,16 @@ A swap replaces one item of one meal. It passes when:
     o nada";
   - the item's main macro (the one carrying most of its kcal) does not drop
     more than MACRO_DROP, and the day's kcal moves no more than DAY_KCAL;
-  - the day keeps its protein floor, its fat floor and day A's kcal floor;
+  - the day keeps its protein floor and its fat floor, and day A is not cut further;
   - no micronutrient passes its upper limit even if every item of the day
     takes its worst swap at once — nothing remembers which ones he picked.
 """
 MACRO_DROP = 0.25
 DAY_KCAL = 0.05
-# Day A's line. It was 1,830 (energy availability of 30 kcal per kg lean)
-# until Alex took the menu itself to 1,799 for the deficit on 2026-11-14;
-# no swap takes the day further than this.
-DAY_A_FLOOR_KCAL = 1750
+# Day A is the leanest menu and Alex set its kcal himself (1,692 since
+# 2026-11-14, under the old 1,830 energy-availability floor, on purpose).
+# A swap may add to it but not take it more than this share lower.
+DAY_A_MAX_DROP = 0.03
 BANNED = {"espinaca", "almendra", "huevo"}   # egg only where the menu already has it
 SESSION_MEALS = ("pre-entreno", "durante", "al terminar")
 DAILY = "Diario"
@@ -92,7 +92,7 @@ def _day_problems(code: str, base: dict, d: dict, protein_floor: float, fat_floo
     kcal = base["kcal"] + d["kcal"]
     if abs(d["kcal"]) > DAY_KCAL * base["kcal"]:
         out.append(f"day kcal moves {d['kcal']:+.0f}")
-    if code == "A" and kcal < DAY_A_FLOOR_KCAL:
+    if code == "A" and d["kcal"] < -DAY_A_MAX_DROP * base["kcal"]:
         out.append(f"day A falls to {kcal:.0f} kcal")
     if base["proteina_g"] + d["proteina_g"] < protein_floor:
         out.append(f"day protein falls to {base['proteina_g'] + d['proteina_g']:.0f} g")

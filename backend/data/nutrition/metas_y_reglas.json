@@ -200,7 +200,7 @@
     },
     {
       "id": "baja_rapido",
-      "regla": "Si baja más de 0.5 kg por semana dos semanas seguidas: regresar plátano 120 g al desayuno de los días B."
+      "regla": "Si baja más de 0.4 kg por semana dos semanas seguidas: regresar plátano 120 g a la merienda de los días A (salió el 14 nov 2026) y, si sigue, al desayuno de los días B."
     },
     {
       "id": "intocables",
@@ -224,7 +224,7 @@
     },
     {
       "id": "estrategia",
-      "regla": "Rendimiento primero hasta el medio maratón del 8 nov: déficit solo en días A y B. Desde el 29 oct el gasto sale de un mantenimiento de 2,025 kcal sin entreno (Katch-McArdle con 61 kg de masa magra × 1.2, sin caminar) más lo que quema cada sesión (~1 kcal por kg por km). Gasto por tipo: A 2,025 (2,165 con gimnasio), B 2,450, D 2,700, C 3,325 con una tirada de ~20 km. Piso del día A: era 1,830 kcal (disponibilidad de energía de 30 kcal por kg de masa magra); desde el 14 nov 2026 el menú A queda en 1,799 por decisión de Alex."
+      "regla": "Rendimiento primero hasta el medio maratón del 8 nov: déficit solo en días A y B. Desde el 29 oct el gasto sale de un mantenimiento de 2,025 kcal sin entreno (Katch-McArdle con 61 kg de masa magra × 1.2, sin caminar) más lo que quema cada sesión (~1 kcal por kg por km). Gasto por tipo: A 2,025 (2,165 con gimnasio), B 2,450, D 2,700, C 3,325 con una tirada de ~20 km. Piso del día A: era 1,830 kcal (disponibilidad de energía de 30 kcal por kg de masa magra); desde el 14 nov 2026 el menú A queda en 1,692 por decisión de Alex (déficit para bajar grasa)."
     },
     {
       "id": "calcio_domingo",
@@ -267,7 +267,7 @@
         "pollo_crudo_g": 530,
         "carne_molida_cruda_g": 490,
         "arroz_cocido_g": 170,
-        "pasta_cocida_g": 925
+        "pasta_cocida_g": 865
       },
       {
         "dia": "miércoles",

@@ -62,7 +62,7 @@ def test_a_swap_says_what_it_does_to_the_day():
 def test_estimated_foods_are_flagged():
     swaps = {s["food_id"]: s["estimate"] for s in _item(_menu("B"), "Cena", "pollo")["alternatives"]}
     assert swaps == {"atun_tuny": False, "camaron": False}
-    dates = next(s for s in _item(_menu("A"), "Merienda", "platano")["alternatives"] if s["food_id"] == "datiles_medjool")
+    dates = next(s for s in _item(_menu("D"), "Desayuno", "platano")["alternatives"] if s["food_id"] == "datiles_medjool")
     assert dates["estimate"] is True   # the label's own carbohydrate is doubted
 
 

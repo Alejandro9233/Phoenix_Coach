@@ -27,7 +27,6 @@ from backend.services import nutrition
 from backend.services.nutrition import (
     DATA_DIR, NutritionPackageError, day_type_from_plan, load_package, today_menu,
 )
-from backend.services.nutrition_swaps import DAY_A_FLOOR_KCAL
 from backend.utils.timezone import get_local_today
 
 
@@ -198,7 +197,7 @@ def test_no_bedtime_meal():
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2083.0
+    assert menu["totals"]["kcal"] == 2032.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     pollo = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "pollo")
@@ -227,7 +226,9 @@ def test_pre_workout_is_one_slice_of_oroweat():
 
 def test_rest_day_meets_the_fiber_target():
     # metas: fibra 38 g; day A sat at 32.8 g until the cranberries (2026-10-28).
-    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 38
+    # 2026-11-14: the banana left day A for the deficit and took 3 g with it;
+    # Alex took that cost knowingly. Under 35 g is a new decision.
+    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 35
 
 
 def test_long_run_day_meets_the_fat_floor():
@@ -243,11 +244,12 @@ def test_long_run_day_meets_the_fat_floor():
 def test_rest_day_cut_stays_above_its_floors():
     # 2026-10-29: day A cut to the 2,025 kcal maintenance (Katch-McArdle x 1.2).
     # Floors: protein 2.0 g/kg, and energy. The energy floor was 30 kcal/kg of
-    # lean mass (1,830) until Alex took the menu to 1,799 on 2026-11-14
-    # ("el piso de las calorías no importa"); DAY_A_FLOOR_KCAL is the line now.
+    # lean mass (1,830) until Alex started the fat-loss deficit on 2026-11-14
+    # ("el piso de las calorías no importa") and set the menu to 1,692.
+    # Anything lower is a new decision of his, not a side effect of an edit.
     a = PKG["types"]["A"]
     assert a["gasto_estimado_kcal"] == 2025
-    assert a["totales"]["kcal"] >= DAY_A_FLOOR_KCAL
+    assert a["totales"]["kcal"] >= 1690
     assert a["totales"]["proteina_g"] >= 2.0 * 74.3
 
 
