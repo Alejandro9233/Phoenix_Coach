@@ -1281,10 +1281,10 @@
       "fuente_micros": "label+usda",
       "pieza": {
         "nombre": "bagel",
-        "peso": 91.5,
+        "peso": 103,
         "entera": true
       },
-      "nota": "Etiqueta del 14 nov 2026; 91.5 g por bagel. Reemplaza al New York Deli (P029). Micronutrientes de la etiqueta (%VNR) y, lo que no declara, del bagel del USDA.",
+      "nota": "Etiqueta del 14 nov 2026; 103 g por bagel pesado por Alex (la etiqueta dice 91.5 g). Reemplaza al New York Deli (P029). Micronutrientes de la etiqueta (%VNR) y, lo que no declara, del bagel del USDA.",
       "en_plan": true,
       "categoria": "Pan y cereales",
       "marca": "Bimbo",
