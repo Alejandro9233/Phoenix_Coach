@@ -71,6 +71,18 @@ def test_gym_only_and_rest_are_a():
     assert day_type_from_plan(_day(REST)) == ("A", "Rest day")
     assert day_type_from_plan(None)[0] == "A"
 
+def test_a_short_easy_swim_keeps_the_rest_day_menu():
+    """Alex 2026-11-14: the technique swim replaced the walk in the deficit."""
+    swim = {**_w("swimming", "Technique Session"), "total_time": "30 min"}
+    code, why = day_type_from_plan(_day(swim))
+    assert code == "A" and "short swim" in why
+    assert day_type_from_plan(_day(swim, EASY))[0] == "B"
+    assert day_type_from_plan(_day({**swim, "total_time": "60 min"}))[0] == "B"
+    assert day_type_from_plan(_day({**swim, "total_time": None}))[0] == "B"
+    css = {**swim, "title": "CSS Threshold", "steps": [{"type": "main", "duration": "20:00", "zone": 4}]}
+    assert day_type_from_plan(_day(css))[0] == "D"
+
+
 
 def test_highest_load_wins():
     assert day_type_from_plan(_day(GYM, EASY))[0] == "B"

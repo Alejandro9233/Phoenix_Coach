@@ -13,7 +13,10 @@ the calendar never hears about it. Highest load wins on a two-session day:
      longest-run fallback would turn an easy week's jog into a C day)
   D  any quality session (volume_gate.is_quality)
   B  any other cardio
-  A  gym only, or rest (Alex, 2026-10-21: the package eats A on gym days)
+  A  gym only, or rest (Alex, 2026-10-21: the package eats A on gym days),
+     or an easy swim of 45 min or less (Alex, 2026-11-14: the technique swim
+     took the walk's place in the deficit; menu B would feed back about
+     twice what it burns)
 and the day before a long run of 2 h or more eats at least D.
 The calendar still wins on its fixed days — an event, a sin_deficit day, or
 PENDIENTE (no menu yet, eat C) — because the plan can't know "eat a full C
@@ -59,6 +62,9 @@ NEXT_MEAL_GRACE = timedelta(minutes=30)
 # week's lowest-carb menu. Alex, 2026-10-22; first applies Sat 14 Nov,
 # the eve of the 27 km.
 LONG_RUN_EVE_MINUTES = 120
+# An easy swim this short eats the rest-day menu. Longer, or with no
+# duration on it, it is cardio like any other.
+SHORT_SWIM_MINUTES = 45
 _TIME_FMT = "%I:%M %p"
 
 
@@ -210,6 +216,8 @@ def day_type_from_plan(plan_day: dict | None) -> tuple:
             code = "C"
         elif is_quality(w):
             code = "D"
+        elif sport == "swimming" and 0 < (parse_minutes(w.get("total_time")) or 0) <= SHORT_SWIM_MINUTES:
+            code, title = "A", f"{title} (short swim)"
         elif sport in ("running", "cycling", "swimming") or "elliptic" in raw_sport:
             code = "B"
         elif sport == "strength":
