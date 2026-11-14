@@ -5,7 +5,7 @@
       "codigo": "B",
       "nombre": "Carrera suave",
       "gasto_estimado_kcal": 2450,
-      "deficit_kcal": 429.0,
+      "deficit_kcal": 375.0,
       "comidas": [
         {
           "hora": "12:30 PM",
@@ -268,16 +268,16 @@
             },
             {
               "food_id": "pure",
-              "cantidad": 100,
+              "cantidad": 315,
               "unidad": "g",
               "macros": {
-                "kcal": 25.0,
-                "proteina_g": 0.9,
-                "carbohidrato_g": 5.2,
-                "grasa_g": 0.1,
+                "kcal": 80.0,
+                "proteina_g": 2.8,
+                "carbohidrato_g": 16.4,
+                "grasa_g": 0.3,
                 "grasa_saturada_g": 0.0,
-                "fibra_g": 1.0,
-                "sodio_mg": 308.0
+                "fibra_g": 3.1,
+                "sodio_mg": 970.0
               }
             },
             {
@@ -296,13 +296,13 @@
             }
           ],
           "totales": {
-            "kcal": 636.0,
-            "proteina_g": 41.9,
-            "carbohidrato_g": 58.0,
-            "grasa_g": 26.3,
+            "kcal": 691.0,
+            "proteina_g": 43.8,
+            "carbohidrato_g": 69.2,
+            "grasa_g": 26.5,
             "grasa_saturada_g": 12.6,
-            "fibra_g": 4.2,
-            "sodio_mg": 393.0
+            "fibra_g": 6.3,
+            "sodio_mg": 1055.0
           }
         },
         {
@@ -579,40 +579,40 @@
         }
       ],
       "totales": {
-        "kcal": 2021.0,
-        "proteina_g": 156.8,
-        "carbohidrato_g": 199.3,
-        "grasa_g": 61.9,
+        "kcal": 2075.0,
+        "proteina_g": 158.8,
+        "carbohidrato_g": 210.5,
+        "grasa_g": 62.1,
         "grasa_saturada_g": 20.5,
-        "fibra_g": 35.1,
-        "sodio_mg": 2275.0
+        "fibra_g": 37.2,
+        "sodio_mg": 2937.0
       },
-      "proteina_g_por_kg": 2.11,
-      "carbohidrato_g_por_kg": 2.68,
-      "grasa_pct_kcal": 27.6,
+      "proteina_g_por_kg": 2.14,
+      "carbohidrato_g_por_kg": 2.83,
+      "grasa_pct_kcal": 26.9,
       "micros_totales": {
-        "vitA_ug": 1307.02,
-        "vitC_mg": 1166.11,
+        "vitA_ug": 1344.23,
+        "vitC_mg": 1181.29,
         "vitD_ug": 16.48,
-        "vitE_mg": 12.21,
-        "vitK_ug": 158.18,
-        "tiamina_mg": 2.16,
-        "riboflavina_mg": 2.85,
-        "niacina_mg": 47.23,
-        "b6_mg": 3.65,
-        "folato_ug": 882.39,
+        "vitE_mg": 15.03,
+        "vitK_ug": 163.05,
+        "tiamina_mg": 2.2,
+        "riboflavina_mg": 2.96,
+        "niacina_mg": 49.33,
+        "b6_mg": 3.83,
+        "folato_ug": 898.13,
         "b12_ug": 8.3,
-        "colina_mg": 422.36,
-        "calcio_mg": 1595.8,
-        "hierro_mg": 16.22,
-        "magnesio_mg": 841.68,
-        "fosforo_mg": 2088.23,
-        "potasio_mg": 4247.29,
-        "zinc_mg": 21.14,
-        "cobre_mg": 2.11,
-        "selenio_ug": 176.39,
-        "manganeso_mg": 4.78,
-        "ala_g": 2.44,
+        "colina_mg": 447.56,
+        "calcio_mg": 1621.57,
+        "hierro_mg": 18.77,
+        "magnesio_mg": 874.6,
+        "fosforo_mg": 2145.49,
+        "potasio_mg": 4875.7,
+        "zinc_mg": 21.65,
+        "cobre_mg": 2.53,
+        "selenio_ug": 177.39,
+        "manganeso_mg": 5.02,
+        "ala_g": 2.45,
         "epa_g": 0.61,
         "dha_g": 0.41,
         "epa_dha_g": 1.02

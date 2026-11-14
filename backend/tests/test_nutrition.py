@@ -199,7 +199,7 @@ def test_no_bedtime_meal():
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2021.0
+    assert menu["totals"]["kcal"] == 2075.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     # Alex weighs his chicken cooked (2026-11-14); the ground beef stays raw.

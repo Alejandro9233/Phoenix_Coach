@@ -12,7 +12,7 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 | Tipo | Cuándo | kcal | Proteína | Carbohidrato | Déficit vs gasto |
 |---|---|---|---|---|---|
 | A | Descanso o fuerza ligera | 1,665 | 159 g | 155 g | −360 (−500 con gimnasio) |
-| B | Carrera suave | 2,021 | 157 g | 199 g | −429 |
+| B | Carrera suave | 2,075 | 159 g | 211 g | −375 |
 | C | Tirada larga (domingo) | 3,605 | 174 g | 560 g | +280 (geles) |
 | D | Sesión de calidad (tempo o ritmo de maratón) | 2,761 | 158 g | 379 g | +61 |
 
@@ -102,7 +102,7 @@ Están en `metas_y_reglas.json → pendientes`:
 
 Quedan bajo meta, aceptados por ahora:
 - **Colina:** días B, C y D.
-- **Vitamina E:** días A y B.
+- **Vitamina E:** día A (8.7 de 15 mg). En B y D la cubre el puré de tomate del spaghetti (B 315 g, D 265 g, por decisión de Alex el 14 nov 2026); el costo es sodio, ~660 mg más en B.
 - **Vitamina D:** día A.
 
 ## Fuente de verdad
