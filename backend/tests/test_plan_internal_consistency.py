@@ -24,9 +24,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import backend.main as main_mod
 from backend.agents.response_agent import ResponseAgent
-from backend.main import adapt_today_workout, app, get_db
+from backend.main import app, get_db
+from backend.services.plan_flows import adapt_today_workout
 from backend.models.database import Athlete, Base, RecoverySnapshot, WeeklyPlan
 from backend.services.pace_enforcer import audit_step_paces
 from backend.services.pace_model import compute_pace_model
@@ -37,6 +37,7 @@ from backend.services.volume_gate import (
     workout_km,
 )
 from backend.utils.timezone import get_local_today
+from backend.services import plan_flows
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -489,7 +490,7 @@ def test_adaptation_never_overwrites_deliberate_distance():
     adapted = _day([{"sport": "running", "title": "Easy Run",
                      "total_time": "20 min", "distance_km": 4.2,
                      "steps": []}])
-    main_mod._preserve_adapted_distances(adapted, original)
+    plan_flows._preserve_adapted_distances(adapted, original)
     assert adapted["workouts"][0]["distance_km"] == 4.2
 
 
@@ -508,5 +509,5 @@ def test_adaptation_pairs_same_sport_workouts_in_order():
         {"sport": "running", "title": "Shakeout", "total_time": "20 min",
          "steps": []},
     ])
-    main_mod._preserve_adapted_distances(adapted, original)
+    plan_flows._preserve_adapted_distances(adapted, original)
     assert [w["distance_km"] for w in adapted["workouts"]] == [5.0, 3.0]

@@ -20,15 +20,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.agents.response_agent import ResponseAgent
-from backend.main import (
-    _run_smart_refresh, adapt_today_workout, replan_remaining_days,
-)
+from backend.services.plan_flows import adapt_today_workout, replan_remaining_days
+from backend.services.refresh_job import run_smart_refresh
 from backend.models.database import (
     Athlete, Base, RecoverySnapshot, WeeklyPlan,
 )
 from backend.services import hand_set_weeks
 from backend.services.issue_triage import apply_travel
 from backend.utils.timezone import get_local_now, get_local_today
+from backend.services import refresh_job
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -99,13 +99,11 @@ def llm(monkeypatch):
 
 
 def _stub_scraper(monkeypatch):
-    import backend.main as main_mod
-
     class _EmptyScraper:
         async def scrape_all(self, backfill_days=0):
             return {}
 
-    monkeypatch.setattr(main_mod, "CorosScraper", _EmptyScraper)
+    monkeypatch.setattr(refresh_job, "CorosScraper", _EmptyScraper)
 
 
 # --- A: the morning refresh -------------------------------------------------
@@ -114,7 +112,7 @@ def test_auto_adapt_skipped_in_hand_set_week(db, monkeypatch, llm):
     plan = _seed(db, monkeypatch, hand_set=True)
     _stub_scraper(monkeypatch)
 
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
 
     adaptation = result["event"]["adaptation"]
     assert llm == []                      # the LLM was never asked
@@ -140,7 +138,7 @@ def test_auto_adapt_still_runs_in_llm_week(db, monkeypatch, llm):
     _seed(db, monkeypatch, hand_set=False)
     _stub_scraper(monkeypatch)
 
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
 
     assert result["event"]["adaptation"]["adapted"] is True
     assert llm == [1]
@@ -240,7 +238,7 @@ def test_auto_adapt_failure_records_error_and_keeps_going(db, monkeypatch):
     _dead_model(monkeypatch)
     _stub_scraper(monkeypatch)
 
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
 
     adaptation = result["event"]["adaptation"]
     assert adaptation["adapted"] is False

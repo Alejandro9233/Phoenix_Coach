@@ -21,6 +21,7 @@ from backend.models.database import Athlete, Base, RecoverySnapshot, WeeklyPlan
 from backend.services.pace_enforcer import enforce_paces
 from backend.services import volume_gate
 from backend.utils.timezone import get_local_today
+from backend.services import plan_flows, refresh_job
 
 
 @pytest.fixture
@@ -183,12 +184,12 @@ def test_generation_waits_for_running_refresh(db, monkeypatch):
 
     def fake_sleep(sec):
         order.append("sleep")
-        main_mod._refresh_job.update(state="done")
+        refresh_job.job.update(state="done")
 
-    monkeypatch.setattr(main_mod.time, "sleep", fake_sleep)
-    monkeypatch.setitem(main_mod._refresh_job, "state", "running")
+    monkeypatch.setattr(plan_flows.time, "sleep", fake_sleep)
+    monkeypatch.setitem(refresh_job.job, "state", "running")
 
-    result = main_mod._get_or_generate_weekly_plan(db)
+    result = plan_flows.get_or_generate_weekly_plan(db)
     assert result["days"]
     assert "sleep" in order, "wait branch was never entered"
     assert order.index("sleep") < order.index("pipeline")
@@ -197,10 +198,10 @@ def test_generation_waits_for_running_refresh(db, monkeypatch):
 def test_generation_immediate_when_no_refresh(db, monkeypatch):
     order = []
     _wire_generation(monkeypatch, order)
-    monkeypatch.setattr(main_mod.time, "sleep",
+    monkeypatch.setattr(plan_flows.time, "sleep",
                         lambda sec: order.append("sleep"))
-    assert main_mod._refresh_job["state"] != "running"
-    main_mod._get_or_generate_weekly_plan(db)
+    assert refresh_job.job["state"] != "running"
+    plan_flows.get_or_generate_weekly_plan(db)
     assert "sleep" not in order
     assert "pipeline" in order
 
@@ -209,15 +210,15 @@ def test_generation_proceeds_when_refresh_never_settles(db, monkeypatch):
     """The 90s cap: a wedged refresh job must delay generation, not block it."""
     order = []
     _wire_generation(monkeypatch, order)
-    monkeypatch.setattr(main_mod.time, "sleep",
+    monkeypatch.setattr(plan_flows.time, "sleep",
                         lambda sec: order.append("sleep"))
-    monkeypatch.setitem(main_mod._refresh_job, "state", "running")
+    monkeypatch.setitem(refresh_job.job, "state", "running")
 
-    result = main_mod._get_or_generate_weekly_plan(db)
+    result = plan_flows.get_or_generate_weekly_plan(db)
     assert result["days"]
     assert order.count("sleep") == 45  # 90s cap at 2s ticks
     assert order[-1] == "pipeline"
-    assert main_mod._refresh_job["state"] == "running"  # untouched
+    assert refresh_job.job["state"] == "running"  # untouched
 
 
 # --- Fix 4a: honest data age in the coach's context -----------------------
@@ -302,3 +303,40 @@ def test_segment_mention_never_shrinks_long_run():
     main = plan["days"]["Sunday"]["workouts"][0]["steps"][0]
     assert main["duration"] == "90:00"
     assert plan["days"]["Sunday"]["workouts"][0]["total_time"] == "90 min"
+
+
+def test_refresh_job_runs_on_its_own_session_and_reports_done(monkeypatch):
+    """The phone's deep pull: start() -> the job opens its own session, runs
+    the refresh, closes the session, and status() carries the result."""
+    import asyncio
+
+    opened = []
+
+    class _Session:
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    def factory():
+        opened.append(_Session())
+        return opened[-1]
+
+    async def fake_refresh(db, progress=None):
+        progress("Syncing...")
+        assert refresh_job.job["stage"] == "Syncing..."
+        return {"adapted": False, "session": db}
+
+    monkeypatch.setattr(refresh_job, "run_smart_refresh", fake_refresh)
+    monkeypatch.setattr(refresh_job, "job", {"state": "idle", "stage": "", "result": None, "error": None})
+
+    async def go():
+        first = refresh_job.start(factory)
+        assert first["state"] == "running"
+        assert refresh_job.start(factory)["state"] == "running"   # joins, no second job
+        await refresh_job.job["task"]
+
+    asyncio.run(go())
+    assert len(opened) == 1 and opened[0].closed
+    done = refresh_job.status()
+    assert done["state"] == "done" and done["result"]["session"] is opened[0]

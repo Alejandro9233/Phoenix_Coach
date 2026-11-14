@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.models.database import Athlete, Base, InjuryLog, WeeklyPlan
+from backend.services import plan_flows
 from backend.services.issue_triage import (
     apply_issue,
     build_proposal,
@@ -396,9 +397,8 @@ def test_apply_endpoint_updates_the_plan(client, db):
 def test_apply_pushes_the_changed_week_to_the_watch(client, db, monkeypatch):
     """The watch used to catch up only at the next refresh: a run cancelled
     for an injury stayed on it until then. A failed apply pushes nothing."""
-    import backend.main as main
     pushed = []
-    monkeypatch.setattr(main, "_watch_sync_safe",
+    monkeypatch.setattr(plan_flows, "watch_sync_safe",
                         lambda db, plan_json, week_start, days=None: pushed.append(plan_json))
     _seed(db, **_all_week(_run))
 

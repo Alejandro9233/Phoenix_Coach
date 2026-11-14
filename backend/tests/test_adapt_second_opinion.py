@@ -5,7 +5,7 @@ primary key) AFTER the day's adaptation already ran. Rules locked in here:
 
 - Unchanged (or barely drifted) numbers: the idempotency guard holds — one
   LLM call per day, the second request gets the existing adapted day back.
-- A material move (thresholds in main.ADAPT_SUPERSEDE_THRESHOLDS) earns
+- A material move (thresholds in plan_flows.ADAPT_SUPERSEDE_THRESHOLDS) earns
   exactly ONE superseding re-adaptation, receipted with a "Second opinion"
   reason and the inputs it saw.
 - MAX_ADAPTS_PER_DAY caps the day at two writes no matter what the data
@@ -19,12 +19,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import backend.main as main_mod
-from backend.main import adapt_today_workout
+from backend.services.plan_flows import adapt_today_workout
 from backend.models.database import (
     Athlete, Base, RecoverySnapshot, WeeklyPlan,
 )
 from backend.utils.timezone import get_local_now, get_local_today
+from backend.services import plan_flows
 
 
 @pytest.fixture
@@ -194,5 +194,5 @@ def test_helper_ignores_other_sources_and_days(db, quiet_llm):
     flag_modified(plan, "plan_json")
     db.commit()
 
-    assert main_mod._recovery_changed_since_adapt(
+    assert plan_flows._recovery_changed_since_adapt(
         db, plan.plan_json, get_local_today()) is None

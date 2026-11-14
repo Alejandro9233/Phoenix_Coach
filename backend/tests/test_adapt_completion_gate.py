@@ -25,7 +25,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.main import adapt_today_workout, use_original_today
+from backend.services.plan_flows import adapt_today_workout, use_original_today
 from backend.models.database import (
     Activity, Athlete, Base, RecoverySnapshot, WeeklyPlan,
 )

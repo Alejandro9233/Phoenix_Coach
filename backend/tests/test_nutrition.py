@@ -359,7 +359,7 @@ def test_endpoint_reads_stored_plan_and_never_generates(client, db):
     week_start = today - timedelta(days=today.weekday())
     db.add(WeeklyPlan(week_start=week_start, athlete_id=1, plan_json=_plan(today.strftime("%A"), TEMPO)))
     db.commit()
-    with patch("backend.main._generate_weekly_plan") as gen:
+    with patch("backend.services.plan_flows._generate_weekly_plan") as gen:
         r = client.get("/nutrition/today")
     assert r.status_code == 200
     assert gen.call_count == 0
@@ -369,7 +369,7 @@ def test_endpoint_reads_stored_plan_and_never_generates(client, db):
 
 
 def test_endpoint_without_plan_does_not_generate(client):
-    with patch("backend.main._generate_weekly_plan") as gen:
+    with patch("backend.services.plan_flows._generate_weekly_plan") as gen:
         r = client.get("/nutrition/today")
     assert r.status_code == 200
     assert gen.call_count == 0
@@ -390,7 +390,7 @@ def test_days_endpoint_crosses_into_unplanned_week(client, db):
     db.add(WeeklyPlan(week_start=week_start, athlete_id=1,
                       plan_json={"week_summary": {}, "days": {}}))
     db.commit()
-    with patch("backend.main._generate_weekly_plan") as gen:
+    with patch("backend.services.plan_flows._generate_weekly_plan") as gen:
         r = client.get("/nutrition/days?count=7")
     assert r.status_code == 200
     assert gen.call_count == 0

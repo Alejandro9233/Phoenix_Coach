@@ -15,9 +15,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
-import backend.main as main_mod
 from backend.models.database import Athlete, Base, WeeklyPlan
 from backend.utils.timezone import get_local_today
+from backend.services import plan_flows
 
 
 def _fake_week():
@@ -68,7 +68,7 @@ def test_concurrent_requests_generate_one_plan(monkeypatch, tmp_path):
     def worker(i):
         db = SessionLocal()
         try:
-            results[i] = main_mod._get_or_generate_weekly_plan(db)
+            results[i] = plan_flows.get_or_generate_weekly_plan(db)
         except Exception as e:
             errors[i] = e
         finally:

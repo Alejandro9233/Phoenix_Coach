@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.main import _backfill_days_needed
+from backend.services.refresh_job import _backfill_days_needed
 from backend.models.database import Activity, Base
 from backend.services.coros_scraper import (
     CorosScraper,

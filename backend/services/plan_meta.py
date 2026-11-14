@@ -18,9 +18,8 @@ violations always persist, as week_summary.gate_warnings. The gate never
 fails a request that generation itself survived — C2's pace enforcer slots in
 right after the audit. Ungated paths (adapt-today's recovery downgrade,
 profile re-enforce) skip the audit on purpose but still get their sums
-restamped. test_plan_meta.py locks the choke point structurally: main.py and
-issue_triage.py may not call enforce_constraints directly, and any function
-that assigns plan_json must call the pipeline.
+restamped. test_plan_meta.py locks the choke point structurally: no backend module but
+this one may call enforce_constraints directly or assign plan_json.
 
 finalize_plan_write() cures two audit findings:
 

@@ -23,7 +23,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.agents.response_agent import ResponseAgent
-from backend.main import app, get_db, _run_smart_refresh
+from backend.main import app, get_db
+from backend.services.refresh_job import run_smart_refresh
 from backend.models.database import (
     Activity, Athlete, Base, RecoverySnapshot, RefreshEvent, WeeklyPlan,
 )
@@ -32,6 +33,7 @@ from backend.services.refresh_events import (
     REFRESH_EVENTS_KEEP, build_refresh_event, record_refresh_event,
 )
 from backend.utils.timezone import get_local_now, get_local_today
+from backend.services import plan_flows, refresh_job
 
 
 @pytest.fixture
@@ -225,14 +227,13 @@ def test_prune_keeps_newest(db):
 
 
 def test_partial_scrape_still_records_event(db, monkeypatch):
-    import backend.main as main_mod
 
     class _BoomScraper:
         async def scrape_all(self, backfill_days=0):
             raise RuntimeError("coros down")
 
-    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
-    result = asyncio.run(_run_smart_refresh(db))
+    monkeypatch.setattr(refresh_job, "CorosScraper", _BoomScraper)
+    result = asyncio.run(run_smart_refresh(db))
     assert result["sync_status"] == "partial"
     assert "coros down" in result["sync_message"]
     assert result["event_recorded"] is True
@@ -241,13 +242,12 @@ def test_partial_scrape_still_records_event(db, monkeypatch):
 
 
 def test_event_write_failure_never_fails_refresh(db, monkeypatch):
-    import backend.main as main_mod
 
     class _BoomScraper:
         async def scrape_all(self, backfill_days=0):
             raise RuntimeError("coros down")
 
-    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(refresh_job, "CorosScraper", _BoomScraper)
     # main imports record_refresh_event inside the function, so patching the
     # source module's attribute is enough.
     import backend.services.refresh_events as re_mod
@@ -256,7 +256,7 @@ def test_event_write_failure_never_fails_refresh(db, monkeypatch):
         raise RuntimeError("db full")
 
     monkeypatch.setattr(re_mod, "record_refresh_event", _boom)
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     assert result["event_recorded"] is False
     assert result["sync_status"] == "partial"  # refresh survived
 
@@ -441,7 +441,7 @@ def _stub_scraper(monkeypatch):
         async def scrape_all(self, backfill_days=0):
             return {}
 
-    monkeypatch.setattr(main_mod, "CorosScraper", _EmptyScraper)
+    monkeypatch.setattr(refresh_job, "CorosScraper", _EmptyScraper)
     return main_mod
 
 
@@ -484,9 +484,9 @@ def test_fresh_triggers_recorded_and_adapt_joined(db, monkeypatch, client):
     _bad_recovery_today(db)
     main_mod = _stub_scraper(monkeypatch)
     calls = {"n": 0}
-    monkeypatch.setattr(main_mod, "adapt_today_workout", _fake_adapt(db, calls))
+    monkeypatch.setattr(plan_flows, "adapt_today_workout", _fake_adapt(db, calls))
 
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     event = result["event"]
     assert {t["name"] for t in event["triggers"]} == {
         "hrv_drop", "rhr_elevated", "fatigue_high", "load_ratio_high", "tib_low"}
@@ -518,10 +518,10 @@ def test_second_refresh_never_claims_the_mornings_adapt(db, monkeypatch, client)
     _bad_recovery_today(db)
     main_mod = _stub_scraper(monkeypatch)
     calls = {"n": 0}
-    monkeypatch.setattr(main_mod, "adapt_today_workout", _fake_adapt(db, calls))
+    monkeypatch.setattr(plan_flows, "adapt_today_workout", _fake_adapt(db, calls))
 
-    first = asyncio.run(_run_smart_refresh(db))
-    second = asyncio.run(_run_smart_refresh(db))
+    first = asyncio.run(run_smart_refresh(db))
+    second = asyncio.run(run_smart_refresh(db))
 
     assert first["event"]["adaptation"]["adapted"] is True
     assert second["event"]["adaptation"]["needed"] is True
@@ -643,9 +643,8 @@ def _mcp_payload(today):
 
 
 def test_mcp_off_means_scraper_with_reason(db, monkeypatch):
-    import backend.main as main_mod
-    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
-    result = asyncio.run(_run_smart_refresh(db))
+    monkeypatch.setattr(refresh_job, "CorosScraper", _BoomScraper)
+    result = asyncio.run(run_smart_refresh(db))
     src = result["event"]["coros_source"]
     assert src["source"] == "scraper" and "not enabled" in src["fallback_reason"]
     assert result["event"]["schema_version"] == 4
@@ -653,13 +652,12 @@ def test_mcp_off_means_scraper_with_reason(db, monkeypatch):
 
 
 def test_mcp_success_skips_the_scraper(db, monkeypatch):
-    import backend.main as main_mod
     from backend.services import coros_mcp
-    monkeypatch.setattr(main_mod, "CorosScraper", _NeverScraper)
+    monkeypatch.setattr(refresh_job, "CorosScraper", _NeverScraper)
     monkeypatch.setattr(coros_mcp, "enabled", lambda: True)
     monkeypatch.setattr(coros_mcp, "fetch_scrape_shaped",
                         lambda days, known, **kw: _mcp_payload(get_local_today()))
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     assert result["sync_status"] == "ok" and result["sync_message"] == "Biometrics synced."
     src = result["event"]["coros_source"]
     assert src["source"] == "mcp" and src["fallback_reason"] is None
@@ -668,15 +666,14 @@ def test_mcp_success_skips_the_scraper(db, monkeypatch):
 
 
 def test_mcp_failure_falls_back_to_the_scraper(db, monkeypatch):
-    import backend.main as main_mod
     from backend.services import coros_mcp
-    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(refresh_job, "CorosScraper", _BoomScraper)
     monkeypatch.setattr(coros_mcp, "enabled", lambda: True)
 
     def _boom(days, known, **kw):
         raise coros_mcp.CorosMcpError("token refresh failed: HTTP 400")
     monkeypatch.setattr(coros_mcp, "fetch_scrape_shaped", _boom)
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     src = result["event"]["coros_source"]
     assert src["source"] == "scraper" and src["fallback_reason"].startswith("CorosMcpError: token refresh")
     assert result["sync_status"] == "partial" and "coros down" in result["sync_message"]
@@ -684,14 +681,13 @@ def test_mcp_failure_falls_back_to_the_scraper(db, monkeypatch):
 
 
 def test_mcp_partial_today_falls_back_to_the_scraper(db, monkeypatch):
-    import backend.main as main_mod
     from backend.services import coros_mcp
-    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(refresh_job, "CorosScraper", _BoomScraper)
     monkeypatch.setattr(coros_mcp, "enabled", lambda: True)
     partial = _mcp_payload(get_local_today())
     partial["today_status"], partial["missing"] = "partial", ["ati", "cti", "tib", "fatigue_state"]
     monkeypatch.setattr(coros_mcp, "fetch_scrape_shaped", lambda days, known, **kw: partial)
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     src = result["event"]["coros_source"]
     assert src["source"] == "scraper" and "parsed partially" in src["fallback_reason"]
     assert src["today_status"] == "partial" and "ati" in src["missing"]
@@ -709,15 +705,14 @@ def _today_snapshot(db, **kw):
 
 
 def _quiet_adapt(monkeypatch):
-    import backend.main as main_mod
-    monkeypatch.setattr(main_mod, "CorosScraper", _BoomScraper)
-    monkeypatch.setattr(main_mod, "adapt_today_workout", lambda body=None, db=None: None)
+    monkeypatch.setattr(refresh_job, "CorosScraper", _BoomScraper)
+    monkeypatch.setattr(plan_flows, "adapt_today_workout", lambda body=None, db=None: None)
 
 
 def test_hrv_inside_coros_band_does_not_fire_despite_baseline(db, monkeypatch):
     _quiet_adapt(monkeypatch)
     _today_snapshot(db, hrv_ms=70.0, hrv_baseline=80.0, hrv_normal_low=58.0, hrv_normal_high=97.0)
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     trig = {t["name"]: t for t in result["event"]["triggers"]}
     assert trig["hrv_drop"] == {"name": "hrv_drop", "fired": False, "value": 70, "threshold": 58}
     assert result["adaptation"]["needed"] is False
@@ -727,7 +722,7 @@ def test_hrv_inside_coros_band_does_not_fire_despite_baseline(db, monkeypatch):
 def test_hrv_below_coros_band_fires_with_the_range_in_the_reason(db, monkeypatch):
     _quiet_adapt(monkeypatch)
     _today_snapshot(db, hrv_ms=47.0, hrv_baseline=77.0, hrv_normal_low=58.0, hrv_normal_high=97.0)
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     trig = {t["name"]: t for t in result["event"]["triggers"]}
     assert trig["hrv_drop"]["fired"] is True and trig["hrv_drop"]["value"] == 47 and trig["hrv_drop"]["threshold"] == 58
     assert result["adaptation"]["reasons"] == ["HRV 47 ms below COROS normal range (58–97 ms)"]
@@ -736,7 +731,7 @@ def test_hrv_below_coros_band_fires_with_the_range_in_the_reason(db, monkeypatch
 def test_hrv_without_a_band_keeps_the_legacy_percentage_rule(db, monkeypatch):
     _quiet_adapt(monkeypatch)
     _today_snapshot(db, hrv_ms=70.0, hrv_baseline=80.0)      # athlete baseline 95 → −26%
-    result = asyncio.run(_run_smart_refresh(db))
+    result = asyncio.run(run_smart_refresh(db))
     trig = {t["name"]: t for t in result["event"]["triggers"]}
     assert trig["hrv_drop"]["fired"] is True and trig["hrv_drop"]["threshold"] == -15
     assert trig["hrv_drop"]["value"] == -26.3

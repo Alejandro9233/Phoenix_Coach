@@ -102,6 +102,14 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
 ## Where things live
 
 - `backend/main.py` — all endpoints. `grep -n '^@app\.' backend/main.py` to list them.
+  Endpoints are thin: the logic lives in services.
+- `backend/services/plan_flows.py` — everything that builds or rewrites this
+  week's plan: generate, regenerate, replan, adapt-today, use-original.
+- `backend/services/refresh_job.py` — the smart refresh (pull COROS → ingest →
+  adapt) and its background job.
+- `week_plan(db, monday)` in `models/database.py` is the one lookup for a week's
+  plan row; `sport_days(athlete)` in `constraint_enforcer.py` is the one read of
+  the training-day schedule. Don't write either out by hand (tests fail).
 - `backend/models/database.py` — all tables. `grep -n '__tablename__'` to list them.
 - `backend/services/periodization_engine.py` — phases, volume targets. Docstring has
   the ceilings and why the distance profiles exist.
@@ -128,5 +136,10 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
   must use a `en_US_POSIX` `"EEEE"` formatter — `shortWeekdaySymbols` yields `"sun"`
   and silently misses, and a Spanish phone yields `"domingo"`.
 - **uvicorn buffers logs** when started non-interactively. Missing output ≠ didn't run.
+- **Tests fake the date with the `freeze_today` fixture only** (conftest). Never
+  monkeypatch one module's `get_local_today` — the other modules stay on the
+  real date and the test stays green. Patch a function on the module that
+  defines it (`plan_flows.adapt_today_workout`), and call across modules as
+  `module.func` so that patch reaches every caller.
 - Tests use in-memory SQLite with a `get_db` override, so they're safe to run on a
   machine holding production credentials: `PYTHONPATH=. ./venv/bin/pytest backend/tests/`

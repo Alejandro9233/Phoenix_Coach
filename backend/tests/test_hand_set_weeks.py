@@ -20,6 +20,7 @@ from backend.services import coros_watch
 from backend.services.hand_set_weeks import HAND_SET_WEEKS, hand_set_week
 from backend.services.periodization_engine import RUN_KM_PLAN, RUN_KM_PLAN_CAP
 from backend.services.volume_gate import is_quality
+from backend.services import plan_flows
 
 TRIAL_WEEK = date(2026, 11, 2)
 
@@ -118,15 +119,14 @@ def test_the_week_fits_its_planned_km(db):
 
 
 def test_generation_uses_the_hand_set_week_without_the_llm(db, monkeypatch):
-    from backend import main
     from backend.agents.response_agent import ResponseAgent
 
     def boom(*a, **k):
         raise AssertionError("the LLM must not write a hand-set week")
 
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", boom)
-    monkeypatch.setattr(main, "_watch_sync_safe", lambda *a, **k: {"status": "off"})
-    plan = main._generate_weekly_plan(db, TRIAL_WEEK, None, "generate", "test")
+    monkeypatch.setattr(plan_flows, "watch_sync_safe", lambda *a, **k: {"status": "off"})
+    plan = plan_flows._generate_weekly_plan(db, TRIAL_WEEK, None, "generate", "test")
     assert _run(plan, "Sunday")["title"] == "Half Marathon Time Trial"
 
 

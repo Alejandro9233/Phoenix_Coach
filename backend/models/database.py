@@ -227,7 +227,7 @@ class WatchWorkout(Base):
 
 class RefreshEvent(Base):
     """One row per smart-refresh run — the durable answer to "what happened
-    when I refreshed". Written as the FINAL stage of _run_smart_refresh (after
+    when I refreshed". Written as the FINAL stage of run_smart_refresh (after
     every swallowed-exception stage, so partial scrapes still record), pruned
     to the newest REFRESH_EVENTS_KEEP rows on insert. payload_json is the
     frozen event document (schema_version inside); history shows what was

@@ -31,7 +31,7 @@ SCHEMA_VERSION = 4  # 3: coros_source (mcp | scraper); 4: watch (COROS watch pus
 REFRESH_EVENTS_KEEP = 200   # months of history for one athlete
 MAX_ACTIVITIES_STORED = 20  # deep backfills report a count beyond this
 
-# The five deterministic adaptation triggers, mirrored from _run_smart_refresh.
+# The five deterministic adaptation triggers, mirrored from run_smart_refresh.
 TRIGGER_NAMES = ("hrv_drop", "rhr_elevated", "fatigue_high",
                  "load_ratio_high", "tib_low")
 
