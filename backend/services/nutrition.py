@@ -273,7 +273,7 @@ def _swap_view(food: dict, amount, new: dict, new_amount) -> dict:
         "delta": {"kcal": round(d["kcal"]), "protein_g": round(d["proteina_g"], 1),
                   "carbs_g": round(d["carbohidrato_disponible_g"], 1), "fat_g": round(d["grasa_g"], 1)},
         # label numbers the package itself doubts, or micronutrients worked out from a similar food
-        "estimate": new.get("fuente_micros") == "estimate" or bool(new.get("datos_dudosos")),
+        "estimate": "estimate" in (new.get("fuente_micros") or "") or bool(new.get("datos_dudosos")),
     }
     if pieza.get("peso"):
         out["pieces"] = round(new_amount / pieza["peso"], 1)
