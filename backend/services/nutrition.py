@@ -42,7 +42,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from backend.services.pace_enforcer import classify_run_workout
-from backend.services.nutrition_swaps import delta, is_whole, item_swaps
+from backend.services.nutrition_swaps import delta, is_whole, item_swaps, pieces_label
 from backend.services.plan_normalizer import map_sport
 from backend.services.volume_gate import is_quality, parse_minutes
 
@@ -250,6 +250,9 @@ def _item_view(item: dict, foods: dict) -> dict:
     if pieza and pieza.get("peso") and isinstance(amount, (int, float)):
         out["pieces"] = round(amount / pieza["peso"], 1)
         out["piece_name"] = pieza.get("nombre")
+    label = pieces_label(food, amount)
+    if label:
+        out["pieces_label"] = label
     alt = item.get("alternativa")
     if alt:
         alt_food = foods[alt["food_id"]]
@@ -283,6 +286,9 @@ def _swap_view(food: dict, amount, new: dict, new_amount) -> dict:
     if pieza.get("peso"):
         out["pieces"] = round(new_amount / pieza["peso"], 1)
         out["piece_name"] = pieza.get("nombre")
+    label = pieces_label(new, new_amount)
+    if label:
+        out["pieces_label"] = label
     return out
 
 

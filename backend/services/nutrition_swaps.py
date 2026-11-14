@@ -54,6 +54,22 @@ def is_whole(food: dict) -> bool:
     return bool((food.get("pieza") or {}).get("entera"))
 
 
+def pieces_label(food: dict, qty) -> str | None:
+    """"3 tostadas", "1 lata" — only for a food eaten whole, in whole pieces.
+    Everything else is weighed and shown in grams (the pieces-first sheet for
+    every food was rejected 2026-10-21; Alex kept it for these on 2026-11-14)."""
+    pieza = food.get("pieza") or {}
+    if not pieza.get("entera") or not isinstance(qty, (int, float)):
+        return None
+    n = qty / pieza["peso"]
+    if n < 0.99 or abs(n - round(n)) > 0.01:
+        return None
+    name = pieza["nombre"]
+    if round(n) != 1:
+        name = pieza.get("plural") or (name + ("s" if name[-1] in "aeiouáéíóú" else "es"))
+    return f"{round(n)} {name}"
+
+
 def swappable(meal: dict, food: dict) -> bool:
     name = (meal.get("nombre") or "").lower()
     return (meal.get("hora") != DAILY and not name.startswith(SESSION_MEALS)

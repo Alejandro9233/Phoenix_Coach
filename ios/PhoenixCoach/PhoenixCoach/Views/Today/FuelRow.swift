@@ -69,10 +69,16 @@ struct FuelRow: View {
 /// The whole day's menu as a timeline rail (fuel-sheet round 1, V1): time,
 /// dot, meal. One meal open at a time, the next one to start (round 2: V4's
 /// chevron + blur-in, with V2's accordion). Supplements close the day.
+/// An open meal is a ledger (meal-detail round, V1, 2026-11-14): a macro
+/// line, each food with its swaps as grey "o …" lines, and "Or instead" for
+/// a whole other meal. Showing a variant is this sheet's state only; the
+/// backend stores nothing and the day's totals stay the plan's.
 struct FuelSheet: View {
     let day: NutritionDay
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var open: Int?
+    /// Meal index → the variant shown in its place.
+    @State private var shownVariant: [Int: Int] = [:]
 
     private var meals: [NutritionMeal] { day.meals ?? [] }
 
@@ -154,8 +160,15 @@ struct FuelSheet: View {
         withAnimation(DS.Animation.normal) { open = open == i ? nil : i }
     }
 
+    private func variant(_ i: Int, _ meal: NutritionMeal) -> NutritionMealVariant? {
+        guard let v = shownVariant[i], let all = meal.variants, all.indices.contains(v) else { return nil }
+        return all[v]
+    }
+
     private func railRow(_ i: Int, _ meal: NutritionMeal) -> some View {
         let isOpen = open == i
+        let shown = variant(i, meal)
+        let totals = shown?.totals ?? meal.totals
         let next = day.nextMealIndex
         let isPast = next.map { i < $0 } ?? true
         return HStack(alignment: .top, spacing: DS.Spacing.m) {
@@ -176,12 +189,12 @@ struct FuelSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 Button { toggle(i) } label: {
                     HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
-                        Text(meal.name)
+                        Text(shown?.name ?? meal.name)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(isPast ? DS.Colors.onSurface : .white)
                             .multilineTextAlignment(.leading)
                         Spacer(minLength: DS.Spacing.s)
-                        if let k = meal.totals.kcal { DS.MonoLabel(text: FuelFormat.kcal(k)) }
+                        if let k = totals.kcal { DS.MonoLabel(text: FuelFormat.kcal(k)).fixedSize() }
                         Image(systemName: "chevron.down")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(DS.Colors.outline)
@@ -193,11 +206,29 @@ struct FuelSheet: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(meal.time), \(meal.name)\(i == next ? ", next" : "")")
+                .accessibilityLabel("\(meal.time), \(shown?.name ?? meal.name)\(i == next ? ", next" : "")")
                 .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
                 if isOpen {
                     VStack(alignment: .leading, spacing: DS.Spacing.s) {
-                        ForEach(Array(meal.items.enumerated()), id: \.offset) { _, item in itemLine(item) }
+                        VStack(alignment: .leading, spacing: DS.Spacing.s) {
+                            if let line = FuelFormat.macros(totals) { DS.MonoLabel(text: line) }
+                            ForEach(Array((shown?.items ?? meal.items).enumerated()), id: \.offset) { _, item in itemLine(item) }
+                        }
+                        .id(shownVariant[i] ?? -1)
+                        .transition(.opacity)
+                        if let variants = meal.variants, !variants.isEmpty {
+                            DS.Hairline().padding(.top, DS.Spacing.s)
+                            if shown != nil {
+                                insteadRow(meal.name, meal.totals, delta: nil) { shownVariant[i] = nil }
+                            }
+                            ForEach(Array(variants.enumerated()), id: \.offset) { v, other in
+                                if shownVariant[i] != v {
+                                    insteadRow(other.name, other.totals, delta: shown == nil ? other.delta.kcal : nil) {
+                                        shownVariant[i] = v
+                                    }
+                                }
+                            }
+                        }
                     }
                     .transition(reduceMotion
                         ? .opacity
@@ -226,6 +257,51 @@ struct FuelSheet: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// A whole other meal for this slot: tap to read the menu with it.
+    private func insteadRow(_ name: String, _ totals: NutritionTotals, delta: Double?,
+                            show: @escaping () -> Void) -> some View {
+        Button { withAnimation(DS.Animation.normal) { show() } } label: {
+            HStack(alignment: .center, spacing: DS.Spacing.m) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                    DS.SectionLabel(text: "Or instead")
+                    Text(name)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.leading)
+                    if let line = FuelFormat.macros(totals) { DS.MonoLabel(text: line).lineLimit(1) }
+                }
+                .layoutPriority(1)
+                Spacer(minLength: 0)
+                if let k = totals.kcal {
+                    DS.MonoLabel(text: [FuelFormat.kcal(k), delta.map(FuelFormat.signed)].compactMap { $0 }.joined(separator: " · "))
+                        .fixedSize()
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DS.Colors.outline)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Shows this meal in its place")
+    }
+
+    /// Grams lead. A food eaten whole leads with its pieces and keeps the grams beside them.
+    private func amountText(_ amount: Double, _ unit: String, pieces: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.xs) {
+            if let pieces {
+                Text(pieces).font(.system(size: 13)).foregroundStyle(.white)
+                Text("\(FuelFormat.amount(amount)) \(unit)").font(.system(size: 11)).foregroundStyle(DS.Colors.outline)
+            } else {
+                Text("\(FuelFormat.amount(amount)) \(unit)").font(.system(size: 13)).foregroundStyle(.white)
+            }
+        }
+        .monospacedDigit()
+        .fixedSize()
+    }
+
     private func itemLine(_ item: NutritionItem) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
@@ -235,12 +311,24 @@ struct FuelSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: DS.Spacing.s)
                 if let w = item.weigh { DS.MonoLabel(text: w) }
-                Text("\(FuelFormat.amount(item.amount)) \(item.unit)")
-                    .font(.system(size: 13))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
+                amountText(item.amount, item.unit, pieces: item.piecesLabel)
             }
-            if let alt = item.alternative {
+            if let swaps = item.alternatives {
+                ForEach(Array(swaps.enumerated()), id: \.offset) { _, swap in
+                    HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.s) {
+                        Text("o \(swap.name) \(swap.piecesLabel ?? "\(FuelFormat.amount(swap.amount)) \(swap.unit)")")
+                            .font(.system(size: 11))
+                            .foregroundStyle(DS.Colors.outline)
+                            .lineLimit(1)
+                        Spacer(minLength: DS.Spacing.s)
+                        if let k = swap.delta?.kcal {
+                            DS.MonoLabel(text: "\(FuelFormat.signed(k)) kcal\(swap.estimate == true ? " · est" : "")")
+                                .fixedSize()
+                        }
+                    }
+                }
+            } else if let alt = item.alternative {
+                // a backend from before the swaps list
                 Text("o \(alt.name) \(FuelFormat.amount(alt.amount)) \(alt.unit)")
                     .font(.system(size: 11))
                     .foregroundStyle(DS.Colors.outline)
@@ -274,5 +362,20 @@ enum FuelFormat {
     /// 54 → "54", 0.5 → "0.5".
     static func amount(_ v: Double) -> String {
         v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)
+    }
+
+    /// 80 → "+80", -41 → "−41", 0 → "±0".
+    static func signed(_ v: Double) -> String {
+        let n = Int(v.rounded())
+        return n == 0 ? "±0" : (n > 0 ? "+\(n)" : "−\(-n)")
+    }
+
+    /// A meal's macro line: protein, fat and fiber (Alex, 2026-11-14: fiber
+    /// instead of carbs). A missing figure is left out, never shown as 0.
+    static func macros(_ t: NutritionTotals) -> String? {
+        let parts = [("P", t.proteinG), ("Fat", t.fatG), ("Fiber", t.fiberG)].compactMap { label, v in
+            v.map { "\(label) \(Int($0.rounded())) g" }
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

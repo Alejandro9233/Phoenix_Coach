@@ -1282,7 +1282,8 @@
       "pieza": {
         "nombre": "bagel",
         "peso": 103,
-        "entera": true
+        "entera": true,
+        "plural": "bagels"
       },
       "nota": "Etiqueta del 14 nov 2026; 103 g por bagel pesado por Alex (la etiqueta dice 91.5 g). Reemplaza al New York Deli (P029). Micronutrientes de la etiqueta (%VNR) y, lo que no declara, del bagel del USDA.",
       "en_plan": true,
@@ -1532,7 +1533,8 @@
       "pieza": {
         "nombre": "sobre preparado",
         "peso": 585,
-        "entera": true
+        "entera": true,
+        "plural": "sobres preparados"
       },
       "nota": "Valores por 100 g de sopa PREPARADA (1 sobre de 85 g + 500 ml de agua = 585 g).",
       "en_plan": true
@@ -2284,7 +2286,7 @@
     },
     {
       "id": "papas_susalia",
-      "nombre": "Papas de maíz nixtamalizado con nopal, tipo totopo, sabor limón ardiente Susalia",
+      "nombre": "Papas Susalia limón ardiente",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
@@ -2345,11 +2347,12 @@
       "posible_reemplazo_de": null,
       "datos_dudosos": [],
       "lecturas_dudosas": "La tabla de la etiqueta viene desfasada: los nombres de los renglones no coinciden con los valores (p. ej. «Porciones por envase» trae las kcal). Se leyó en el orden estándar de la NOM-051 y cuadra: 4×3 + 4×40 + 9×11 = 271 kcal, y saturada + mono + poli = 10 g de 11 g de grasa.",
-      "observaciones": "30 g dan 81 kcal, 12 g de carbohidrato, 3.3 g de grasa, 1.8 g de fibra y 240 mg de sodio. Alto en sodio para una botana (800 mg por 100 g; 295 mg por cada 100 kcal). Lleva inulina y fibra añadidas, igual que el cereal Groovies: fermentable, mejor no comerla justo antes de correr. Buen aporte de hierro (8 mg por 100 g) y ácido fólico, probablemente de la harina de maíz nixtamalizada, que en México viene fortificada. El calcio viene del hidróxido de calcio (cal) del nixtamal."
+      "observaciones": "30 g dan 81 kcal, 12 g de carbohidrato, 3.3 g de grasa, 1.8 g de fibra y 240 mg de sodio. Alto en sodio para una botana (800 mg por 100 g; 295 mg por cada 100 kcal). Lleva inulina y fibra añadidas, igual que el cereal Groovies: fermentable, mejor no comerla justo antes de correr. Buen aporte de hierro (8 mg por 100 g) y ácido fólico, probablemente de la harina de maíz nixtamalizada, que en México viene fortificada. El calcio viene del hidróxido de calcio (cal) del nixtamal.",
+      "nombre_etiqueta": "Papas de maíz nixtamalizado con nopal, tipo totopo, sabor limón ardiente Susalia"
     },
     {
       "id": "pollo_empanizado_kirkland",
-      "nombre": "Pechugas de pollo empanizadas, completamente cocidas, congeladas Kirkland Signature",
+      "nombre": "Pechuga empanizada Kirkland",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
@@ -2416,7 +2419,8 @@
       "posible_reemplazo_de": null,
       "datos_dudosos": [],
       "lecturas_dudosas": "Los valores son del producto tal como viene (ya cocido), antes de recalentarlo.",
-      "observaciones": "Ya viene cocido: solo se recalienta (horno o freidora de aire, sin aceite extra). Comparado con la pechuga cruda Kirkland (P012) tiene menos proteína por caloría (16 g por 162 kcal, ~40% de las calorías), porque lleva empanizado (11 g de carbohidrato por 100 g) y agua añadida. Alto en sodio: 680 mg por 100 g. El empanizado lleva claras de huevo deshidratadas (Alex no come huevo salvo en el bagel; aquí es solo un ingrediente del empanizado). Práctico para días sin cocinar. 1 pechuga (140 g) da 227 kcal, 22.4 g de proteína, 15.4 g de carbohidrato, 8.4 g de grasa y 952 mg de sodio."
+      "observaciones": "Ya viene cocido: solo se recalienta (horno o freidora de aire, sin aceite extra). Comparado con la pechuga cruda Kirkland (P012) tiene menos proteína por caloría (16 g por 162 kcal, ~40% de las calorías), porque lleva empanizado (11 g de carbohidrato por 100 g) y agua añadida. Alto en sodio: 680 mg por 100 g. El empanizado lleva claras de huevo deshidratadas (Alex no come huevo salvo en el bagel; aquí es solo un ingrediente del empanizado). Práctico para días sin cocinar. 1 pechuga (140 g) da 227 kcal, 22.4 g de proteína, 15.4 g de carbohidrato, 8.4 g de grasa y 952 mg de sodio.",
+      "nombre_etiqueta": "Pechugas de pollo empanizadas, completamente cocidas, congeladas Kirkland Signature"
     },
     {
       "id": "queso_crema_reny_picot",
@@ -2487,7 +2491,7 @@
     },
     {
       "id": "atun_tuny",
-      "nombre": "Atún aleta amarilla en hojuelas, en agua Tuny",
+      "nombre": "Atún Tuny en agua",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
@@ -2554,11 +2558,12 @@
       "posible_reemplazo_de": null,
       "datos_dudosos": [],
       "lecturas_dudosas": null,
-      "observaciones": "Proteína casi pura: 21 g por 93 kcal (90% de las calorías). Casi igual al mix de atún con camarón Dolores (P006: 21.4 g de proteína y 229 mg de sodio), pero con muchos menos aditivos: solo agua, fibra de chícharo y sal, sin nitrito, fosfato ni carragenina. 260 mg de sodio por 100 g. El aleta amarilla es magro: aporta poco omega-3. Los valores son de atún escurrido: la masa drenada de la lata es 220 g y 220 × 0.93 = 205 kcal, igual al contenido energético por envase. 1 lata da 205 kcal, 46 g de proteína, 2.2 g de grasa y 572 mg de sodio."
+      "observaciones": "Proteína casi pura: 21 g por 93 kcal (90% de las calorías). Casi igual al mix de atún con camarón Dolores (P006: 21.4 g de proteína y 229 mg de sodio), pero con muchos menos aditivos: solo agua, fibra de chícharo y sal, sin nitrito, fosfato ni carragenina. 260 mg de sodio por 100 g. El aleta amarilla es magro: aporta poco omega-3. Los valores son de atún escurrido: la masa drenada de la lata es 220 g y 220 × 0.93 = 205 kcal, igual al contenido energético por envase. 1 lata da 205 kcal, 46 g de proteína, 2.2 g de grasa y 572 mg de sodio.",
+      "nombre_etiqueta": "Atún aleta amarilla en hojuelas, en agua Tuny"
     },
     {
       "id": "datiles_medjool",
-      "nombre": "Dátiles Medjool orgánicos Dátiles del Desierto",
+      "nombre": "Dátiles Medjool",
       "unidad": "g",
       "valores_por": "100 g",
       "macros": {
@@ -2626,7 +2631,8 @@
         "Azúcares (g)"
       ],
       "lecturas_dudosas": "La etiqueta declara más azúcares (65 g) que carbohidratos disponibles (62 g), lo que no es posible, y las kcal calculadas dan 256 contra 280 declaradas. El USDA da para Medjool ~277 kcal, 1.8 g de proteína, 75 g de carbohidrato total, 6.7 g de fibra y 66 g de azúcares por 100 g, así que el carbohidrato disponible real anda en ~68 g. El peso por dátil (20 g) es el promedio de la etiqueta; un Medjool suele pesar ~24 g.",
-      "observaciones": "Carbohidrato rápido y natural, sin azúcar añadida: buena opción antes de correr o en tiradas largas, en lugar de miel o mermelada. 2 dátiles (~40 g) dan ~112 kcal, ~25 g de carbohidrato, 2.8 g de fibra y 136 mg de potasio. La fibra (7 g por 100 g) es natural de la fruta, pero si se comen varios justo antes de correr conviene probar tolerancia."
+      "observaciones": "Carbohidrato rápido y natural, sin azúcar añadida: buena opción antes de correr o en tiradas largas, en lugar de miel o mermelada. 2 dátiles (~40 g) dan ~112 kcal, ~25 g de carbohidrato, 2.8 g de fibra y 136 mg de potasio. La fibra (7 g por 100 g) es natural de la fruta, pero si se comen varios justo antes de correr conviene probar tolerancia.",
+      "nombre_etiqueta": "Dátiles Medjool orgánicos Dátiles del Desierto"
     }
   ]
 }

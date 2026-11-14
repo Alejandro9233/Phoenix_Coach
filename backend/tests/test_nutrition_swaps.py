@@ -141,3 +141,17 @@ def test_a_broken_variant_is_caught():
         {"food_id": "aderezo", "cantidad": 30}]}]
     problems = "\n".join(swap_problems(t, PKG["foods"], RULES))
     assert "bagel is eaten whole" in problems and "day kcal moves" in problems
+
+
+def test_whole_foods_say_their_pieces_and_weighed_foods_do_not():
+    dinner = next(m for m in _menu("B")["meals"] if m["name"].startswith("Cena"))
+    labels = {i["food_id"]: i.get("pieces_label") for i in dinner["items"]}
+    assert labels["tostada"] == "3 tostadas"
+    assert labels["pollo"] is None and labels["spray"] is None    # a spray has a "piece" but is not eaten whole
+    swaps = {s["food_id"]: s.get("pieces_label") for s in _item(_menu("B"), "Cena", "pollo")["alternatives"]}
+    assert swaps == {"atun_tuny": "1 lata", "camaron": None}
+    sandwich = {i["food_id"]: i.get("pieces_label") for i in dinner["variants"][0]["items"]}
+    assert (sandwich["bagel"], sandwich["pollo_empanizado_kirkland"]) == ("1 bagel", "1 pechuga")
+    eggs = _item(_menu("A"), "Desayuno", "huevo")
+    assert eggs["pieces_label"] == "2 huevos"
+    assert dinner["totals"]["fiber_g"] == 16.0                     # the sheet's macro line shows fiber

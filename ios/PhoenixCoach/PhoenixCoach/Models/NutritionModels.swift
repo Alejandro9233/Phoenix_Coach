@@ -47,6 +47,16 @@ struct NutritionMeal: Codable {
     let name: String
     let items: [NutritionItem]
     let totals: NutritionTotals
+    /// Whole other meals for this slot (the chicken sandwich for the tostadas).
+    let variants: [NutritionMealVariant]?
+}
+
+struct NutritionMealVariant: Codable {
+    let name: String
+    let items: [NutritionItem]
+    let totals: NutritionTotals
+    /// This variant minus the meal it replaces.
+    let delta: NutritionTotals
 }
 
 struct NutritionItem: Codable {
@@ -56,15 +66,21 @@ struct NutritionItem: Codable {
     let unit: String
     let pieces: Double?
     let pieceName: String?
+    /// "3 tostadas", "1 lata": only for a food eaten whole. Python words it.
+    let piecesLabel: String?
     /// "raw" / "cooked" / "prepared": how the grams are weighed.
     let weigh: String?
     /// A swap at the given amount that needs no recalculation (amaranth for oats).
     let alternative: NutritionAlternative?
+    /// Every swap for this food, the one above first. The backend checked each
+    /// against the day's rules; picking one changes nothing that is stored.
+    let alternatives: [NutritionSwap]?
 
     enum CodingKeys: String, CodingKey {
-        case name, amount, unit, pieces, weigh, alternative
+        case name, amount, unit, pieces, weigh, alternative, alternatives
         case foodId = "food_id"
         case pieceName = "piece_name"
+        case piecesLabel = "pieces_label"
     }
 }
 
@@ -74,16 +90,34 @@ struct NutritionAlternative: Codable {
     let unit: String
 }
 
+struct NutritionSwap: Codable {
+    let name: String
+    let amount: Double
+    let unit: String
+    let piecesLabel: String?
+    /// The swap minus the food it replaces.
+    let delta: NutritionTotals?
+    /// Label numbers the package doubts, or micronutrients from a similar food.
+    let estimate: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case name, amount, unit, delta, estimate
+        case piecesLabel = "pieces_label"
+    }
+}
+
 struct NutritionTotals: Codable {
     let kcal: Double?
     let proteinG: Double?
     let carbsG: Double?
     let fatG: Double?
+    let fiberG: Double?
 
     enum CodingKeys: String, CodingKey {
         case kcal
         case proteinG = "protein_g"
         case carbsG = "carbs_g"
         case fatG = "fat_g"
+        case fiberG = "fiber_g"
     }
 }

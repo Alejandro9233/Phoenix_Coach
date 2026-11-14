@@ -431,7 +431,7 @@
           },
           "variantes": [
             {
-              "nombre": "Sándwich de pechuga empanizada con aderezo chipotle",
+              "nombre": "Sándwich de pechuga con chipotle",
               "items": [
                 {
                   "food_id": "bagel",
@@ -2354,7 +2354,7 @@
           },
           "variantes": [
             {
-              "nombre": "Sándwich de pechuga empanizada con aderezo chipotle",
+              "nombre": "Sándwich de pechuga con chipotle",
               "items": [
                 {
                   "food_id": "bagel",
