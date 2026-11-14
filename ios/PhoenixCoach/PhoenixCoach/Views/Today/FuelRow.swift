@@ -146,14 +146,11 @@ struct FuelSheet: View {
         }
     }
 
+    /// kcal, then the same three figures as each meal's line (fiber, not carbs).
     private var totalsLine: String {
         guard let t = day.totals else { return "" }
-        var parts: [String] = []
-        if let k = t.kcal { parts.append("\(FuelFormat.kcal(k)) kcal") }
-        for (label, value) in [("P", t.proteinG), ("C", t.carbsG), ("F", t.fatG)] {
-            if let v = value { parts.append("\(label) \(FuelFormat.kcal(v)) g") }
-        }
-        return parts.joined(separator: " · ")
+        return [t.kcal.map { "\(FuelFormat.kcal($0)) kcal" }, FuelFormat.macros(t)]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     private func toggle(_ i: Int) {
