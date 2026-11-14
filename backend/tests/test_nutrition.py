@@ -193,7 +193,8 @@ def test_no_bedtime_meal():
         assert not any(m["nombre"] == "Antes de dormir" for m in t["comidas"]), code
         assert t["totales"]["proteina_g"] >= 2.0 * 74.3, code
     assert PKG["types"]["C"]["totales"]["carbohidrato_g"] >= 559
-    assert PKG["types"]["D"]["totales"]["carbohidrato_g"] >= 379
+    # D gave 5 g of carbs to "less pasta, more sauce" (2026-11-14); 5 g/kg is its floor.
+    assert PKG["types"]["D"]["totales"]["carbohidrato_g"] >= 5.0 * 74.3
 
 
 def test_menu_shape():

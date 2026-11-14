@@ -266,8 +266,8 @@
         ],
         "pollo_crudo_g": 530,
         "carne_molida_cruda_g": 490,
-        "arroz_cocido_g": 170,
-        "pasta_cocida_g": 865
+        "arroz_cocido_g": 0,
+        "pasta_cocida_g": 900
       },
       {
         "dia": "miércoles",
@@ -278,8 +278,8 @@
         ],
         "pollo_crudo_g": 800,
         "carne_molida_cruda_g": 90,
-        "arroz_cocido_g": 460,
-        "pasta_cocida_g": 275
+        "arroz_cocido_g": 290,
+        "pasta_cocida_g": 310
       }
     ],
     "nota": "Cantidades para una semana con calidad martes y jueves. Lo cocido dura 3–4 días en refrigeración. Overnight oats: avena, chía, moras y leche en frasco la noche anterior; plátano y miel al servir."

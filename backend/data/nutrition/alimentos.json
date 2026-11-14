@@ -2653,7 +2653,7 @@
         "entera": true
       },
       "nota": "P041, etiqueta del 13 nov 2026. La etiqueta declara más azúcar (65 g) que carbohidrato (62 g); el USDA da ~68 g de carbohidrato disponible. Peso por dátil estimado (20 a 24 g). Micronutrientes del dátil Medjool del USDA (SR 168191), potasio incluido (696 mg; la etiqueta dice 340).",
-      "en_plan": false,
+      "en_plan": true,
       "id_producto": "P041",
       "categoria": "Frutas",
       "marca": "Dátiles del Desierto",
