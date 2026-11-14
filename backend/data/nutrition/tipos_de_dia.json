@@ -1321,7 +1321,7 @@
       "codigo": "C",
       "nombre": "Tirada larga",
       "gasto_estimado_kcal": 3325,
-      "deficit_kcal": -280.0,
+      "deficit_kcal": -189.0,
       "comidas": [
         {
           "hora": "12:30 PM",
@@ -1604,79 +1604,35 @@
         },
         {
           "hora": "5:45 PM",
-          "nombre": "Licuado de recuperación",
+          "nombre": "Al terminar la tirada",
           "items": [
             {
-              "food_id": "leche",
-              "cantidad": 200,
-              "unidad": "ml",
-              "macros": {
-                "kcal": 88.0,
-                "proteina_g": 10.8,
-                "carbohidrato_g": 6.8,
-                "grasa_g": 2.0,
-                "grasa_saturada_g": 1.2,
-                "fibra_g": 0.0,
-                "sodio_mg": 66.0
-              }
-            },
-            {
-              "food_id": "platano",
-              "cantidad": 120,
+              "food_id": "datiles_medjool",
+              "cantidad": 60,
               "unidad": "g",
               "macros": {
-                "kcal": 107.0,
-                "proteina_g": 1.3,
-                "carbohidrato_g": 24.2,
-                "grasa_g": 0.4,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 3.1,
-                "sodio_mg": 1.0
-              },
-              "alternativas": [
-                {
-                  "food_id": "datiles_medjool",
-                  "cantidad": 40
-                },
-                {
-                  "food_id": "mango",
-                  "cantidad": 180
-                }
-              ]
-            },
-            {
-              "food_id": "miel",
-              "cantidad": 42,
-              "unidad": "g",
-              "macros": {
-                "kcal": 134.0,
-                "proteina_g": 0.0,
-                "carbohidrato_g": 33.6,
+                "kcal": 168.0,
+                "proteina_g": 1.2,
+                "carbohidrato_g": 37.2,
                 "grasa_g": 0.0,
                 "grasa_saturada_g": 0.0,
-                "fibra_g": 0.0,
+                "fibra_g": 4.2,
                 "sodio_mg": 0.0
-              },
-              "alternativas": [
-                {
-                  "food_id": "datiles_medjool",
-                  "cantidad": 60
-                }
-              ]
+              }
             }
           ],
           "totales": {
-            "kcal": 329.0,
-            "proteina_g": 12.1,
-            "carbohidrato_g": 64.6,
-            "grasa_g": 2.4,
-            "grasa_saturada_g": 1.3,
-            "fibra_g": 3.1,
-            "sodio_mg": 67.0
+            "kcal": 168.0,
+            "proteina_g": 1.2,
+            "carbohidrato_g": 37.2,
+            "grasa_g": 0.0,
+            "grasa_saturada_g": 0.0,
+            "fibra_g": 4.2,
+            "sodio_mg": 0.0
           }
         },
         {
-          "hora": "7:30 PM",
+          "hora": "6:30 PM",
           "nombre": "Comida: ramen de atún y camarón",
           "items": [
             {
@@ -1726,7 +1682,7 @@
         },
         {
           "hora": "10:30 PM",
-          "nombre": "Cena: spaghetti con carne + ensalada de lechuga y aguacate",
+          "nombre": "Cena: spaghetti con carne",
           "items": [
             {
               "food_id": "pasta",
@@ -1744,30 +1700,30 @@
             },
             {
               "food_id": "carne",
-              "cantidad": 80,
+              "cantidad": 200,
               "unidad": "g",
               "macros": {
-                "kcal": 173.0,
-                "proteina_g": 15.6,
-                "carbohidrato_g": 0.1,
-                "grasa_g": 12.2,
-                "grasa_saturada_g": 5.8,
+                "kcal": 432.0,
+                "proteina_g": 39.0,
+                "carbohidrato_g": 0.2,
+                "grasa_g": 30.6,
+                "grasa_saturada_g": 14.6,
                 "fibra_g": 0.0,
-                "sodio_mg": 41.0
+                "sodio_mg": 102.0
               }
             },
             {
               "food_id": "pure",
-              "cantidad": 100,
+              "cantidad": 240,
               "unidad": "g",
               "macros": {
-                "kcal": 25.0,
-                "proteina_g": 0.9,
-                "carbohidrato_g": 5.2,
-                "grasa_g": 0.1,
+                "kcal": 61.0,
+                "proteina_g": 2.2,
+                "carbohidrato_g": 12.5,
+                "grasa_g": 0.2,
                 "grasa_saturada_g": 0.0,
-                "fibra_g": 1.0,
-                "sodio_mg": 308.0
+                "fibra_g": 2.4,
+                "sodio_mg": 739.0
               }
             },
             {
@@ -1783,58 +1739,16 @@
                 "fibra_g": 0.0,
                 "sodio_mg": 0.0
               }
-            },
-            {
-              "food_id": "lechuga",
-              "cantidad": 100,
-              "unidad": "g",
-              "macros": {
-                "kcal": 17.0,
-                "proteina_g": 1.2,
-                "carbohidrato_g": 1.2,
-                "grasa_g": 0.3,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 2.1,
-                "sodio_mg": 8.0
-              }
-            },
-            {
-              "food_id": "aguacate",
-              "cantidad": 100,
-              "unidad": "g",
-              "macros": {
-                "kcal": 160.0,
-                "proteina_g": 2.0,
-                "carbohidrato_g": 1.8,
-                "grasa_g": 14.7,
-                "grasa_saturada_g": 2.1,
-                "fibra_g": 6.7,
-                "sodio_mg": 7.0
-              }
-            },
-            {
-              "food_id": "aderezo",
-              "cantidad": 7,
-              "unidad": "g",
-              "macros": {
-                "kcal": 48.0,
-                "proteina_g": 0.1,
-                "carbohidrato_g": 0.0,
-                "grasa_g": 5.2,
-                "grasa_saturada_g": 0.8,
-                "fibra_g": 0.0,
-                "sodio_mg": 44.0
-              }
             }
           ],
           "totales": {
-            "kcal": 927.0,
-            "proteina_g": 38.6,
-            "carbohidrato_g": 110.1,
-            "grasa_g": 35.0,
-            "grasa_saturada_g": 9.7,
-            "fibra_g": 15.9,
-            "sodio_mg": 414.0
+            "kcal": 997.0,
+            "proteina_g": 60.0,
+            "carbohidrato_g": 114.5,
+            "grasa_g": 33.3,
+            "grasa_saturada_g": 15.5,
+            "fibra_g": 8.5,
+            "sodio_mg": 847.0
           }
         },
         {
@@ -1896,43 +1810,43 @@
         }
       ],
       "totales": {
-        "kcal": 3605.0,
-        "proteina_g": 173.8,
-        "carbohidrato_g": 559.8,
-        "grasa_g": 68.9,
-        "grasa_saturada_g": 23.3,
-        "fibra_g": 46.1,
-        "sodio_mg": 3435.0
+        "kcal": 3514.0,
+        "proteina_g": 184.3,
+        "carbohidrato_g": 536.8,
+        "grasa_g": 64.8,
+        "grasa_saturada_g": 27.7,
+        "fibra_g": 39.8,
+        "sodio_mg": 3801.0
       },
-      "proteina_g_por_kg": 2.34,
-      "carbohidrato_g_por_kg": 7.53,
-      "grasa_pct_kcal": 17.2,
+      "proteina_g_por_kg": 2.48,
+      "carbohidrato_g_por_kg": 7.22,
+      "grasa_pct_kcal": 16.6,
       "micros_totales": {
-        "vitA_ug": 1576.05,
-        "vitC_mg": 1196.0,
-        "vitD_ug": 18.99,
-        "vitE_mg": 15.58,
-        "vitK_ug": 174.2,
-        "tiamina_mg": 2.95,
-        "riboflavina_mg": 3.66,
-        "niacina_mg": 48.62,
-        "b6_mg": 3.77,
-        "folato_ug": 1161.32,
-        "b12_ug": 11.91,
-        "colina_mg": 476.76,
-        "calcio_mg": 2000.63,
-        "hierro_mg": 21.76,
-        "magnesio_mg": 985.0,
-        "fosforo_mg": 2508.38,
-        "potasio_mg": 5436.71,
-        "zinc_mg": 20.75,
-        "cobre_mg": 2.79,
-        "selenio_ug": 318.7,
-        "manganeso_mg": 7.53,
-        "ala_g": 2.89,
+        "vitA_ug": 1028.76,
+        "vitC_mg": 1181.23,
+        "vitD_ug": 18.1,
+        "vitE_mg": 15.05,
+        "vitK_ug": 45.04,
+        "tiamina_mg": 2.79,
+        "riboflavina_mg": 3.28,
+        "niacina_mg": 53.45,
+        "b6_mg": 3.59,
+        "folato_ug": 935.58,
+        "b12_ug": 13.5,
+        "colina_mg": 502.17,
+        "calcio_mg": 1699.73,
+        "hierro_mg": 24.39,
+        "magnesio_mg": 962.13,
+        "fosforo_mg": 2474.51,
+        "potasio_mg": 5120.66,
+        "zinc_mg": 24.74,
+        "cobre_mg": 2.99,
+        "selenio_ug": 329.61,
+        "manganeso_mg": 7.22,
+        "ala_g": 2.31,
         "epa_g": 0.77,
         "dha_g": 0.74,
-        "epa_dha_g": 1.5
+        "epa_dha_g": 1.51
       }
     },
     {
