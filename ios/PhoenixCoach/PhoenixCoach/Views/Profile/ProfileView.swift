@@ -55,7 +55,6 @@ struct ProfileView: View {
     let daysOfWeek = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
     let dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     
-    let raceTypes = ["Triathlon", "Running", "Cycling", "Swimming"]
     var distancesForType: [String] {
         switch profile.raceType ?? "Triathlon" {
         case "Running": return ["5k", "10k", "Half Marathon", "Marathon", "Ultra"]
@@ -840,41 +839,6 @@ struct ProfileView: View {
     
     // MARK: - String-Numerical Bindings Helpers
     
-    private func intBinding(_ value: Binding<Int?>) -> Binding<String> {
-        Binding(
-            get: {
-                if let val = value.wrappedValue {
-                    return "\(val)"
-                }
-                return ""
-            },
-            set: {
-                if let parsed = Int($0) {
-                    value.wrappedValue = parsed
-                } else if $0.isEmpty {
-                    value.wrappedValue = nil
-                }
-            }
-        )
-    }
-    
-    private func doubleBinding(_ value: Binding<Double?>) -> Binding<String> {
-        Binding(
-            get: {
-                if let val = value.wrappedValue {
-                    return String(format: "%.1f", val)
-                }
-                return ""
-            },
-            set: {
-                if let parsed = Double($0) {
-                    value.wrappedValue = parsed
-                } else if $0.isEmpty {
-                    value.wrappedValue = nil
-                }
-            }
-        )
-    }
 }
 
 // MARK: - Reusable Custom Styling Components

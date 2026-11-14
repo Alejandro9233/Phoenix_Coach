@@ -1,32 +1,6 @@
 import Foundation
 
-// MARK: - Coaching Recommendation (from /coaching endpoint)
-
-struct CoachingRecommendation: Codable, Identifiable {
-    var id = UUID()
-    let summary: String
-    let workouts: [Workout]?
-    let rationale: String?
-    let adaptation: String?
-    let coachNote: String?
-    let athleteSummary: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case summary, workouts, rationale, adaptation
-        case coachNote = "coach_note"
-        case athleteSummary = "athlete_summary"
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.summary = try container.decode(String.self, forKey: .summary)
-        self.workouts = try container.decodeIfPresent([Workout].self, forKey: .workouts)
-        self.rationale = try container.decodeIfPresent(String.self, forKey: .rationale)
-        self.adaptation = try container.decodeIfPresent(String.self, forKey: .adaptation)
-        self.coachNote = try container.decodeIfPresent(String.self, forKey: .coachNote)
-        self.athleteSummary = try container.decodeIfPresent(String.self, forKey: .athleteSummary)
-    }
-}
+// MARK: - Weekly Plan
 
 struct WeekSummary: Codable {
     let focus: String
@@ -518,11 +492,6 @@ struct Activity: Codable, Identifiable {
         let h = totalSec / 3600
         let m = (totalSec % 3600) / 60
         return h > 0 ? "\(h)h \(m)m" : "\(m)m"
-    }
-    
-    var distanceFormatted: String {
-        guard let m = distanceM, m > 0 else { return "" }
-        return String(format: "%.1f km", m / 1000)
     }
     
     var startTimeDate: Date? {
@@ -1032,18 +1001,6 @@ struct APIChatMessage: Codable, Identifiable {
 }
 
 // MARK: - Pull to Refresh
-
-struct SyncResponse: Codable {
-    let syncStatus: String
-    let syncMessage: String
-    let coaching: CoachingRecommendation
-    
-    enum CodingKeys: String, CodingKey {
-        case syncStatus = "sync_status"
-        case syncMessage = "sync_message"
-        case coaching
-    }
-}
 
 // MARK: - Smart Refresh (new single-action refresh flow)
 

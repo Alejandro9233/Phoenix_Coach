@@ -2,7 +2,6 @@ import Foundation
 import Combine
 
 /// Handles all communication with the Phoenix Coach backend.
-/// Automatically discovers the Mac backend on the local network.
 class NetworkManager: ObservableObject {
     static let shared = NetworkManager()
     
@@ -36,15 +35,6 @@ class NetworkManager: ObservableObject {
         self.session = URLSession(configuration: config)
         self.decoder = JSONDecoder()
         
-        Task {
-            await checkConnection()
-        }
-    }
-    
-    /// Reset the base URL to its environment-appropriate default.
-    func resetToDefaultURL() {
-        let defaultURL = "https://phoenix-coach.duckdns.org"
-        self.baseURL = defaultURL
         Task {
             await checkConnection()
         }
@@ -104,27 +94,7 @@ class NetworkManager: ObservableObject {
         }
     }
     
-    // MARK: - Coaching
-    
-    func fetchCoaching() async throws -> CoachingRecommendation {
-        guard let url = URL(string: "\(baseURL)/coaching") else {
-            throw NetworkError.invalidURL
-        }
-        let (data, _) = try await session.data(from: url)
-        return try decoder.decode(CoachingRecommendation.self, from: data)
-    }
-    
-    // MARK: - Pull to Refresh (Sync + Coaching)
-    
-    func pullToRefresh() async throws -> SyncResponse {
-        guard let url = URL(string: "\(baseURL)/pull-to-refresh") else {
-            throw NetworkError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        let (data, _) = try await session.data(for: request)
-        return try decoder.decode(SyncResponse.self, from: data)
-    }
+    // MARK: - Smart Refresh
     
     /// Kicks off the deep refresh as a backend job and returns immediately.
     /// Joins the running job if one already exists. Poll smartRefreshStatus()
@@ -279,27 +249,6 @@ class NetworkManager: ObservableObject {
         }
     }
     
-    /// Synchronous chat fallback — returns the full response at once.
-    func sendChat(message: String, sessionId: Int? = nil) async throws -> String {
-        guard let url = URL(string: "\(baseURL)/chat-sync") else {
-            throw NetworkError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = ["message": message]
-        if let sid = sessionId {
-            body["session_id"] = sid
-        }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, _) = try await session.data(for: request)
-        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let reply = json["response"] as? String {
-            return reply
-        }
-        return String(data: data, encoding: .utf8) ?? "No response"
-    }
-    
     // MARK: - Chat Sessions
     
     func fetchChatSessions() async throws -> [APIChatSession] {
@@ -323,9 +272,6 @@ class NetworkManager: ObservableObject {
         }
         return try decoder.decode([APIChatMessage].self, from: data)
     }
-    
-    // MARK: - Feedback
-    
     
     // MARK: - Injuries
     
@@ -527,19 +473,6 @@ class NetworkManager: ObservableObject {
         return fallback
     }
     
-    func adaptTodayWorkout() async throws -> DayPlan {
-        guard let url = URL(string: "\(baseURL)/weekly-plan/adapt-today") else {
-            throw NetworkError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw NetworkError.serverError
-        }
-        return try decoder.decode(DayPlan.self, from: data)
-    }
-    
     /// Restore today's pre-adaptation workouts. The backend receipts the
     /// override and blocks further automatic re-adaptation today.
     func useOriginalPlanToday() async throws -> DayPlan {
@@ -622,24 +555,6 @@ class NetworkManager: ObservableObject {
     
     // MARK: - Injury / soreness triage
 
-    /// Re-run a proposal after the athlete edits severity or duration on the card.
-    /// Read-only — the plan is untouched until `applyIssue`.
-    func previewIssue(issue: ReportedIssue) async throws -> IssueProposal? {
-        guard let url = URL(string: "\(baseURL)/coach/issue/preview") else {
-            throw NetworkError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(IssuePreviewRequest(message: issue.notes ?? "", issue: issue))
-
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw NetworkError.serverError
-        }
-        return try decoder.decode(IssuePreviewResponse.self, from: data).proposal
-    }
-
     /// Commit the confirmed issue. This is the call that writes the injury and
     /// rewrites the affected days.
     func applyIssue(issue: ReportedIssue, choices: [String: String]) async throws -> IssueApplyResult {
@@ -656,16 +571,6 @@ class NetworkManager: ObservableObject {
             throw NetworkError.serverError
         }
         return try decoder.decode(IssueApplyResult.self, from: data)
-    }
-
-    private struct IssuePreviewRequest: Codable {
-        let message: String
-        let issue: ReportedIssue
-    }
-
-    private struct IssuePreviewResponse: Codable {
-        let detected: Bool
-        let proposal: IssueProposal?
     }
 
     private struct IssueApplyRequest: Codable {
