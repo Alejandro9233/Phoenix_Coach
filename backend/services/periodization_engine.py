@@ -1890,14 +1890,24 @@ class PeriodizationEngine:
         weeks = [first + timedelta(weeks=i) for i in range((monday - first).days // 7)]
         km = [week_km.get(w, 0.0) for w in weeks]
 
+        # The recovery weeks after the goal race are planned rest: barely
+        # running the week after a marathon is the plan, not an injury. Read
+        # as a break, it had the first Foundation week "coming back" to the
+        # marathon peak (70/85/100% of 60 km).
+        athlete = db.query(Athlete).first()
+        race_date = athlete.race_date if athlete else None
+        off = [k <= RUN_NOISE_FLOOR_KM
+               and not 0 < self._post_race_week(race_date, w) <= POST_RACE_WEEKS
+               for w, k in zip(weeks, km)]
+
         # Walk back over the comeback (or normal) weeks to the latest break.
         i = len(km) - 1
-        while i >= 0 and km[i] > RUN_NOISE_FLOOR_KM:
+        while i >= 0 and not off[i]:
             i -= 1
         if i < 0:
             return None
         break_end = i
-        while i >= 0 and km[i] <= RUN_NOISE_FLOOR_KM:
+        while i >= 0 and off[i]:
             i -= 1
         if i < 0:
             return None  # the history starts inside the break: no normal week

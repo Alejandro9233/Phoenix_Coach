@@ -103,3 +103,24 @@ def test_the_prompt_stops_counting_down(db, freeze_today):
     text = _format_training_context(ctx)
     assert "already run" in text and "Weeks to race" not in text
     assert "in 0 weeks" not in _journey("M", "Marathon", 0, True)
+
+
+def test_a_rest_week_after_the_race_is_not_a_break(db, freeze_today):
+    """Barely running the week after a marathon is the plan, not an injury.
+    The comeback ladder read it as a 1-week break and, from the first
+    Foundation week, chased the marathon peak (70/85/100% of 60 km)."""
+    _seed(db, (3, 27, 36))
+    ctx = _ctx(db, freeze_today, RACE_MONDAY + timedelta(weeks=4, days=1))
+    assert ctx["phase"] == "foundation"
+    assert ctx["volume_targets"]["comeback"] is None
+    assert "Comeback" not in (ctx.get("recovery_note") or "")
+    assert ctx["cycle_week"] == 1
+
+
+def test_a_break_after_the_recovery_weeks_still_counts(db, freeze_today):
+    """Only the three recovery weeks are excused. A zero week after them is
+    a real break and the ladder takes over as before."""
+    _seed(db, (15, 27, 36, 0))
+    ctx = _ctx(db, freeze_today, RACE_MONDAY + timedelta(weeks=5, days=1))
+    comeback = ctx["volume_targets"]["comeback"]
+    assert comeback and comeback["break_weeks"] == 1
