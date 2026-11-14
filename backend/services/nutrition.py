@@ -106,6 +106,10 @@ def load_package(data_dir: Path = DATA_DIR) -> dict:
                 for fid in (item.get("food_id"), *(s.get("food_id") for s in item_swaps(item))):
                     if fid is not None and fid not in foods:
                         raise NutritionPackageError(f"day {code}: unknown food {fid!r}")
+            for var in meal.get("variantes") or []:
+                for item in var.get("items") or []:
+                    if item.get("food_id") not in foods:
+                        raise NutritionPackageError(f"day {code}: unknown food {item.get('food_id')!r}")
             if meal.get("hora") == "Diario":
                 continue
             at = _parse_time(meal.get("hora"))
@@ -295,11 +299,28 @@ def _totals_view(t: dict) -> dict:
 
 
 def _meal_view(meal: dict, foods: dict) -> dict:
-    return {
+    out = {
         "time": meal.get("hora"),
         "name": meal.get("nombre"),
         "items": [_item_view(i, foods) for i in meal.get("items") or []],
         "totals": _totals_view(meal.get("totales")),
+    }
+    # A whole other meal for this slot, checked like the swaps (services/nutrition_swaps.py).
+    variants = [_variant_view(v, meal, foods) for v in meal.get("variantes") or []]
+    if variants:
+        out["variants"] = variants
+    return out
+
+
+def _variant_view(var: dict, meal: dict, foods: dict) -> dict:
+    was, now = meal.get("totales") or {}, var.get("totales") or {}
+    return {
+        "name": var.get("nombre"),
+        "items": [_item_view(i, foods) for i in var.get("items") or []],
+        "totals": _totals_view(now),
+        "delta": {out_key: round((now.get(key) or 0) - (was.get(key) or 0), 1)
+                  for out_key, key in (("kcal", "kcal"), ("protein_g", "proteina_g"),
+                                       ("carbs_g", "carbohidrato_g"), ("fat_g", "grasa_g"))},
     }
 
 

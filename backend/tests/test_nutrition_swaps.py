@@ -7,6 +7,8 @@ Rules locked in here:
   every swap of the day taken at once.
 - A food eaten whole (a can of tuna, a breaded breast) is offered in whole pieces.
 - Fuel around a session, gels and supplements are never swapped.
+- A meal can carry a whole-meal variant (the breaded-chicken sandwich for the
+  chicken tostadas); it answers to the same day rules.
 - The old single `alternative` still goes out for app builds that only know one.
 """
 import copy
@@ -116,3 +118,26 @@ def test_every_swap_food_exists():
             for i in m["items"]:
                 for s in item_swaps(i):
                     assert s["food_id"] in PKG["foods"]
+
+
+def test_the_chicken_sandwich_stands_in_for_the_tostadas():
+    # Alex, 2026-11-14: one breaded breast in a Bimbo bagel with chipotle dressing.
+    # One breast can't match a chicken item, so it is a whole dinner on B and D.
+    for code in ("B", "D"):
+        dinner = next(m for m in _menu(code)["meals"] if m["name"].startswith("Cena"))
+        (sandwich,) = dinner["variants"]
+        amounts = {i["food_id"]: (i["amount"], i.get("pieces")) for i in sandwich["items"]}
+        assert amounts["pollo_empanizado_kirkland"] == (140, 1.0) and amounts["bagel"] == (103, 1.0)
+        assert abs(sandwich["delta"]["kcal"]) <= 0.05 * _menu(code)["totals"]["kcal"]
+        assert sandwich["totals"]["kcal"] == round(dinner["totals"]["kcal"] + sandwich["delta"]["kcal"])
+    assert not any("variants" in m for m in _menu("A")["meals"])   # on a rest day it eats the deficit
+
+
+def test_a_broken_variant_is_caught():
+    t = copy.deepcopy(PKG["types"]["B"])
+    dinner = next(m for m in t["comidas"] if m["nombre"].startswith("Cena"))
+    dinner["variantes"] = [{"nombre": "dos sándwiches", "items": [
+        {"food_id": "bagel", "cantidad": 150}, {"food_id": "pollo_empanizado_kirkland", "cantidad": 280},
+        {"food_id": "aderezo", "cantidad": 30}]}]
+    problems = "\n".join(swap_problems(t, PKG["foods"], RULES))
+    assert "bagel is eaten whole" in problems and "day kcal moves" in problems

@@ -27,6 +27,7 @@ from backend.services import nutrition
 from backend.services.nutrition import (
     DATA_DIR, NutritionPackageError, day_type_from_plan, load_package, today_menu,
 )
+from backend.services.nutrition_swaps import DAY_A_FLOOR_KCAL
 from backend.utils.timezone import get_local_today
 
 
@@ -241,10 +242,12 @@ def test_long_run_day_meets_the_fat_floor():
 
 def test_rest_day_cut_stays_above_its_floors():
     # 2026-10-29: day A cut to the 2,025 kcal maintenance (Katch-McArdle x 1.2).
-    # Floors: energy availability 30 kcal/kg of lean mass (61 kg), protein 2.0 g/kg.
+    # Floors: protein 2.0 g/kg, and energy. The energy floor was 30 kcal/kg of
+    # lean mass (1,830) until Alex took the menu to 1,799 on 2026-11-14
+    # ("el piso de las calorías no importa"); DAY_A_FLOOR_KCAL is the line now.
     a = PKG["types"]["A"]
     assert a["gasto_estimado_kcal"] == 2025
-    assert a["totales"]["kcal"] >= 30 * 61
+    assert a["totales"]["kcal"] >= DAY_A_FLOOR_KCAL
     assert a["totales"]["proteina_g"] >= 2.0 * 74.3
 
 

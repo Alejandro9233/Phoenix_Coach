@@ -62,6 +62,7 @@ for t in doc["tipos_de_dia"]:
                 # each swap is judged alone here; the day-wide limits are judged at the end
                 trial = copy.deepcopy(t)
                 for m in trial["comidas"]:
+                    m.pop("variantes", None)
                     for i in m["items"]:
                         i.pop("alternativas", None)
                         i.pop("alternativa", None)

@@ -11,6 +11,11 @@ lost because the limits are day-wide: carb-matched tostadas for the long-run
 pasta put calcium past its ceiling, and a protein-matched swap to whey is a
 second scoop.
 
+A meal can also carry `variantes`: a whole other meal in its place (the
+breaded-chicken sandwich for the chicken tostadas), written by hand because
+a food eaten whole rarely matches one item. A variant answers to the same
+rules, measured against the meal it replaces; it has no main macro to hold.
+
 A swap replaces one item of one meal. It passes when:
   - the meal is not fuel around a session (pre-workout, during, right after)
     and the item is not a per-unit one (gels, supplements);
@@ -26,8 +31,10 @@ A swap replaces one item of one meal. It passes when:
 """
 MACRO_DROP = 0.25
 DAY_KCAL = 0.05
-# README: day A never goes under an energy availability of 30 kcal per kg lean.
-DAY_A_FLOOR_KCAL = 1830
+# Day A's line. It was 1,830 (energy availability of 30 kcal per kg lean)
+# until Alex took the menu itself to 1,799 for the deficit on 2026-11-14;
+# no swap takes the day further than this.
+DAY_A_FLOOR_KCAL = 1750
 BANNED = {"espinaca", "almendra", "huevo"}   # egg only where the menu already has it
 SESSION_MEALS = ("pre-entreno", "durante", "al terminar")
 DAILY = "Diario"
@@ -79,6 +86,22 @@ def _day_raw(day_type: dict, foods: dict) -> dict:
     return raw
 
 
+def _day_problems(code: str, base: dict, d: dict, protein_floor: float, fat_floor: float) -> list:
+    """What a change of d does to the day's energy, protein and fat."""
+    out = []
+    kcal = base["kcal"] + d["kcal"]
+    if abs(d["kcal"]) > DAY_KCAL * base["kcal"]:
+        out.append(f"day kcal moves {d['kcal']:+.0f}")
+    if code == "A" and kcal < DAY_A_FLOOR_KCAL:
+        out.append(f"day A falls to {kcal:.0f} kcal")
+    if base["proteina_g"] + d["proteina_g"] < protein_floor:
+        out.append(f"day protein falls to {base['proteina_g'] + d['proteina_g']:.0f} g")
+    # day C sits under the fat floor already (its gels are pure carbohydrate)
+    if base["grasa_g"] * 9 / base["kcal"] * 100 >= fat_floor > (base["grasa_g"] + d["grasa_g"]) * 9 / kcal * 100:
+        out.append(f"day fat falls under {fat_floor}% of kcal")
+    return out
+
+
 def swap_problems(day_type: dict, foods: dict, rules: dict) -> list:
     """Why this day type's swaps can't ship, one line each. Empty = fine."""
     code = day_type["codigo"]
@@ -89,6 +112,7 @@ def swap_problems(day_type: dict, foods: dict, rules: dict) -> list:
     worst = {}
     out = []
     for meal in day_type["comidas"]:
+        meal_worst = {}
         for item in meal["items"]:
             orig = foods[item["food_id"]]
             item_worst = {}
@@ -106,20 +130,31 @@ def swap_problems(day_type: dict, foods: dict, rules: dict) -> list:
                 had = orig["macros"][macro] * factor(orig, item["cantidad"])
                 if d[macro] < -MACRO_DROP * had:
                     out.append(f"{tag}: {macro} drops {-d[macro]:.0f} of {had:.0f} g")
-                kcal = base["kcal"] + d["kcal"]
-                if abs(d["kcal"]) > DAY_KCAL * base["kcal"]:
-                    out.append(f"{tag}: day kcal moves {d['kcal']:+.0f}")
-                if code == "A" and kcal < DAY_A_FLOOR_KCAL:
-                    out.append(f"{tag}: day A falls to {kcal:.0f} kcal")
-                if base["proteina_g"] + d["proteina_g"] < protein_floor:
-                    out.append(f"{tag}: day protein falls to {base['proteina_g'] + d['proteina_g']:.0f} g")
-                # day C sits under the fat floor already (its gels are pure carbohydrate)
-                if base["grasa_g"] * 9 / base["kcal"] * 100 >= fat_floor > (base["grasa_g"] + d["grasa_g"]) * 9 / kcal * 100:
-                    out.append(f"{tag}: day fat falls under {fat_floor}% of kcal")
+                out += [f"{tag}: {why}" for why in _day_problems(code, base, d, protein_floor, fat_floor)]
                 for k, v in d.items():
                     item_worst[k] = max(item_worst.get(k, 0.0), v)
             for k, v in item_worst.items():
-                worst[k] = worst.get(k, 0.0) + v
+                meal_worst[k] = meal_worst.get(k, 0.0) + v
+        for var in meal.get("variantes") or []:
+            tag = f"day {code}, {meal['nombre']}: variant {var['nombre']!r}"
+            if meal.get("hora") == DAILY or (meal.get("nombre") or "").lower().startswith(SESSION_MEALS):
+                out.append(f"{tag}: this meal is never swapped")
+            d = {}
+            for sign, items in ((-1, meal["items"]), (1, var["items"])):
+                for item in items:
+                    food = foods[item["food_id"]]
+                    if sign == 1 and (item["food_id"] in BANNED or food["valores_por"] == "1 unidad" or item["food_id"] == "whey"):
+                        out.append(f"{tag}: {item['food_id']} is not a food to swap in")
+                    if sign == 1 and is_whole(food) and abs(item["cantidad"] / food["pieza"]["peso"] - round(item["cantidad"] / food["pieza"]["peso"])) > 0.01:
+                        out.append(f"{tag}: {food['pieza']['nombre']} is eaten whole")
+                    k = factor(food, item["cantidad"])
+                    for key, v in {**food["macros"], **(food.get("micros") or {})}.items():
+                        d[key] = d.get(key, 0.0) + sign * v * k
+            out += [f"{tag}: {why}" for why in _day_problems(code, base, d, protein_floor, fat_floor)]
+            for k, v in d.items():   # the variant replaces the meal, item swaps and all
+                meal_worst[k] = max(meal_worst.get(k, 0.0), v)
+        for k, v in meal_worst.items():
+            worst[k] = worst.get(k, 0.0) + max(v, 0.0)
     for key, m in metas["micros"].items():
         limit = m.get("limite_superior")
         if limit and base.get(key, 0) <= limit < base.get(key, 0) + worst.get(key, 0):

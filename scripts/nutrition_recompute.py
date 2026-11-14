@@ -37,6 +37,16 @@ def recompute(t):
             for mk, mv in (f.get("micros") or {}).items():
                 micros[mk] = micros.get(mk, 0.0) + mv * k
         meal["totales"] = {key: rnd(key, v) for key, v in raw_meal.items()}
+        for var in meal.get("variantes") or []:   # a whole meal that can stand in for this one
+            raw_var = {k: 0.0 for k in MAC}
+            for it in var["items"]:
+                f = foods[it["food_id"]]
+                k = factor(f, it["cantidad"])
+                it["unidad"] = f["unidad"]
+                it["macros"] = {key: rnd(key, f["macros"][src] * k) for key, src in MAC.items()}
+                for key, src in MAC.items():
+                    raw_var[key] += f["macros"][src] * k
+            var["totales"] = {key: rnd(key, v) for key, v in raw_var.items()}
         for key in MAC:
             raw_day[key] += raw_meal[key]
     t["totales"] = {key: rnd(key, v) for key, v in raw_day.items()}
