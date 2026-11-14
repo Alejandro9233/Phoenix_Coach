@@ -14,7 +14,7 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 | A | Descanso o fuerza ligera | 1,665 | 159 g | 155 g | −360 (−500 con gimnasio) |
 | B | Carrera suave | 2,021 | 157 g | 199 g | −429 |
 | C | Tirada larga (domingo) | 3,605 | 174 g | 560 g | +280 (geles) |
-| D | Sesión de calidad (tempo o ritmo de maratón) | 2,745 | 157 g | 376 g | +45 |
+| D | Sesión de calidad (tempo o ritmo de maratón) | 2,761 | 158 g | 379 g | +61 |
 
 Gasto desde el 29 oct 2026: mantenimiento de 2,025 kcal sin entreno (Katch-McArdle con 61 kg de masa magra × 1.2, sin caminar) más cada sesión a ~1 kcal por kg por km. El día A tenía un piso de 1,830 kcal (disponibilidad de energía de 30 kcal por kg de masa magra); el 14 nov 2026 Alex lo bajó a propósito para el déficit y el menú queda en 1,692. Un cambio de alimento puede subir el día A, pero no bajarlo más de 3 %.
 
@@ -43,7 +43,7 @@ Gasto desde el 29 oct 2026: mantenimiento de 2,025 kcal sin entreno (Katch-McArd
 - **Día A en un bowl (14 nov 2026):** comida y cena se fundieron en una sola cena a las 8 PM, sin tostadas: pollo cocido 240 g, arroz 145 g, aguacate 80 g, lechuga 100 g y kéfir 150 ml. Variantes: «Bowl con Susalias» (arroz 80 g + 30 g de Susalias) y, en la merienda, «Medio bagel con queso crema y moras» en lugar de los overnight oats (el kéfir, el shake y el café se quedan; ese día la fibra baja a ~18 g). El bagel es el único alimento entero que se parte: `pieza.paso: 0.5`.
 - **Solo bagels (14 nov 2026):** el pre-entreno de B, C y D lleva medio bagel Bimbo (51.5 g) en lugar de la rebanada de Oroweat, con la mermelada bajada 10 g (B 35 g; C y D 40 g) para dejar el mismo carbohidrato. El día D sube el aguacate a 130 g para no bajar de 20 % de grasa (el Oroweat traía mantequilla).
 - **Vitamina E corregida (14 nov 2026):** la fila del bagel traía 7.46 mg por 100 g, copiados de una fila del USDA que no cuadra (el mismo bagel tostado da 0.12). Con el valor corregido la vitamina E queda bajo la meta de 15 mg en A (8.7), B (12.2) y D (12.9); antes el día A parecía cubierto solo por el bagel.
-- **Día D revisado (14 nov 2026):** la cena ya no lleva arroz (Alex no se lo comía). Su carbohidrato pasó a la sesión: 2 dátiles al terminar (5:15 PM) y spaghetti con pasta 310 g y el doble de puré de tomate (200 g; pidió menos pasta y más salsa). El día queda en 5.05 g/kg de carbohidrato, pegado al mínimo de 5.
+- **Día D revisado (14 nov 2026):** la cena ya no lleva arroz (Alex no se lo comía). Su carbohidrato pasó a la sesión: 2 dátiles al terminar (5:15 PM) y spaghetti con pasta 310 g y puré de tomate 265 g (pidió menos pasta y más salsa; el puré se subió hasta cubrir los 15 mg de vitamina E del día). El día queda en 5.1 g/kg de carbohidrato.
 - **Micronutrientes completados (14 nov 2026):** arándanos, Lucky Charms, chía, espresso, Groovies y atún Tuny se completaron con el USDA (SR Legacy) solo en lo que la etiqueta no declara; el potasio de los dátiles es el del USDA (696 mg), no el de la etiqueta (340 mg). Los totales de micronutrientes de los cuatro días se recalcularon; no cambió qué queda bajo meta.
 - **Lote del 14 nov 2026 (P037–P041):** papas Susalia, pollo empanizado Kirkland, queso crema Reny Picot, atún Tuny y dátiles Medjool entraron **solo al catálogo** (`en_plan: false`); ningún menú cambió. Sus `micros` (y los del camarón) se completaron el 14 nov con el USDA: alimento equivalente ajustado a la proteína o grasa de la etiqueta, o receta por ingredientes (pollo empanizado); el valor de la etiqueta manda donde existe, y `fuente_micros` dice `estimate` cuando es aproximación. Una clave que falta sigue siendo «sin dato», no cero (atún: vitaminas A, D, E, K y colina; papas: E, K y colina). Los dátiles llevan el carbohidrato de la etiqueta (62 g), que es dudoso; el USDA da ~68 g. El paquete traía además P027–P036, que ya estaban aquí desde el 28 oct con los ids del plan (`avena`, `chia`, `bagel`, `tocino`…): no se duplicaron. Quedaron fuera a propósito el tocino crudo (P031, etiqueta mal) y la avena Granvita por etiqueta (P033, valores imposibles; se usa `avena_generica`).
 - **Campos extra de etiqueta:** los productos P027–P041 traen además `id_producto`, `categoria`, `marca`, `estado`, `porcion_etiqueta_g`, `macros_detalle` (azúcares, añadidos, trans, mono, poli, colesterol; `null` = no declarado), `micros_extra`, `ingredientes`, `contiene` y `puede_contener`; los cinco nuevos también `observaciones`, `datos_dudosos`, `lecturas_dudosas` y `posible_reemplazo_de`. La app todavía no los lee.
@@ -102,7 +102,7 @@ Están en `metas_y_reglas.json → pendientes`:
 
 Quedan bajo meta, aceptados por ahora:
 - **Colina:** días B, C y D.
-- **Vitamina E:** días A, B y D.
+- **Vitamina E:** días A y B.
 - **Vitamina D:** día A.
 
 ## Fuente de verdad
