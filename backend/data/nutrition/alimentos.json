@@ -657,7 +657,7 @@
         "peso": 42.5
       },
       "nota": "P028, etiqueta del 28 oct 2026. Sin conservadores. Micronutrientes de la etiqueta (%VNR) y del pan del USDA.",
-      "en_plan": true,
+      "en_plan": false,
       "id_producto": "P028",
       "categoria": "Pan y cereales",
       "marca": "Oroweat",
@@ -1301,7 +1301,7 @@
         "vitA_ug": 0,
         "vitC_mg": 0.0,
         "vitD_ug": 0.0,
-        "vitE_mg": 7.46,
+        "vitE_mg": 0.12,
         "vitK_ug": 0.2,
         "tiamina_mg": 0.42,
         "riboflavina_mg": 0.257,
@@ -1332,7 +1332,7 @@
         "plural": "bagels",
         "paso": 0.5
       },
-      "nota": "Etiqueta del 14 nov 2026; 103 g por bagel pesado por Alex (la etiqueta dice 91.5 g). Reemplaza al New York Deli (P029). Micronutrientes de la etiqueta (%VNR) y, lo que no declara, del bagel del USDA.",
+      "nota": "Etiqueta del 14 nov 2026; 103 g por bagel pesado por Alex (la etiqueta dice 91.5 g). Reemplaza al New York Deli (P029). Micronutrientes de la etiqueta (%VNR) y, lo que no declara, del bagel del USDA. La vitamina E es la del bagel tostado del USDA (0.12 mg); la fila sin tostar (SR 174899) da 7.46 mg, un valor que no cuadra con un pan de trigo y que hacía ver cubierta la vitamina E del día.",
       "en_plan": true,
       "categoria": "Pan y cereales",
       "marca": "Bimbo",

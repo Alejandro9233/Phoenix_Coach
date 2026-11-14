@@ -198,7 +198,7 @@ def test_no_bedtime_meal():
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2024.0
+    assert menu["totals"]["kcal"] == 2021.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     # Alex weighs his chicken cooked (2026-11-14); the ground beef stays raw.
@@ -223,12 +223,14 @@ def test_alternatives_are_carb_matched():
     assert not any(i.get("alternativa") for t in PKG["types"].values() for m in t["comidas"] for i in m["items"])
 
 
-def test_pre_workout_is_one_slice_of_oroweat():
-    # 2026-10-28 batch: Oroweat replaces Bimbo; the jam makes up the carbs.
+def test_pre_workout_is_half_a_bagel():
+    # 2026-11-14: Alex only buys bagels now. Half a Bimbo bagel replaces the
+    # Oroweat slice and the jam gives back the difference, so the carbs hold.
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
     pre = next(m for m in menu["meals"] if m["time"] == "3:30 PM")
-    bread = next(i for i in pre["items"] if i["food_id"] == "pan_oroweat")
-    assert (bread["pieces"], bread["piece_name"]) == (1.0, "rebanada")
+    bread = next(i for i in pre["items"] if i["food_id"] == "bagel")
+    assert bread["pieces_label"] == "½ bagel"
+    assert not any(i["food_id"] == "pan_oroweat" for t in PKG["types"].values() for m in t["comidas"] for i in m["items"])
     assert abs(pre["totals"]["carbs_g"] - 53.9) <= 1   # the Bimbo pre-workout carried 53.9 g
 
 

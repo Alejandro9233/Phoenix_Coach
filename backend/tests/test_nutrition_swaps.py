@@ -110,7 +110,7 @@ def test_broken_swaps_are_caught():
 
     pre = next(m for m in PKG["types"]["B"]["comidas"] if m["nombre"].startswith("Pre-entreno"))
     t = copy.deepcopy(PKG["types"]["B"])
-    bread = next(i for m in t["comidas"] if m["nombre"] == pre["nombre"] for i in m["items"] if i["food_id"] == "pan_oroweat")
+    bread = next(i for m in t["comidas"] if m["nombre"] == pre["nombre"] for i in m["items"] if i["food_id"] == "bagel")
     bread["alternativas"] = [{"food_id": "pan", "cantidad": 54}]
     assert any("never swapped" in p for p in swap_problems(t, PKG["foods"], RULES))
 
