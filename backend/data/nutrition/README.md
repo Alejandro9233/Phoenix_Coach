@@ -22,7 +22,7 @@ Gasto desde el 29 oct 2026: mantenimiento de 2,025 kcal sin entreno (Katch-McArd
 
 | Archivo | Contenido |
 |---|---|
-| `alimentos.json` | Catálogo de 48 alimentos y suplementos. 34 se usan en el plan (`en_plan: true`); el resto son alternativas ya calculadas. |
+| `alimentos.json` | Catálogo de 53 alimentos y suplementos. 34 se usan en el plan (`en_plan: true`); el resto son alternativas ya calculadas o productos de la alacena que todavía no están en ningún menú. |
 | `tipos_de_dia.json` | Los 4 tipos de día, con cada comida, sus ingredientes y cantidades, y los totales por comida y por día, incluidos los micronutrientes. |
 | `calendario.json` | Del 19 oct al 13 dic 2026, con el tipo de día de cada fecha, la fase, los días sin déficit y los eventos (medio maratón, tirada de 27 km, carga y maratón). |
 | `metas_y_reglas.json` | Metas de macros y 23 micronutrientes con su límite superior, suplementos, reglas de ajuste, meal prep y pendientes. |
@@ -36,6 +36,8 @@ Gasto desde el 29 oct 2026: mantenimiento de 2,025 kcal sin entreno (Katch-McArd
 - **Crudo o cocido:** carne molida y pollo se pesan **crudos**; arroz y pasta, **ya cocidos**; la Maruchan es la sopa **preparada** (585 g). Está en `nota` de cada alimento y conviene mostrárselo al usuario.
 - **Carbohidrato:** siempre es **disponible**, sin fibra, como en la etiqueta mexicana (NOM-051). La fibra va aparte.
 - **Lote del 28 oct 2026:** chía OKKO, avena Bob's Red Mill (alta en proteína), bagel New York Deli, pan Oroweat y tocino Obertal entraron al menú con los gramos ajustados al mismo carbohidrato; arándanos OKKO en la merienda de A; Groovies como alternativa a Lucky Charms; camarón congelado solo en el catálogo. La avena Granvita usa la fila `avena_generica` (su etiqueta solo da valores preparada).
+- **Lote del 14 nov 2026 (P037–P041):** papas Susalia, pollo empanizado Kirkland, queso crema Reny Picot, atún Tuny y dátiles Medjool entraron **solo al catálogo** (`en_plan: false`); ningún menú cambió. Sus `micros` traen solo lo que declara la etiqueta: una clave que falta es «sin dato», no cero, así que al meter uno a un menú los micronutrientes del día quedan subcontados. Los dátiles llevan el carbohidrato de la etiqueta (62 g), que es dudoso; el USDA da ~68 g. El paquete traía además P027–P036, que ya estaban aquí desde el 28 oct con los ids del plan (`avena`, `chia`, `bagel`, `tocino`…): no se duplicaron. Quedaron fuera a propósito el tocino crudo (P031, etiqueta mal) y la avena Granvita por etiqueta (P033, valores imposibles; se usa `avena_generica`).
+- **Campos extra de etiqueta:** los productos P027–P041 traen además `id_producto`, `categoria`, `marca`, `estado`, `porcion_etiqueta_g`, `macros_detalle` (azúcares, añadidos, trans, mono, poli, colesterol; `null` = no declarado), `micros_extra`, `ingredientes`, `contiene` y `puede_contener`; los cinco nuevos también `observaciones`, `datos_dudosos`, `lecturas_dudosas` y `posible_reemplazo_de`. La app todavía no los lee.
 - **Alternativas:** un ítem puede traer `alternativa` (`food_id` + `cantidad`): se puede cambiar por ese alimento sin recalcular el día. Hoy: amaranto en lugar de avena, mismos gramos.
 - **Piezas:** `pieza` da equivalencias para mostrar (1 tostada = 12 g, 1 scoop = 31 g, 1 segundo de spray = 0.67 g). La cantidad del plan siempre está en gramos o mililitros.
 - **Fuentes:** `fuente_macros` y `fuente_micros` valen `label` (etiqueta del usuario), `usda`, `label+usda` o `estimate`. Si la app muestra datos, conviene distinguir los estimados.

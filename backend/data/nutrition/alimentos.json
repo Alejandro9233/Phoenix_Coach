@@ -137,7 +137,24 @@
       "fuente_micros": "usda",
       "pieza": null,
       "nota": "P032, etiqueta del 28 oct 2026. Pesar en seco. Micronutrientes de la avena del USDA.",
-      "en_plan": true
+      "en_plan": true,
+      "id_producto": "P032",
+      "categoria": "Pan y cereales",
+      "marca": "Bob's Red Mill",
+      "estado": "g crudo",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": 2.08,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": null,
+        "grasa_poli_g": null,
+        "colesterol_mg": null
+      },
+      "micros_extra": {},
+      "ingredientes": "Avena integral sin gluten.",
+      "contiene": null,
+      "puede_contener": "Frutos secos y soya"
     },
     {
       "id": "avena_generica",
@@ -267,7 +284,27 @@
       "fuente_micros": "label+usda",
       "pieza": null,
       "nota": "P030, etiqueta del 28 oct 2026. La etiqueta no cuenta la energía de la fibra (380 contra 486 kcal del USDA).",
-      "en_plan": true
+      "en_plan": true,
+      "id_producto": "P030",
+      "categoria": "Semillas",
+      "marca": "OKKO",
+      "estado": "g",
+      "porcion_etiqueta_g": 30,
+      "macros_detalle": {
+        "azucares_g": 0,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": 2.5,
+        "grasa_poli_g": 24,
+        "colesterol_mg": 0
+      },
+      "micros_extra": {
+        "omega6_g": 6,
+        "omega9_g": 2
+      },
+      "ingredientes": "Semilla de chía orgánica (Salvia hispanica L.).",
+      "contiene": null,
+      "puede_contener": null
     },
     {
       "id": "moras",
@@ -337,7 +374,24 @@
       "fuente_micros": "none",
       "pieza": null,
       "nota": "P034, etiqueta del 28 oct 2026. Casi toda la fibra es añadida y fermentable (tapioca): no comer justo antes de correr.",
-      "en_plan": true
+      "en_plan": true,
+      "id_producto": "P034",
+      "categoria": "Frutas",
+      "marca": "OKKO",
+      "estado": "g",
+      "porcion_etiqueta_g": 40,
+      "macros_detalle": {
+        "azucares_g": 4,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": null,
+        "grasa_poli_g": null,
+        "colesterol_mg": null
+      },
+      "micros_extra": {},
+      "ingredientes": "Arándanos orgánicos deshidratados en mitad (arándanos orgánicos, fibra soluble de tapioca orgánica, glicerina orgánica y aceite de girasol orgánico).",
+      "contiene": null,
+      "puede_contener": null
     },
     {
       "id": "huevo",
@@ -576,7 +630,26 @@
         "peso": 42.5
       },
       "nota": "P028, etiqueta del 28 oct 2026. Sin conservadores. Micronutrientes de la etiqueta (%VNR) y del pan del USDA.",
-      "en_plan": true
+      "en_plan": true,
+      "id_producto": "P028",
+      "categoria": "Pan y cereales",
+      "marca": "Oroweat",
+      "estado": "g",
+      "porcion_etiqueta_g": 85,
+      "macros_detalle": {
+        "azucares_g": 14.3,
+        "azucares_anadidos_g": 5.3,
+        "grasa_trans_mg": 178,
+        "grasa_mono_g": 0.9,
+        "grasa_poli_g": 0.6,
+        "colesterol_mg": 9
+      },
+      "micros_extra": {
+        "yodo_ug": 19.8
+      },
+      "ingredientes": "Harina de trigo, masa madre (14%), levadura, azúcares añadidos (azúcar), mantequilla (5%) (grasa butírica, agua, sólidos de la leche, lecitina de soya, sal yodada, extracto de annato), gluten de trigo, almidón, sal yodada.",
+      "contiene": "Gluten, leche y soya",
+      "puede_contener": "Huevo y ajonjolí"
     },
     {
       "id": "mermelada",
@@ -1183,7 +1256,24 @@
         "peso": 90
       },
       "nota": "P029, etiqueta del 28 oct 2026; 90 g por bagel (confirmado por Alex). Lleva jarabe de maíz de alta fructosa, grasa vegetal hidrogenada y azodicarbonamida. Micronutrientes del bagel del USDA.",
-      "en_plan": true
+      "en_plan": true,
+      "id_producto": "P029",
+      "categoria": "Pan y cereales",
+      "marca": "New York Deli & Bagel",
+      "estado": "g",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": 3.1,
+        "azucares_anadidos_g": 2.5,
+        "grasa_trans_mg": 29,
+        "grasa_mono_g": 1.3,
+        "grasa_poli_g": 0.8,
+        "colesterol_mg": 0
+      },
+      "micros_extra": {},
+      "ingredientes": "Harina de trigo (gluten), masa madre 5% (harina de trigo (gluten) fermentada), azúcares añadidos (azúcar, jarabe de maíz de alta fructosa), grasa vegetal hidrogenada, sal yodada, levadura, acondicionador de masa (carbonato de calcio, mono y diglicéridos, diacetil tartárico, estearoil lactilato de sodio, harina de soya, carragenina, azodicarbonamida, peróxido de calcio, alfa amilasa, hemicelulasa, ácido ascórbico), harina de malta, propionato de calcio, cloruro de potasio.",
+      "contiene": "Gluten (trigo) y soya",
+      "puede_contener": "Leche, huevo, nuez y sulfitos"
     },
     {
       "id": "tocino",
@@ -1232,7 +1322,24 @@
         "peso": 8
       },
       "nota": "P035: pesar cocido y escurrido. Valores del USDA (SR 168322); la etiqueta de Obertal (P031, 100 kcal por 100 g crudo) no cuadra con un tocino real.",
-      "en_plan": false
+      "en_plan": false,
+      "id_producto": "P035",
+      "categoria": "Carnes",
+      "marca": "Obertal (valores USDA)",
+      "estado": "g cocido",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": null,
+        "azucares_anadidos_g": null,
+        "grasa_trans_mg": 144,
+        "grasa_mono_g": 15.5,
+        "grasa_poli_g": 6.11,
+        "colesterol_mg": 99
+      },
+      "micros_extra": {},
+      "ingredientes": "Tocino (carne de cerdo), sal yodada, azúcares añadidos (azúcar), condimentos, eritorbato de sodio y nitrito de sodio. (Mismo producto que P031, ya cocinado.)",
+      "contiene": null,
+      "puede_contener": "Soya y leche"
     },
     {
       "id": "atun",
@@ -1305,7 +1412,24 @@
         "peso": 3
       },
       "nota": "P036, etiqueta del 28 oct 2026; marca pendiente. Pesar descongelado y escurrido. Trae agua o solución: 11.6 g de proteína por 100 g contra ~20 g del USDA, y 479 mg de sodio.",
-      "en_plan": false
+      "en_plan": false,
+      "id_producto": "P036",
+      "categoria": "Pescados y mariscos",
+      "marca": "Sin marca registrada (no se ve en la foto)",
+      "estado": "g crudo",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": 0,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": null,
+        "grasa_poli_g": null,
+        "colesterol_mg": null
+      },
+      "micros_extra": {},
+      "ingredientes": "Camarón (Penaeus vannamei).",
+      "contiene": "Crustáceos y sus productos",
+      "puede_contener": null
     },
     {
       "id": "maruchan",
@@ -1425,7 +1549,26 @@
         "peso": 30
       },
       "nota": "P027, etiqueta del 28 oct 2026. Endulzado con alulosa, 0 g de azúcar añadida, 14 g de fibra por 100 g (fibra de maíz e inulina). No declara vitamina D (Lucky Charms da 3.3 µg en 30 g).",
-      "en_plan": false
+      "en_plan": false,
+      "id_producto": "P027",
+      "categoria": "Pan y cereales",
+      "marca": "Groovies",
+      "estado": "g",
+      "porcion_etiqueta_g": 30,
+      "macros_detalle": {
+        "azucares_g": 1,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": null,
+        "grasa_poli_g": null,
+        "colesterol_mg": null
+      },
+      "micros_extra": {
+        "pantotenico_mg": 0.7
+      },
+      "ingredientes": "Harina de maíz (45%), quinoa (30%), fibra de maíz, alulosa, inulina de achicoria, saborizantes naturales, 1% canela, sal yodada, ortofosfato férrico (hierro), sulfato de zinc (zinc), niacina, ácido pantoténico, vitamina B6, vitamina B2, vitamina B1, vitamina A, ácido fólico y vitamina B12.",
+      "contiene": null,
+      "puede_contener": "Gluten (trigo, avena y cebada), derivados lácteos, nueces de árboles (almendras) y soya"
     },
     {
       "id": "miel",
@@ -2030,6 +2173,239 @@
       "pieza": null,
       "nota": "Por tableta: 210 mg sodio, 303 mg potasio, 10 µg vitamina D, 100 mg vitamina C.",
       "en_plan": true
+    },
+    {
+      "id": "papas_susalia",
+      "nombre": "Papas de maíz nixtamalizado con nopal, tipo totopo, sabor limón ardiente Susalia",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 271,
+        "proteina_g": 3,
+        "carbohidrato_disponible_g": 40,
+        "grasa_g": 11,
+        "grasa_saturada_g": 3,
+        "fibra_g": 6,
+        "sodio_mg": 800
+      },
+      "micros": {
+        "calcio_mg": 166,
+        "hierro_mg": 8,
+        "potasio_mg": 305,
+        "folato_ug": 120
+      },
+      "fuente_macros": "label",
+      "fuente_micros": "label",
+      "pieza": {
+        "nombre": "porción de la etiqueta",
+        "peso": 30
+      },
+      "nota": "P037, etiqueta del 13 nov 2026. Alto en sodio (800 mg por 100 g). Lleva inulina y fibra añadidas: no comer justo antes de correr.",
+      "en_plan": false,
+      "id_producto": "P037",
+      "categoria": "Botanas",
+      "marca": "Susalia",
+      "estado": "g",
+      "porcion_etiqueta_g": 30,
+      "macros_detalle": {
+        "azucares_g": 5,
+        "azucares_anadidos_g": 2,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": 5,
+        "grasa_poli_g": 2,
+        "colesterol_mg": 0
+      },
+      "micros_extra": {},
+      "ingredientes": "Harina de maíz nixtamalizada, nopal en polvo, 5% de inulina de achicoria, fibra vegetal, hidróxido de calcio, sazonador limón ardiente (azúcares añadidos), maltodextrina, almidón de maíz modificado, sal yodada, ácido cítrico, diacetato de sodio, saborizantes naturales, extracto de levadura, aceite vegetal de canola, inosinato de sodio, guanilato de sodio, silicato de sodio, bicarbonato de sodio, extracto de paprika, goma arábica y aceite vegetal puro de maíz.",
+      "contiene": null,
+      "puede_contener": null,
+      "posible_reemplazo_de": null,
+      "datos_dudosos": [],
+      "lecturas_dudosas": "La tabla de la etiqueta viene desfasada: los nombres de los renglones no coinciden con los valores (p. ej. «Porciones por envase» trae las kcal). Se leyó en el orden estándar de la NOM-051 y cuadra: 4×3 + 4×40 + 9×11 = 271 kcal, y saturada + mono + poli = 10 g de 11 g de grasa.",
+      "observaciones": "30 g dan 81 kcal, 12 g de carbohidrato, 3.3 g de grasa, 1.8 g de fibra y 240 mg de sodio. Alto en sodio para una botana (800 mg por 100 g; 295 mg por cada 100 kcal). Lleva inulina y fibra añadidas, igual que el cereal Groovies: fermentable, mejor no comerla justo antes de correr. Buen aporte de hierro (8 mg por 100 g) y ácido fólico, probablemente de la harina de maíz nixtamalizada, que en México viene fortificada. El calcio viene del hidróxido de calcio (cal) del nixtamal."
+    },
+    {
+      "id": "pollo_empanizado_kirkland",
+      "nombre": "Pechugas de pollo empanizadas, completamente cocidas, congeladas Kirkland Signature",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 162,
+        "proteina_g": 16,
+        "carbohidrato_disponible_g": 11,
+        "grasa_g": 6,
+        "grasa_saturada_g": 1,
+        "fibra_g": 0,
+        "sodio_mg": 680
+      },
+      "micros": {},
+      "fuente_macros": "label",
+      "fuente_micros": "none",
+      "pieza": {
+        "nombre": "pechuga",
+        "peso": 140
+      },
+      "nota": "P038, etiqueta del 13 nov 2026. Ya viene cocido: pesar tal como viene, antes de recalentar. El empanizado lleva claras de huevo. 680 mg de sodio por 100 g.",
+      "en_plan": false,
+      "id_producto": "P038",
+      "categoria": "Carnes",
+      "marca": "Kirkland Signature",
+      "estado": "g",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": 2,
+        "azucares_anadidos_g": 1,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": 1,
+        "grasa_poli_g": 3,
+        "colesterol_mg": 50
+      },
+      "micros_extra": {},
+      "ingredientes": "Carne de pollo sazonada (carne de pechuga de pollo sin piel y sin hueso, agua, sazonador (azúcares añadidos (azúcar), sal, mezcla con especias (especias, paprika, semillas de apio), grasa animal (de pollo), especias, aceite vegetal (de canola), aceite vegetal (de soya)), almidón (de arroz)), empanizado [11%] (harina de trigo, azúcares añadidos (azúcar), sal, leche de vaca descremada en polvo, claras de huevo deshidratadas, mezcla con polvos para hornear (pirofosfato ácido de sodio, bicarbonato de sodio, almidón (de maíz), fosfato monocálcico, lactato de calcio), especias, extracto de paprika), aceite vegetal.",
+      "contiene": "Trigo (gluten), leche y huevo",
+      "puede_contener": null,
+      "posible_reemplazo_de": null,
+      "datos_dudosos": [],
+      "lecturas_dudosas": "Los valores son del producto tal como viene (ya cocido), antes de recalentarlo.",
+      "observaciones": "Ya viene cocido: solo se recalienta (horno o freidora de aire, sin aceite extra). Comparado con la pechuga cruda Kirkland (P012) tiene menos proteína por caloría (16 g por 162 kcal, ~40% de las calorías), porque lleva empanizado (11 g de carbohidrato por 100 g) y agua añadida. Alto en sodio: 680 mg por 100 g. El empanizado lleva claras de huevo deshidratadas (Alex no come huevo salvo en el bagel; aquí es solo un ingrediente del empanizado). Práctico para días sin cocinar. 1 pechuga (140 g) da 227 kcal, 22.4 g de proteína, 15.4 g de carbohidrato, 8.4 g de grasa y 952 mg de sodio."
+    },
+    {
+      "id": "queso_crema_reny_picot",
+      "nombre": "Queso crema en barra Reny Picot",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 270,
+        "proteina_g": 6,
+        "carbohidrato_disponible_g": 4,
+        "grasa_g": 26,
+        "grasa_saturada_g": 18,
+        "fibra_g": 0,
+        "sodio_mg": 280
+      },
+      "micros": {},
+      "fuente_macros": "label",
+      "fuente_micros": "none",
+      "pieza": null,
+      "nota": "P039, etiqueta del 13 nov 2026. 18 g de grasa saturada por 100 g; 20 g son una capa en un bagel.",
+      "en_plan": false,
+      "id_producto": "P039",
+      "categoria": "Lácteos",
+      "marca": "Reny Picot",
+      "estado": "g",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": 4,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": 6,
+        "grasa_poli_g": 1,
+        "colesterol_mg": null
+      },
+      "micros_extra": {},
+      "ingredientes": "Leche entera pasteurizada de vaca, crema pasteurizada, sal yodada, cultivos lácticos, goma algarrobo.",
+      "contiene": "Leche",
+      "puede_contener": null,
+      "posible_reemplazo_de": null,
+      "datos_dudosos": [],
+      "lecturas_dudosas": "El colesterol no aparece en la foto.",
+      "observaciones": "Es sobre todo grasa: 87% de sus calorías, y 18 g de grasa saturada por 100 g. 20 g (una capa en un bagel) dan 54 kcal, 5.2 g de grasa, 3.6 g de saturada, 1.2 g de proteína y 56 mg de sodio. Ingredientes simples, sin conservadores."
+    },
+    {
+      "id": "atun_tuny",
+      "nombre": "Atún aleta amarilla en hojuelas, en agua Tuny",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 93,
+        "proteina_g": 21,
+        "carbohidrato_disponible_g": 0,
+        "grasa_g": 1,
+        "grasa_saturada_g": 0.5,
+        "fibra_g": 0,
+        "sodio_mg": 260
+      },
+      "micros": {},
+      "fuente_macros": "label",
+      "fuente_micros": "none",
+      "pieza": {
+        "nombre": "lata",
+        "peso": 220
+      },
+      "nota": "P040, etiqueta del 13 nov 2026. Valores de atún escurrido; 1 lata = 220 g drenados.",
+      "en_plan": false,
+      "id_producto": "P040",
+      "categoria": "Pescados y mariscos",
+      "marca": "Tuny",
+      "estado": "g",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": 0,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": null,
+        "grasa_poli_g": null,
+        "colesterol_mg": null
+      },
+      "micros_extra": {},
+      "ingredientes": "Lomo de atún aleta amarilla en hojuelas, caldo vegetal (agua y fibra de chícharo) y sal yodada.",
+      "contiene": "Pescado (atún aleta amarilla)",
+      "puede_contener": null,
+      "posible_reemplazo_de": null,
+      "datos_dudosos": [],
+      "lecturas_dudosas": null,
+      "observaciones": "Proteína casi pura: 21 g por 93 kcal (90% de las calorías). Casi igual al mix de atún con camarón Dolores (P006: 21.4 g de proteína y 229 mg de sodio), pero con muchos menos aditivos: solo agua, fibra de chícharo y sal, sin nitrito, fosfato ni carragenina. 260 mg de sodio por 100 g. El aleta amarilla es magro: aporta poco omega-3. Los valores son de atún escurrido: la masa drenada de la lata es 220 g y 220 × 0.93 = 205 kcal, igual al contenido energético por envase. 1 lata da 205 kcal, 46 g de proteína, 2.2 g de grasa y 572 mg de sodio."
+    },
+    {
+      "id": "datiles_medjool",
+      "nombre": "Dátiles Medjool orgánicos Dátiles del Desierto",
+      "unidad": "g",
+      "valores_por": "100 g",
+      "macros": {
+        "kcal": 280,
+        "proteina_g": 2,
+        "carbohidrato_disponible_g": 62,
+        "grasa_g": 0,
+        "grasa_saturada_g": 0,
+        "fibra_g": 7,
+        "sodio_mg": 0
+      },
+      "micros": {
+        "potasio_mg": 340
+      },
+      "fuente_macros": "label",
+      "fuente_micros": "label",
+      "pieza": {
+        "nombre": "dátil",
+        "peso": 20
+      },
+      "nota": "P041, etiqueta del 13 nov 2026. La etiqueta declara más azúcar (65 g) que carbohidrato (62 g); el USDA da ~68 g de carbohidrato disponible. Peso por dátil estimado (20 a 24 g).",
+      "en_plan": false,
+      "id_producto": "P041",
+      "categoria": "Frutas",
+      "marca": "Dátiles del Desierto",
+      "estado": "g",
+      "porcion_etiqueta_g": 100,
+      "macros_detalle": {
+        "azucares_g": 65,
+        "azucares_anadidos_g": 0,
+        "grasa_trans_mg": 0,
+        "grasa_mono_g": null,
+        "grasa_poli_g": null,
+        "colesterol_mg": 0
+      },
+      "micros_extra": {},
+      "ingredientes": "Dátiles Medjool orgánicos.",
+      "contiene": null,
+      "puede_contener": null,
+      "posible_reemplazo_de": null,
+      "datos_dudosos": [
+        "Peso por pieza (g o ml)",
+        "Carbohidratos disponibles (g)",
+        "Azúcares (g)"
+      ],
+      "lecturas_dudosas": "La etiqueta declara más azúcares (65 g) que carbohidratos disponibles (62 g), lo que no es posible, y las kcal calculadas dan 256 contra 280 declaradas. El USDA da para Medjool ~277 kcal, 1.8 g de proteína, 75 g de carbohidrato total, 6.7 g de fibra y 66 g de azúcares por 100 g, así que el carbohidrato disponible real anda en ~68 g. El peso por dátil (20 g) es el promedio de la etiqueta; un Medjool suele pesar ~24 g.",
+      "observaciones": "Carbohidrato rápido y natural, sin azúcar añadida: buena opción antes de correr o en tiradas largas, en lugar de miel o mermelada. 2 dátiles (~40 g) dan ~112 kcal, ~25 g de carbohidrato, 2.8 g de fibra y 136 mg de potasio. La fibra (7 g por 100 g) es natural de la fruta, pero si se comen varios justo antes de correr conviene probar tolerancia."
     }
   ]
 }
