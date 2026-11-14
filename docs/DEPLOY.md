@@ -19,7 +19,7 @@ PLAYWRIGHT_BROWSERS_PATH=0           # persists the Chromium cache between build
 **`TIMEZONE` is deliberately NOT set.** It overrides the timezone the phone reports and
 breaks travel. The app sends `TimeZone.current.identifier` on every profile save.
 
-`OLLAMA_MODEL` and `SCRAPER_DEBUG_DIR` are local-dev only — don't set them on Render.
+`SCRAPER_DEBUG_DIR` is local-dev only — don't set it on the server.
 
 `COROS_MCP_ENABLED`, `COROS_MCP_TOKEN_PATH`, `COROS_MCP_TOKEN_ROOT` are optional. The
 morning refresh pulls from the official COROS MCP (docs/COROS_MCP.md) whenever a token

@@ -1,11 +1,11 @@
 """
-LLM Client — Abstraction layer over Groq API (cloud) and Ollama (local dev).
+LLM Client — Groq, through the OpenAI-compatible SDK.
 
-Uses the OpenAI-compatible SDK pointed at Groq's endpoint.
-Falls back to Ollama if GROQ_API_KEY is not set (local dev mode).
+Groq is the only provider. The local Ollama fallback was deleted 2026-11-13:
+it never ran on the server, and a missing GROQ_API_KEY silently switching
+models is worse than failing loud.
 """
 import os
-import json
 from openai import OpenAI
 
 # --- Configuration ---
@@ -14,14 +14,14 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # must also be enabled for the org at console.groq.com/settings/limits — a
 # listed-but-blocked model fails with model_permission_blocked_org.
 GROQ_MODEL = os.getenv("COACHING_MODEL", "openai/gpt-oss-120b")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 
-def _use_groq() -> bool:
-    """Return True if we should use Groq cloud, False for local Ollama."""
-    return bool(GROQ_API_KEY)
+def _require_key():
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY is not set")
 
 def _get_groq_client() -> OpenAI:
     """Return an OpenAI client pointed at Groq's API."""
+    _require_key()
     return OpenAI(
         api_key=GROQ_API_KEY,
         base_url="https://api.groq.com/openai/v1",
@@ -30,7 +30,7 @@ def _get_groq_client() -> OpenAI:
 def chat_completion(messages: list[dict], json_mode: bool = False,
                     temperature: float = 0.7, seed: int | None = None) -> str:
     """
-    Send a chat completion request to Groq (cloud) or Ollama (local).
+    Send a chat completion request to Groq.
 
     Args:
         messages: List of {"role": ..., "content": ...} dicts.
@@ -52,10 +52,7 @@ def chat_completion(messages: list[dict], json_mode: bool = False,
     gpt-oss-120b is MoE on batched LPU inference, so same-seed drift persists.
     "Plans still differ" is expected, not a bug.
     """
-    if _use_groq():
-        return _groq_chat(messages, json_mode, temperature, seed)
-    else:
-        return _ollama_chat(messages, json_mode, temperature, seed)
+    return _groq_chat(messages, json_mode, temperature, seed)
 
 # JSON-mode budget (2026-08-24 incident). gpt-oss-120b is a reasoning model
 # whose thinking tokens COUNT AGAINST the completion budget; with no explicit
@@ -140,33 +137,6 @@ def _groq_chat(messages: list[dict], json_mode: bool,
         response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content
 
-def _build_ollama_options(temperature: float, seed: int | None) -> dict:
-    """Shared options dict for Ollama chat and stream calls."""
-    options = {"temperature": temperature}
-    if seed is not None:
-        options["seed"] = seed
-    return options
-
-def _ollama_chat(messages: list[dict], json_mode: bool,
-                 temperature: float, seed: int | None) -> str:
-    """Call local Ollama (for development/testing only)."""
-    import ollama
-    kwargs = {
-        "model": OLLAMA_MODEL,
-        "messages": messages,
-        "options": _build_ollama_options(temperature, seed),
-    }
-    if json_mode:
-        kwargs["format"] = "json"
-
-    response = ollama.chat(**kwargs)
-    content = response["message"]["content"]
-
-    # Strip Qwen3 thinking tags
-    if "<think>" in content:
-        content = content.split("</think>")[-1].strip()
-    return content
-
 async def chat_completion_stream(messages: list[dict],
                                  temperature: float = 0.7,
                                  seed: int | None = None):
@@ -175,16 +145,13 @@ async def chat_completion_stream(messages: list[dict],
     Used by the /chat SSE endpoint. Chat stays at 0.7 on purpose —
     conversation should remain lively; no caller lowers it.
     """
-    if _use_groq():
-        async for token in _groq_stream(messages, temperature, seed):
-            yield token
-    else:
-        async for token in _ollama_stream(messages, temperature, seed):
-            yield token
+    async for token in _groq_stream(messages, temperature, seed):
+        yield token
 
 async def _groq_stream(messages: list[dict], temperature: float, seed: int | None):
     """Stream tokens from Groq."""
     from openai import AsyncOpenAI
+    _require_key()
     client = AsyncOpenAI(
         api_key=GROQ_API_KEY,
         base_url="https://api.groq.com/openai/v1",
@@ -195,64 +162,12 @@ async def _groq_stream(messages: list[dict], temperature: float, seed: int | Non
         if chunk.choices and chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-async def _ollama_stream(messages: list[dict], temperature: float, seed: int | None):
-    """Stream tokens from local Ollama (dev mode)."""
-    import ollama
-    client = ollama.AsyncClient()
-    inside_think = False
-    think_buffer = ""
-
-    async for chunk in await client.chat(
-        model=OLLAMA_MODEL,
-        messages=messages,
-        stream=True,
-        options=_build_ollama_options(temperature, seed),
-    ):
-        token = chunk["message"]["content"]
-        if not token:
-            continue
-
-        # Handle <think> tag suppression (same logic as current main.py)
-        if inside_think:
-            think_buffer += token
-            if "</think>" in think_buffer:
-                after = think_buffer.split("</think>", 1)[1]
-                inside_think = False
-                think_buffer = ""
-                if after.strip():
-                    yield after
-            continue
-
-        if "<think>" in token:
-            parts = token.split("<think>", 1)
-            if parts[0]:
-                yield parts[0]
-            inside_think = True
-            think_buffer = parts[1] if len(parts) > 1 else ""
-            if "</think>" in think_buffer:
-                after = think_buffer.split("</think>", 1)[1]
-                inside_think = False
-                think_buffer = ""
-                if after.strip():
-                    yield after
-            continue
-
-        yield token
-
 def check_llm_available() -> dict:
     """Health check for the LLM backend. Returns status dict."""
-    if _use_groq():
-        try:
-            client = _get_groq_client()
-            # Minimal test call
-            client.models.list()
-            return {"provider": "groq", "status": "connected", "model": GROQ_MODEL}
-        except Exception as e:
-            return {"provider": "groq", "status": "error", "detail": str(e)}
-    else:
-        try:
-            import ollama
-            ollama.show(OLLAMA_MODEL)
-            return {"provider": "ollama", "status": "connected", "model": OLLAMA_MODEL}
-        except Exception:
-            return {"provider": "ollama", "status": "disconnected", "model": OLLAMA_MODEL}
+    try:
+        client = _get_groq_client()
+        # Minimal test call
+        client.models.list()
+        return {"provider": "groq", "status": "connected", "model": GROQ_MODEL}
+    except Exception as e:
+        return {"provider": "groq", "status": "error", "detail": str(e)}

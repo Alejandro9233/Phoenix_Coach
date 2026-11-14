@@ -9,8 +9,7 @@ requests==2.34.1
 python-dotenv==1.2.2
 chromadb==1.5.9
 openai==2.46.0
-ollama==0.6.2
 pydantic==2.13.4
-pydantic-settings==2.14.1
+pydantic-settings==2.14.1  # chromadb needs it; pinned for reproducible installs
 garmin-fit-sdk==21.202.0
 playwright==1.59.0

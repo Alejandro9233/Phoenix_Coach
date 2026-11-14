@@ -79,6 +79,9 @@ those limits and writes the coaching notes.
   week path stays. The three `tune_race_*` columns are still in prod Postgres,
   nullable and unread — no migration framework to drop them; don't re-add them
   to the model or the startup `ALTER TABLE` dict.
+- **Ollama fallback** (`_ollama_chat`, `_ollama_stream`, `OLLAMA_MODEL`), deleted
+  2026-11-13. Groq is the only LLM provider. A missing `GROQ_API_KEY` raises; it
+  never switches to a local model.
 - **`frontend/`** web UI — replaced by the iOS app.
 - **Root `phoenix_coach.db`** — no SQLite snapshot in the repo. Use `scripts/rebuild_db.py`.
 

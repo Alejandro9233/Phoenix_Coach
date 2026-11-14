@@ -149,7 +149,7 @@ from backend.core.llm_client import check_llm_available
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize singletons and warm up Ollama on startup."""
+    """Initialize singletons and check the LLM on startup."""
     # 1. Pre-load the KnowledgeBase (once, not per-request)
     get_kb()
     print("✅ KnowledgeBase singleton initialized.")
@@ -722,7 +722,7 @@ def get_coaching_recommendation(db: Session = Depends(get_db)):
     data_agent = DataAgent(db)
     summary = data_agent.summarize()
     
-    # 2. Response Agent: generate recommendation via Ollama + RAG
+    # 2. Response Agent: generate recommendation via the LLM + RAG
     response_agent = ResponseAgent()
     recommendation = response_agent.generate_recommendation(summary)
     
@@ -2254,16 +2254,6 @@ async def smart_refresh_start():
 @app.get("/smart-refresh/status")
 async def smart_refresh_status():
     return _refresh_job_status()
-
-
-def _strip_think_tags(text: str) -> str:
-    """Remove <think>...</think> blocks from Qwen3 output."""
-    import re
-    # Remove complete think blocks
-    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    # Remove any unclosed <think> tag at the start (streaming edge case)
-    cleaned = re.sub(r'^<think>.*', '', cleaned, flags=re.DOTALL)
-    return cleaned.strip()
 
 
 CHAT_HISTORY_MESSAGES = 20   # newest messages sent to the model

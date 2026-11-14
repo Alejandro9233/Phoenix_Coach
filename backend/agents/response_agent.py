@@ -1,5 +1,5 @@
 """
-Response Agent — Generates coaching recommendations using Ollama LLM + RAG knowledge.
+Response Agent — Generates coaching recommendations using the LLM + RAG knowledge.
 
 The LLM is the COACH — it makes real coaching decisions:
 - Which workouts to assign to which days
@@ -458,7 +458,7 @@ Based on this data and these principles, what should the athlete do today? Remem
             print(f"Failed to parse LLM JSON: {e}")
             return self._fallback_recommendation(athlete_summary)
         except Exception as e:
-            print(f"Ollama error: {e}")
+            print(f"LLM error: {e}")
             return self._fallback_recommendation(athlete_summary)
 
     def analyze_activity(self, activity_data: dict, planned_workout: dict = None,
