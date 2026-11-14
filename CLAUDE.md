@@ -122,7 +122,9 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
 - `backend/services/issue_triage.py` — "my calf is shot" → plan change. Detect in
   chat, propose, apply only on confirm. Docstring has the three-step shape.
 - `backend/agents/` — `data_agent` summarizes state, `response_agent` holds prompts
-- `ios/PhoenixCoach/` — 4 tabs: Today, Coach, Recent, Profile.
+- `ios/PhoenixCoach/` — 5 tabs: Today, Coach, Recent, History, Profile.
+  Data types live in `Models/` by area (`PlanModels`, `DashboardModels`,
+  `TriageModels`, `NutritionModels`…), not in one file.
   **Recent** = `Views/Feedback/FeedbackView.swift` — the one tab whose name
   doesn't match its filename.
 - `docs/DEPLOY.md` — Render env vars, free-tier limits, rollback. Read before deploying.
