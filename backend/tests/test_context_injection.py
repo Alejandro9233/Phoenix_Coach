@@ -185,19 +185,22 @@ def test_hours_range_untouched_when_no_constraint(temp_db_session):
 
     ctx = PeriodizationEngine().compute_context(temp_db_session)
 
-    assert ctx["volume_references"]["phase_hours_range"] == "5-7"
+    # The top carries the two 30-min swims a marathon goal budgets on top
+    # (2026-11-14); the bottom does not move.
+    assert ctx["volume_references"]["phase_hours_range"] == "5-8"
 
 
 def test_hours_range_deducts_capped_sessions(temp_db_session):
     # Foundation advertises cycling 2x/week; one open day keeps 1 session,
-    # so ~1.25h comes off both ends: 5-7 -> 4-6 after rounding.
+    # so ~1.25h comes off both ends: 5-7 -> 4-6 after rounding, and the two
+    # on-top swims put an hour back on the top.
     athlete = _marathon_athlete(bike_days="mon")
     temp_db_session.add(athlete)
     temp_db_session.commit()
 
     ctx = PeriodizationEngine().compute_context(temp_db_session)
 
-    assert ctx["volume_references"]["phase_hours_range"] == "4-6"
+    assert ctx["volume_references"]["phase_hours_range"] == "4-7"
 
 
 def test_recovery_week_scales_the_deducted_range(temp_db_session):
@@ -529,14 +532,14 @@ def test_blocked_running_moves_the_hours_to_the_bike(temp_db_session):
     ctx = PeriodizationEngine().compute_context(temp_db_session)
     refs = ctx["volume_references"]
 
-    assert refs["phase_hours_range"] == "5-7"
+    assert refs["phase_hours_range"] == "5-8"  # 5-7 + the two on-top swims
     assert refs["sport_sessions"]["running"]["sessions"] == 0
     assert refs["sport_sessions"]["cycling"]["sessions"] == 5
     # Foundation with no run history: long run 70 min -> long ride
     # round(70 * 1.5) = 105 min.
     assert refs["injury_substitution"] == {
         "blocked": "running", "carrier": "cycling",
-        "rides": 5, "hours_range": "5-7", "long_ride_minutes": 105,
+        "rides": 5, "hours_range": "5-8", "long_ride_minutes": 105,
     }
     assert "LONG RIDE: ~105 min" in refs["sport_sessions"]["cycling"]["volume_note"]
     assert "running" in ctx["injury_blocked_sports"]

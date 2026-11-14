@@ -204,7 +204,7 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
                             required_run_km: float = None,
                             inputs: dict = None,
                             fill_run_km: bool = False):
-    """[generate] -> normalize -> enforce -> [gate] -> finalize.
+    """[generate] -> normalize -> enforce -> swims -> [gate] -> finalize.
 
     Returns (plan_json, violations). Two calling modes:
 
@@ -227,7 +227,16 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
     """
     from backend.services.constraint_enforcer import enforce_constraints
 
+    from backend.services.swim_enforcer import enforce_swims, swim_rule
+
     gated = generate is not None and gate_ctx is not None
+    # Ungated writes carry no context; the rule needs one (cheap: DB reads
+    # and date math, the same build finalize does).
+    swim_ctx = gate_ctx
+    if swim_ctx is None and db is not None:
+        from backend.services.periodization_engine import PeriodizationEngine
+        swim_ctx = PeriodizationEngine().compute_context(db)
+    swim_rule_ = swim_rule(swim_ctx)
     attempts = GATE_ATTEMPTS if gated else 1
     feedback = None
     report = None
@@ -241,6 +250,10 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
             active_injuries=active_injuries,
             days=days,
         )
+        # On-top swims (a marathon goal's two easy technique sessions) are
+        # held to their budget here: count, length, no race week.
+        candidate, swim_cuts = enforce_swims(candidate, swim_rule_, days=days)
+        violations = list(violations) + swim_cuts
         # The long run lands on its fixed day, by swapping whole days, after
         # the enforcer (so it never moves a run onto a stripped day) and
         # before the stamps and the audit (so they judge the final layout).

@@ -65,6 +65,11 @@ from backend.utils.timezone import get_local_today
 # Strength is absent on purpose: hours exclude strength everywhere
 # (volume_gate charter), so gym availability never moves the window.
 SESSION_HOURS_ESTIMATE = {"swimming": 1.0, "cycling": 1.25, "running": 1.0}
+# A sport_sessions entry may carry "hours_each" (its own session length) and
+# "on_top": True — cross-training the phase's hours_range was written without
+# (the marathon's two 30-min technique swims, Alex 2026-11-14). On-top hours
+# are added to the window's top when the sport is available and never taken
+# off it when it is not; swim_enforcer holds the sessions to that shape.
 # Slowest easy pace the hours ceiling must hold a week's run km at when there
 # is no pace model (CDMX, 2,240 m: easy runs 5:45-6:30/km).
 HOURS_PACE_SEC_KM = 390.0
@@ -666,7 +671,7 @@ DISTANCE_PROFILES = {
                 "long_run_cap_min": 110,
                 "sport_sessions": {
                     "running": {"sessions": 4, "volume_note": "Volume down 22/38/55% across the three weeks; ONE short session stays at race pace"},
-                    "swimming": {"sessions": 0, "volume_note": "Optional — not budgeted"},
+                    "swimming": {"sessions": 2, "hours_each": 0.5, "on_top": True, "volume_note": "Easy technique, 30 min each: drills and relaxed laps, no hard sets. Not on the week's only rest day"},
                     "cycling": {"sessions": 1, "volume_note": "1 short easy spin"},
                     "strength": {"sessions": 0, "volume_note": "Stop all lifting 7-10 days before race"},
                 },
@@ -684,7 +689,7 @@ DISTANCE_PROFILES = {
                 "long_run_cap_min": 150,
                 "sport_sessions": {
                     "running": {"sessions": 5, "volume_note": "40-55 km/week, M-pace + cruise intervals"},
-                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
+                    "swimming": {"sessions": 2, "hours_each": 0.5, "on_top": True, "volume_note": "Easy technique, 30 min each: drills and relaxed laps, no hard sets. Not on the week's only rest day"},
                     "cycling": {"sessions": 2, "volume_note": "One easy spin + one Z2 ride — hours the legs cannot take on foot"},
                     "strength": {"sessions": 2, "volume_note": "Maintenance — 2 sets, heavy compounds, no accessories"},
                 },
@@ -702,7 +707,7 @@ DISTANCE_PROFILES = {
                 "long_run_cap_min": 160,
                 "sport_sessions": {
                     "running": {"sessions": 5, "volume_note": "40-55 km/week, long run + M-pace + tempo"},
-                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
+                    "swimming": {"sessions": 2, "hours_each": 0.5, "on_top": True, "volume_note": "Easy technique, 30 min each: drills and relaxed laps, no hard sets. Not on the week's only rest day"},
                     "cycling": {"sessions": 2, "volume_note": "One easy spin + one longer Z2 ride the day AFTER the long run"},
                     "strength": {"sessions": 2, "volume_note": "Shift to maintenance — 2 sets, keep compounds, drop accessories"},
                 },
@@ -720,7 +725,7 @@ DISTANCE_PROFILES = {
                 "long_run_cap_min": 110,
                 "sport_sessions": {
                     "running": {"sessions": 5, "volume_note": "28-40 km/week, add long run 60-90 min"},
-                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
+                    "swimming": {"sessions": 2, "hours_each": 0.5, "on_top": True, "volume_note": "Easy technique, 30 min each: drills and relaxed laps, no hard sets. Not on the week's only rest day"},
                     "cycling": {"sessions": 2, "volume_note": "75-90 min/session, Z2 — adds aerobic hours without impact"},
                     "strength": {"sessions": 3, "volume_note": "Hypertrophy but watch total fatigue — reduce sets if running suffers"},
                 },
@@ -738,7 +743,7 @@ DISTANCE_PROFILES = {
                 "long_run_cap_min": 90,
                 "sport_sessions": {
                     "running": {"sessions": 4, "volume_note": "20-28 km/week, easy runs, build gradually (10% rule)"},
-                    "swimming": {"sessions": 0, "volume_note": "Optional cross-training — not budgeted for a marathon goal"},
+                    "swimming": {"sessions": 2, "hours_each": 0.5, "on_top": True, "volume_note": "Easy technique, 30 min each: drills and relaxed laps, no hard sets. Not on the week's only rest day"},
                     "cycling": {"sessions": 2, "volume_note": "60-75 min/session, Z2 endurance"},
                     "strength": {"sessions": 3, "volume_note": "Hypertrophy focus — best window for muscle building"},
                 },
@@ -750,7 +755,7 @@ DISTANCE_PROFILES = {
                 "allowed": {
                     "running": ["Easy Run", "Long Run", "Strides/Openers", "Tempo Run", "Cruise Intervals"],
                     "cycling": ["Endurance Ride (Z2)", "Sweet Spot Intervals"],
-                    "swimming": ["Technique Session", "CSS Threshold", "Endurance Swim"],
+                    "swimming": ["Technique Session"],
                     "strength": {
                         "types": ["Hypertrophy Push/Pull/Legs", "Hypertrophy Upper/Lower"],
                         "available_muscle_groups": ["chest", "shoulders", "back", "legs", "arms"],
@@ -770,7 +775,7 @@ DISTANCE_PROFILES = {
                         "Cruise Intervals", "Marathon Pace Long Run", "Progressive Run",
                     ],
                     "cycling": ["Endurance Ride (Z2)", "Sweet Spot Intervals", "Threshold Intervals"],
-                    "swimming": ["Technique Session", "CSS Threshold", "Endurance Swim"],
+                    "swimming": ["Technique Session"],
                     "strength": {
                         "types": ["Maintenance (2 sets, heavy compounds)"],
                         "available_muscle_groups": ["chest", "shoulders", "back", "legs", "arms"],
@@ -790,7 +795,7 @@ DISTANCE_PROFILES = {
                         "VO2max Intervals (careful — only if well-recovered)",
                     ],
                     "cycling": ["Endurance Ride (Z2)", "Sweet Spot Intervals", "Threshold Intervals"],
-                    "swimming": ["Technique Session", "CSS Threshold", "Endurance Swim"],
+                    "swimming": ["Technique Session"],
                     "strength": {
                         "types": ["Maintenance (2 sets, heavy compounds)"],
                         "available_muscle_groups": ["chest", "shoulders", "back", "legs", "arms"],
@@ -1437,6 +1442,7 @@ class PeriodizationEngine:
             phase_info, deload_week, athlete, db,
             race_distance=race_distance,
         )
+        self._add_on_top_sessions(volume_refs, race_week)
 
         # THE weekly run-km target — actuals-derived, ramp-capped. The volume
         # gate enforces these numbers; the phase range above is only prose.
@@ -2101,7 +2107,7 @@ class PeriodizationEngine:
         for sport, info in (phase_def.get("sport_sessions") or {}).items():
             est = SESSION_HOURS_ESTIMATE.get(sport)
             planned = (info or {}).get("sessions")
-            if not est or not isinstance(planned, int):
+            if not est or not isinstance(planned, int) or (info or {}).get("on_top"):
                 continue
             kept = (filtered_sessions.get(sport) or {}).get("sessions")
             lost = planned - (kept if isinstance(kept, int) else 0)
@@ -2114,6 +2120,29 @@ class PeriodizationEngine:
         hi = max(hi, lo)
         # The top rounds UP: "{:.0f}" turned 6.5 into "6".
         return f"{lo:.0f}-{math.ceil(hi - 1e-9):d}"
+
+    @staticmethod
+    def _add_on_top_sessions(refs: dict, race_week: bool) -> None:
+        """Make room for on-top cross-training, or drop it in race week.
+
+        The window's top grows by the sessions' hours; the bottom stays, so
+        a week without them is never short. Race week has none: the legs
+        and the lungs rest for the race.
+        """
+        try:
+            lo, hi = (float(x) for x in refs["phase_hours_range"].split("-"))
+        except (KeyError, ValueError, AttributeError):
+            lo = hi = None
+        for info in (refs.get("sport_sessions") or {}).values():
+            if not (isinstance(info, dict) and info.get("on_top")):
+                continue
+            if race_week:
+                info["sessions"] = 0
+                info["volume_note"] = "None in race week"
+            elif hi is not None and isinstance(info.get("sessions"), int):
+                hi += info["sessions"] * info.get("hours_each", 0.0)
+        if hi is not None and not race_week:
+            refs["phase_hours_range"] = _fmt_hours_range(lo, hi)
 
     @staticmethod
     def _raise_hours_for_km(refs: dict, run_km_target, pace_sec_km: float) -> None:
@@ -2134,7 +2163,8 @@ class PeriodizationEngine:
         except ValueError:
             return
         other = sum(
-            SESSION_HOURS_ESTIMATE.get(sport, 0.0) * (info or {}).get("sessions", 0)
+            (info or {}).get("hours_each", SESSION_HOURS_ESTIMATE.get(sport, 0.0))
+            * (info or {}).get("sessions", 0)
             for sport, info in (refs.get("sport_sessions") or {}).items()
             if sport != "running" and isinstance((info or {}).get("sessions"), int)
         )

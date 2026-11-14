@@ -116,6 +116,8 @@ PYTHONPATH=. ./venv/bin/python3 scripts/scraper_health_check.py
 - `backend/models/database.py` — all tables. `grep -n '__tablename__'` to list them.
 - `backend/services/periodization_engine.py` — phases, volume targets. Docstring has
   the ceilings and why the distance profiles exist.
+- `backend/services/swim_enforcer.py` — a marathon goal gets two easy 30-min
+  technique swims a week on top of the runs: count, length, none in race week.
 - `backend/services/constraint_enforcer.py` — the hard gate. Strips workouts that
   violate availability or an active injury. Read its docstring before touching
   anything that generates a plan.
