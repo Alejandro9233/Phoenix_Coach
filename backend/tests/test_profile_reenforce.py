@@ -17,7 +17,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import backend.main as main_module
 from backend.main import app, get_db
 from backend.models.database import Athlete, Base, WeeklyPlan
 from backend.services.plan_normalizer import VALID_DAYS, normalize_plan
@@ -58,8 +57,8 @@ def test_db_session():
 
 
 @pytest.fixture
-def client(test_db_session, monkeypatch):
-    monkeypatch.setattr(main_module, "get_local_today", lambda: FROZEN_TODAY)
+def client(test_db_session, freeze_today):
+    freeze_today(FROZEN_TODAY)
 
     def override_get_db():
         yield test_db_session

@@ -13,7 +13,6 @@ from datetime import date, timedelta
 import pytest
 
 from backend.models.database import Athlete
-from backend.services import periodization_engine
 from backend.services.periodization_engine import (
     RUN_KM_PLAN, RUN_KM_PLAN_CAP, RUN_KM_PLAN_RACE, PeriodizationEngine, _fmt_hours_range,
 )
@@ -58,13 +57,12 @@ def test_a_comeback_outranks_the_plan(db):
     (date(2026, 11, 23), 55.0, 120, "peak", 9),
     (date(2026, 11, 30), 38.0, 75, "taper", 5.4),  # 3-5 + the bike the taper needs
 ])
-def test_the_short_taper_sets_km_long_run_and_phase(db, monkeypatch, monday, km, long_min,
+def test_the_short_taper_sets_km_long_run_and_phase(db, freeze_today, monday, km, long_min,
                                                     phase, hours_high):
     db.add(Athlete(name="T", race_date=RUN_KM_PLAN_RACE, race_distance="Marathon"))
     db.commit()
     _window(db, 27, monday=monday)
-    monkeypatch.setattr(periodization_engine, "get_local_today",
-                        lambda: monday + timedelta(days=1))
+    freeze_today(monday + timedelta(days=1))
     ctx = PeriodizationEngine().compute_context(db)
     assert ctx["phase"] == phase
     assert ctx["volume_targets"]["run_km_target"] == km
@@ -86,20 +84,19 @@ def test_race_week_and_another_race_are_untouched(db, monkeypatch):
 SLOW_EASY_SEC_KM = 390.0   # 6:30/km, the slow end of easy at 2,240 m
 
 
-def _no_bike_context(db, monkeypatch, monday):
+def _no_bike_context(db, freeze_today, monday):
     db.add(Athlete(name="T", race_date=RUN_KM_PLAN_RACE, race_distance="Marathon",
                    bike_days="", swim_days=""))
     db.commit()
     _window(db, 27, monday=monday)
-    monkeypatch.setattr(periodization_engine, "get_local_today",
-                        lambda: monday + timedelta(days=1))
+    freeze_today(monday + timedelta(days=1))
     return PeriodizationEngine().compute_context(db)
 
 
 @pytest.mark.parametrize("monday", [date(2026, 11, 16), date(2026, 11, 23),
                                     date(2026, 11, 30)])
-def test_no_bike_hours_ceiling_holds_the_km_target_at_slow_easy_pace(db, monkeypatch, monday):
-    ctx = _no_bike_context(db, monkeypatch, monday)
+def test_no_bike_hours_ceiling_holds_the_km_target_at_slow_easy_pace(db, freeze_today, monday):
+    ctx = _no_bike_context(db, freeze_today, monday)
     hours_high = float(ctx["volume_references"]["phase_hours_range"].split("-")[1])
     km = ctx["volume_targets"]["run_km_target"]
     assert km * SLOW_EASY_SEC_KM / 3600 <= hours_high * HOURS_CEILING_FACTOR

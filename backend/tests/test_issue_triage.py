@@ -30,17 +30,13 @@ FROZEN_WEEK_START = date(2026, 8, 17)  # the Monday of that week
 
 
 @pytest.fixture(autouse=True)
-def frozen_today():
+def frozen_today(freeze_today):
     """Pin 'today' for the whole apply path. issue_triage computes the injury
     window from its clock, but apply also runs the plan pipeline, where
     constraint_enforcer expires injuries against ITS clock — leave that one
     real and every test starts failing the day the frozen window passes
     (first seen 2026-08-26, when FROZEN_TODAY + 6 slipped into the past)."""
-    with patch("backend.services.issue_triage.get_local_today", return_value=FROZEN_TODAY), \
-         patch("backend.utils.timezone.get_local_today", return_value=FROZEN_TODAY):
-        # timezone-module patch covers constraint_enforcer, which imports
-        # get_local_today inside the function at call time.
-        yield
+    freeze_today(FROZEN_TODAY)
 
 
 @pytest.fixture
@@ -404,7 +400,6 @@ def test_apply_pushes_the_changed_week_to_the_watch(client, db, monkeypatch):
     pushed = []
     monkeypatch.setattr(main, "_watch_sync_safe",
                         lambda db, plan_json, week_start, days=None: pushed.append(plan_json))
-    monkeypatch.setattr(main, "get_local_today", lambda: FROZEN_TODAY)
     _seed(db, **_all_week(_run))
 
     client.post("/coach/issue/apply", json={"issue": _issue(), "choices": {"Wednesday": "rest"}})

@@ -148,11 +148,10 @@ def test_auto_adapt_still_runs_in_llm_week(db, monkeypatch, llm):
 
 # --- B: LLM rebuild paths ---------------------------------------------------
 
-def test_travel_in_hand_set_week_only_rests_the_travel_day(db, monkeypatch):
+def test_travel_in_hand_set_week_only_rests_the_travel_day(db, monkeypatch, freeze_today):
     # A fixed Monday so "the rest of the week" has six open days on any run.
     monday = date(2026, 11, 16)
-    monkeypatch.setattr("backend.services.issue_triage.get_local_today",
-                        lambda: monday)
+    freeze_today(monday)
     monkeypatch.setitem(hand_set_weeks.HAND_SET_WEEKS, monday, _week("hand-set"))
     db.add(WeeklyPlan(week_start=monday, athlete_id=1, plan_json=_week("stored")))
     db.commit()

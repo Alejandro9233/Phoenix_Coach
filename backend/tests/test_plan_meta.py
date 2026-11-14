@@ -226,6 +226,19 @@ def test_replan_receipt_and_fresh_context(client, test_db_session, monkeypatch):
     assert stored["week_summary"]["rationale"] == "the week as it now stands"
 
 
+def _persist_scan_files():
+    """Every backend module except the pipeline itself and the enforcer it
+    wraps. The scan used to name main.py and issue_triage.py only, so a plan
+    write moved to a new file would have left these guards green and blind."""
+    own = {"backend/services/plan_meta.py", "backend/services/constraint_enforcer.py"}
+    files = sorted(
+        str(path.relative_to(REPO_ROOT))
+        for path in (REPO_ROOT / "backend").rglob("*.py")
+        if "tests" not in path.parts)
+    assert "backend/main.py" in files and len(files) > 20
+    return [rel for rel in files if rel not in own]
+
+
 def _functions_writing_plan_json(tree):
     """Function nodes that assign X.plan_json or build WeeklyPlan(plan_json=...)."""
     for node in ast.walk(tree):
@@ -252,7 +265,7 @@ def _functions_writing_plan_json(tree):
 
 
 def test_no_persist_path_bypasses_pipeline():
-    for rel in ("backend/main.py", "backend/services/issue_triage.py"):
+    for rel in _persist_scan_files():
         src = (REPO_ROOT / rel).read_text()
         tree = ast.parse(src)
 
@@ -271,15 +284,14 @@ def test_no_persist_path_bypasses_pipeline():
                 "run_plan_write_pipeline — a persist path skipped the pipeline")
 
 
-def test_midweek_regenerate_keeps_the_days_already_lived(client, test_db_session, monkeypatch):
+def test_midweek_regenerate_keeps_the_days_already_lived(client, test_db_session, monkeypatch, freeze_today):
     """Regenerate after Monday replans today and on; the days before today
     keep what they were (the iOS alert promises it). It used to rebuild the
     whole week, past days included."""
-    import backend.main as main
     today = get_local_today()
     week_start = today - timedelta(days=today.weekday())
     thursday = week_start + timedelta(days=3)
-    monkeypatch.setattr(main, "get_local_today", lambda: thursday)
+    freeze_today(thursday)
 
     test_db_session.add(WeeklyPlan(week_start=week_start, athlete_id=1, plan_json=normalize_plan({
         "week_summary": {"focus": "f", "rationale": "r"},
@@ -308,7 +320,7 @@ def test_midweek_regenerate_keeps_the_days_already_lived(client, test_db_session
 def test_no_path_saves_plan_json_by_hand():
     """Mid-week writers save through commit_plan_write, which rebases onto a
     write that landed meanwhile. Only first generation inserts a row."""
-    for rel in ("backend/main.py", "backend/services/issue_triage.py"):
+    for rel in _persist_scan_files():
         tree = ast.parse((REPO_ROOT / rel).read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
@@ -438,3 +450,16 @@ def test_the_week_lookup_is_written_once():
         assert not re.search(r"WeeklyPlan\.week_start ==[^\n]*\n?[^\n]*\.first\(\)",
                              path.read_text()), (
             f"{path.name} looks up a week's plan by hand — use week_plan(db, monday)")
+
+
+def test_tests_freeze_the_date_in_one_place():
+    """freeze_today (conftest) pins the clock for every module. Patching one
+    module's get_local_today left the rest on the real date: adapt-today
+    imported its own copy, so a "frozen" test ran on the wall clock."""
+    import re
+    for path in (REPO_ROOT / "backend" / "tests").glob("test_*.py"):
+        if path.name == Path(__file__).name:
+            continue
+        assert not re.search(r"""(setattr|patch)\([^)\n]*get_local_(today|now)""",
+                             path.read_text()), (
+            f"{path.name} patches a module's clock — use the freeze_today fixture")

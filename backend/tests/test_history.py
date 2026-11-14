@@ -410,10 +410,10 @@ def test_history_endpoint(db, monkeypatch, client):
 
 # --- regenerate carries receipts ---
 
-def test_regenerate_preserves_receipts(db, monkeypatch, client):
+def test_regenerate_preserves_receipts(db, monkeypatch, client, freeze_today):
     _seed_plan(db, monkeypatch, client)
     from backend.tests.test_weekly_plan_safety import _monday_regenerate
-    _monday_regenerate(monkeypatch)
+    _monday_regenerate(freeze_today)
     resp = client.post("/weekly-plan/regenerate")
     assert resp.status_code == 200, resp.text
     plan_row = db.query(WeeklyPlan).order_by(WeeklyPlan.id.desc()).first()

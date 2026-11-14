@@ -31,6 +31,23 @@ assert os.environ["DATABASE_URL"].startswith("sqlite"), (
 import pytest
 
 
+@pytest.fixture
+def freeze_today(monkeypatch):
+    """freeze_today(day): pin the athlete-local clock to noon on `day`, for
+    every module at once. The only supported way to fake the date — a
+    monkeypatch of one module's get_local_today misses every other module
+    (and any function that imports it locally)."""
+    from datetime import datetime, time
+    from zoneinfo import ZoneInfo
+
+    from backend.utils import timezone
+
+    def _freeze(day):
+        frozen = datetime.combine(day, time(12), tzinfo=ZoneInfo(timezone.get_timezone_name()))
+        monkeypatch.setattr(timezone, "_now", lambda: frozen)
+    return _freeze
+
+
 @pytest.fixture(autouse=True)
 def _no_hand_set_weeks(monkeypatch):
     """Hand-set weeks (hand_set_weeks.py) are keyed to real dates, so a test

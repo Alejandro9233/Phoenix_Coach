@@ -7,7 +7,6 @@ constraint existed only as prompt text; the LLM ignored it and nothing checked.
 """
 from datetime import date, timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
@@ -206,9 +205,8 @@ def db():
 
 
 @pytest.fixture(autouse=True)
-def frozen_today():
-    with patch("backend.utils.timezone.get_local_today", return_value=TODAY):
-        yield
+def frozen_today(freeze_today):
+    freeze_today(TODAY)
 
 
 def _log_injury(db, athlete_id, recovery_offset_days=None, status="Active"):

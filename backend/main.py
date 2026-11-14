@@ -18,7 +18,7 @@ from backend.services.coros_scraper import CorosScraper
 from backend.services import coros_mcp
 from backend.services import coros_watch_sync
 from backend.utils.timezone import (
-    get_local_today, get_timezone_name, is_valid_timezone, set_athlete_timezone,
+    get_local_now, get_local_today, get_timezone_name, is_valid_timezone, set_athlete_timezone,
 )
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -740,7 +740,6 @@ def get_nutrition_today(db: Session = Depends(get_db)):
     falls back to the calendar instead of failing. A bad package is a 503 for
     this card, not a backend that won't boot."""
     from backend.services import nutrition
-    from backend.utils.timezone import get_local_now
 
     now = get_local_now()
     try:
@@ -758,7 +757,6 @@ def get_nutrition_days(count: int = 3, db: Session = Depends(get_db)):
     the calendar's estimate, labelled in `source`/`reason`."""
     from datetime import timedelta
     from backend.services import nutrition
-    from backend.utils.timezone import get_local_now
 
     now = get_local_now()
     days = [now.date() + timedelta(days=i) for i in range(max(1, min(count, 7)))]
@@ -1351,7 +1349,6 @@ def _todays_training_done(db) -> bool:
     from backend.models.database import Activity
     from backend.services.compliance import day_training_done
     from backend.services.plan_normalizer import normalize_plan
-    from backend.utils.timezone import get_local_now, get_local_today
 
     today = get_local_today()
     week_start = today - timedelta(days=today.weekday())
@@ -1424,7 +1421,6 @@ def _hand_set_today() -> bool:
 def adapt_today_workout(body: dict = None, db: Session = Depends(get_db)):
     """Adapt today's workout in the weekly plan based on today's fresh recovery metrics."""
     from datetime import date, timedelta, datetime
-    from backend.utils.timezone import get_local_now, get_local_today
     from backend.models.database import Activity
     from backend.agents.data_agent import DataAgent
     from backend.agents.response_agent import ResponseAgent
@@ -1650,7 +1646,6 @@ def use_original_today(db: Session = Depends(get_db)):
         capture_before, commit_plan_write, run_plan_write_pipeline,
     )
     from backend.services.plan_normalizer import normalize_plan
-    from backend.utils.timezone import get_local_now, get_local_today
 
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())
@@ -2235,7 +2230,6 @@ def _build_chat_context(db: Session, summary: str, rag_context: str, extras: str
     from backend.services.periodization_engine import PeriodizationEngine
     from backend.services.plan_normalizer import normalize_plan
     from datetime import timedelta
-    from backend.utils.timezone import get_local_now, get_local_today
     import json
 
     engine = PeriodizationEngine()

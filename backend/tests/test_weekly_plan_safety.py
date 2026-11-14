@@ -90,13 +90,11 @@ def _week_start():
     return today - timedelta(days=today.weekday())
 
 
-def _monday_regenerate(monkeypatch):
+def _monday_regenerate(freeze_today):
     """Regenerate runs the full-week path on Monday only; mid-week it
     replans the remaining days. These tests are about the full-week path."""
-    import backend.main as main
     today = get_local_today()
-    monday = today - timedelta(days=today.weekday())
-    monkeypatch.setattr(main, "get_local_today", lambda: monday)
+    freeze_today(today - timedelta(days=today.weekday()))
 
 
 def _insert_real_week(session):
@@ -131,7 +129,7 @@ def test_failed_generation_returns_502_and_persists_nothing(client, test_db_sess
     assert _saved_plan(test_db_session) is None
 
 
-def test_failed_regenerate_keeps_existing_week(client, test_db_session, monkeypatch):
+def test_failed_regenerate_keeps_existing_week(client, test_db_session, monkeypatch, freeze_today):
     """Regenerate deletes before it generates — a failure must roll that back."""
     _insert_real_week(test_db_session)
 
@@ -140,7 +138,7 @@ def test_failed_regenerate_keeps_existing_week(client, test_db_session, monkeypa
 
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", boom)
 
-    _monday_regenerate(monkeypatch)
+    _monday_regenerate(freeze_today)
     response = client.post("/weekly-plan/regenerate")
 
     assert response.status_code == 502, response.text
@@ -152,7 +150,7 @@ def test_failed_regenerate_keeps_existing_week(client, test_db_session, monkeypa
         assert days[name]["summary"] == f"{name} real session"
 
 
-def test_failed_regenerate_with_expired_injury_keeps_existing_week(client, test_db_session, monkeypatch):
+def test_failed_regenerate_with_expired_injury_keeps_existing_week(client, test_db_session, monkeypatch, freeze_today):
     """DataAgent.summarize runs while regenerate's delete is deliberately
     uncommitted. The Active→Recovering flip it triggers for an expired injury
     must not commit — a commit there persists the delete, and a failed
@@ -179,7 +177,7 @@ def test_failed_regenerate_with_expired_injury_keeps_existing_week(client, test_
 
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", boom)
 
-    _monday_regenerate(monkeypatch)
+    _monday_regenerate(freeze_today)
     response = client.post("/weekly-plan/regenerate")
 
     assert response.status_code == 502, response.text
@@ -273,13 +271,13 @@ def test_incomplete_profile_still_serves_stored_plan(client, test_db_session, mo
     assert response.json()["days"]["Monday"]["summary"] == "Monday real session"
 
 
-def test_regenerate_with_incomplete_profile_keeps_existing_week(client, test_db_session, monkeypatch):
+def test_regenerate_with_incomplete_profile_keeps_existing_week(client, test_db_session, monkeypatch, freeze_today):
     """Regenerate pre-deletes the week; the 409 must roll that delete back."""
     _insert_real_week(test_db_session)
     _clear_race(test_db_session, "race_date", "race_distance")
     monkeypatch.setattr(ResponseAgent, "generate_weekly_plan", _never_called)
 
-    _monday_regenerate(monkeypatch)
+    _monday_regenerate(freeze_today)
     response = client.post("/weekly-plan/regenerate")
 
     assert response.status_code == 409, response.text

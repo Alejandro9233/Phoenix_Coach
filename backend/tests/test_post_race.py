@@ -17,7 +17,6 @@ import pytest
 
 from backend.agents.response_agent import _format_training_context, _journey
 from backend.models.database import Activity, Athlete
-from backend.services import periodization_engine
 from backend.services.periodization_engine import PeriodizationEngine
 from backend.tests.test_long_run_path import db  # noqa: F401
 
@@ -54,8 +53,8 @@ def _seed(db, after=()):
     db.commit()
 
 
-def _ctx(db, monkeypatch, today):
-    monkeypatch.setattr(periodization_engine, "get_local_today", lambda: today)
+def _ctx(db, freeze_today, today):
+    freeze_today(today)
     return PeriodizationEngine().compute_context(db)
 
 
@@ -65,9 +64,9 @@ def _ctx(db, monkeypatch, today):
     (2, (3,), 27.0, 60),
     (3, (3, 27), 36.0, 75),
 ])
-def test_three_easy_weeks_off_the_pre_race_peak(db, monkeypatch, week, after, km, long_min):
+def test_three_easy_weeks_off_the_pre_race_peak(db, freeze_today, week, after, km, long_min):
     _seed(db, after)
-    ctx = _ctx(db, monkeypatch, RACE_MONDAY + timedelta(weeks=week, days=1))
+    ctx = _ctx(db, freeze_today, RACE_MONDAY + timedelta(weeks=week, days=1))
     vt = ctx["volume_targets"]
     assert ctx["phase"] == "post_race"
     assert ctx["post_race_week"] == week and ctx["race_done"]
@@ -81,9 +80,9 @@ def test_three_easy_weeks_off_the_pre_race_peak(db, monkeypatch, week, after, km
     assert "Tempo Run" in ctx["forbidden_workouts"]
 
 
-def test_foundation_after_the_recovery(db, monkeypatch):
+def test_foundation_after_the_recovery(db, freeze_today):
     _seed(db, (15, 27, 36))
-    ctx = _ctx(db, monkeypatch, RACE_MONDAY + timedelta(weeks=4, days=1))
+    ctx = _ctx(db, freeze_today, RACE_MONDAY + timedelta(weeks=4, days=1))
     assert ctx["phase"] == "foundation"
     assert ctx["race_done"] and ctx["post_race_week"] is None
     assert ctx["weeks_to_race"] == 99
@@ -91,16 +90,16 @@ def test_foundation_after_the_recovery(db, monkeypatch):
     assert ctx["volume_targets"]["long_run_path"] is None
 
 
-def test_race_sunday_is_still_race_week(db, monkeypatch):
+def test_race_sunday_is_still_race_week(db, freeze_today):
     _seed(db)
-    ctx = _ctx(db, monkeypatch, RACE)
+    ctx = _ctx(db, freeze_today, RACE)
     assert ctx["phase"] == "taper" and ctx["race_week"]
     assert not ctx["race_done"]
 
 
-def test_the_prompt_stops_counting_down(db, monkeypatch):
+def test_the_prompt_stops_counting_down(db, freeze_today):
     _seed(db)
-    ctx = _ctx(db, monkeypatch, RACE_MONDAY + timedelta(weeks=1, days=1))
+    ctx = _ctx(db, freeze_today, RACE_MONDAY + timedelta(weeks=1, days=1))
     text = _format_training_context(ctx)
     assert "already run" in text and "Weeks to race" not in text
     assert "in 0 weeks" not in _journey("M", "Marathon", 0, True)

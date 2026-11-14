@@ -43,9 +43,17 @@ def get_timezone_name() -> str:
     return DEFAULT_TIMEZONE
 
 
+def _now() -> datetime:
+    """The one place the clock is read. Tests freeze time here (conftest's
+    freeze_today), so the date holds in every module however it imported
+    get_local_today — patching one module's copy left the others on the real
+    date, and the tests green."""
+    return datetime.now(ZoneInfo(get_timezone_name()))
+
+
 def get_local_now() -> datetime:
     """Get the current time in the athlete's local timezone."""
-    return datetime.now(ZoneInfo(get_timezone_name()))
+    return _now()
 
 
 def get_local_today() -> date:
