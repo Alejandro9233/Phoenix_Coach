@@ -11,7 +11,7 @@ Versión 2026-10-21. Este paquete contiene el plan de nutrición completo como d
 
 | Tipo | Cuándo | kcal | Proteína | Carbohidrato | Déficit vs gasto |
 |---|---|---|---|---|---|
-| A | Descanso o fuerza ligera | 1,722 | 172 g | 155 g | −303 (−443 con gimnasio) |
+| A | Descanso o fuerza ligera | 1,724 | 172 g | 155 g | −301 (−441 con gimnasio) |
 | B | Carrera suave | 2,075 | 159 g | 211 g | −375 |
 | C | Tirada larga (domingo) | 3,514 | 184 g | 537 g | +189 (geles) |
 | D | Sesión de calidad (tempo o ritmo de maratón) | 2,761 | 158 g | 379 g | +61 |
@@ -45,6 +45,7 @@ Gasto desde el 29 oct 2026: mantenimiento de 2,025 kcal sin entreno (Katch-McArd
 - **Vitamina E corregida (14 nov 2026):** la fila del bagel traía 7.46 mg por 100 g, copiados de una fila del USDA que no cuadra (el mismo bagel tostado da 0.12). Con el valor corregido la vitamina E queda bajo la meta de 15 mg en A (8.7), B (12.2) y D (12.9); antes el día A parecía cubierto solo por el bagel.
 - **Día D revisado (14 nov 2026):** la cena ya no lleva arroz (Alex no se lo comía). Su carbohidrato pasó a la sesión: 2 dátiles al terminar (5:15 PM) y spaghetti con pasta 310 g y puré de tomate 265 g (pidió menos pasta y más salsa; el puré se subió hasta cubrir los 15 mg de vitamina E del día). El día queda en 5.1 g/kg de carbohidrato.
 - **Día C revisado (14 nov 2026):** el licuado de recuperación salió; al terminar la tirada van 3 dátiles y el ramen se adelanta a las 6:30 PM. La cena es solo spaghetti: pasta 290 g, carne 200 g (Alex pidió más carne; además repone la grasa del aguacate) y puré 240 g (repone su vitamina E). Sin ensalada en la cena: «no encaja». El día queda sin lechuga, con la vitamina K en 45 de 120 µg; es un día a la semana y los demás van de 160 a 280.
+- **Multilyte en día A (14 nov 2026):** una tableta con la merienda, por sus 10 µg de vitamina D; el día A era el único bajo la meta. El magnesio de suplementos queda en 331 de 350 mg con el scoop completo.
 - **Micronutrientes completados (14 nov 2026):** arándanos, Lucky Charms, chía, espresso, Groovies y atún Tuny se completaron con el USDA (SR Legacy) solo en lo que la etiqueta no declara; el potasio de los dátiles es el del USDA (696 mg), no el de la etiqueta (340 mg). Los totales de micronutrientes de los cuatro días se recalcularon; no cambió qué queda bajo meta.
 - **Lote del 14 nov 2026 (P037–P041):** papas Susalia, pollo empanizado Kirkland, queso crema Reny Picot, atún Tuny y dátiles Medjool entraron **solo al catálogo** (`en_plan: false`); ningún menú cambió. Sus `micros` (y los del camarón) se completaron el 14 nov con el USDA: alimento equivalente ajustado a la proteína o grasa de la etiqueta, o receta por ingredientes (pollo empanizado); el valor de la etiqueta manda donde existe, y `fuente_micros` dice `estimate` cuando es aproximación. Una clave que falta sigue siendo «sin dato», no cero (atún: vitaminas A, D, E, K y colina; papas: E, K y colina). Los dátiles llevan el carbohidrato de la etiqueta (62 g), que es dudoso; el USDA da ~68 g. El paquete traía además P027–P036, que ya estaban aquí desde el 28 oct con los ids del plan (`avena`, `chia`, `bagel`, `tocino`…): no se duplicaron. Quedaron fuera a propósito el tocino crudo (P031, etiqueta mal) y la avena Granvita por etiqueta (P033, valores imposibles; se usa `avena_generica`).
 - **Campos extra de etiqueta:** los productos P027–P041 traen además `id_producto`, `categoria`, `marca`, `estado`, `porcion_etiqueta_g`, `macros_detalle` (azúcares, añadidos, trans, mono, poli, colesterol; `null` = no declarado), `micros_extra`, `ingredientes`, `contiene` y `puede_contener`; los cinco nuevos también `observaciones`, `datos_dudosos`, `lecturas_dudosas` y `posible_reemplazo_de`. La app todavía no los lee.
@@ -104,7 +105,6 @@ Están en `metas_y_reglas.json → pendientes`:
 Quedan bajo meta, aceptados por ahora:
 - **Colina:** días B, C y D.
 - **Vitamina E:** día A (11.3 de 15 mg, ya con el scoop completo de Isopure en la merienda, que viene fortificado). En B y D la cubre el puré de tomate del spaghetti (B 315 g, D 265 g, por decisión de Alex el 14 nov 2026); el costo es sodio, ~660 mg más en B.
-- **Vitamina D:** día A.
 - **Vitamina K:** día C (45 de 120 µg, sin lechuga ese día).
 
 ## Fuente de verdad
