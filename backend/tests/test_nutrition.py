@@ -143,7 +143,10 @@ SAT = date(2026, 10, 31)   # calendar A, no event
 def test_eve_of_a_two_hour_long_run_eats_d():
     menu = today_menu(SAT, datetime(2026, 10, 31, 9, 0),
                       _week(Saturday=[GYM], Sunday=[_long(140)]), PKG)
-    assert (menu["day_type"], menu["reason"]) == ("D", "Day before a 140 min long run")
+    assert menu["day_type"] == "D"
+    # The menu says tomorrow chose it, and what today alone would be.
+    assert menu["tomorrow_long_run_min"] == 140
+    assert menu["reason"] == "Carb load for tomorrow's 140 min long run. Today alone is an A day."
 
 
 def test_eve_of_a_shorter_long_run_stays_a():
@@ -156,6 +159,7 @@ def test_eve_rule_never_lowers_a_day():
     menu = today_menu(SAT, datetime(2026, 10, 31, 9, 0),
                       _week(Saturday=[LONG], Sunday=[_long(140)]), PKG)
     assert menu["day_type"] == "C"
+    assert menu["tomorrow_long_run_min"] is None   # today's own run chose it
 
 
 def test_sunday_does_not_look_into_next_week():

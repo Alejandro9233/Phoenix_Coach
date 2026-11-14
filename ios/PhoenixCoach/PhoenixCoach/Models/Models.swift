@@ -1288,6 +1288,8 @@ struct NutritionDay: Codable {
     /// included (the menus only carry the ones with nutrients).
     let dailySupplements: [NutritionSupplement]?
     let nextMealIndex: Int?
+    /// Set when tomorrow's long run, not today's session, picked the day type.
+    let tomorrowLongRunMin: Int?
 
     /// No stored plan for the week: the calendar's guess, shown as such.
     var isEstimate: Bool { source == "calendar" && reason?.hasPrefix("No plan") == true }
@@ -1297,6 +1299,7 @@ struct NutritionDay: Codable {
         case dayType = "day_type"
         case dayName = "day_name"
         case nextMealIndex = "next_meal_index"
+        case tomorrowLongRunMin = "tomorrow_long_run_min"
         case dailySupplements = "daily_supplements"
     }
 }

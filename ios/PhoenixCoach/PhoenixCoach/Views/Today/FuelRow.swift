@@ -25,6 +25,12 @@ struct FuelRow: View {
         return parts.joined(separator: " · ")
     }
 
+    /// Why the day type outranks today's session. Without it an easy run
+    /// under "Fuel · D" read as a mistake.
+    private var tomorrowLine: String? {
+        day.tomorrowLongRunMin.map { "For tomorrow's \($0) min long run" }
+    }
+
     var body: some View {
         Button { showMenu = true } label: {
             VStack(spacing: DS.Spacing.s) {
@@ -37,6 +43,9 @@ struct FuelRow: View {
                             .foregroundStyle(.white)
                             .lineLimit(1)
                         DS.MonoLabel(text: detail)
+                        if let tomorrowLine {
+                            DS.MonoLabel(text: tomorrowLine, color: DS.Colors.onSurface)
+                        }
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
@@ -51,7 +60,7 @@ struct FuelRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Fuel, day \(day.dayType ?? ""). \(title). \(detail)")
+        .accessibilityLabel("Fuel, day \(day.dayType ?? ""). \(tomorrowLine.map { "\($0). " } ?? "")\(title). \(detail)")
         .accessibilityHint("Opens today's full menu")
         .sheet(isPresented: $showMenu) { FuelSheet(day: day) }
     }
@@ -111,7 +120,15 @@ struct FuelSheet: View {
                     .foregroundStyle(.white)
                 DS.MonoLabel(text: totalsLine)
                 if let reason = day.reason {
-                    DS.MonoLabel(text: day.source == "plan" ? "From today's plan · \(reason)" : reason)
+                    if day.tomorrowLongRunMin != nil {
+                        // Tomorrow chose this menu: say it in a sentence, not a corner label.
+                        Text(reason)
+                            .font(.footnote)
+                            .foregroundStyle(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        DS.MonoLabel(text: day.source == "plan" ? "From today's plan · \(reason)" : reason)
+                    }
                 }
                 if let note = day.note {
                     Text(note)

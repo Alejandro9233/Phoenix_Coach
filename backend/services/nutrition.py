@@ -301,6 +301,7 @@ def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | Non
     cal = pkg["calendar"].get(day.isoformat()) or {}
     cal_type = cal.get("tipo_dia")
     plan_day = ((plan_json or {}).get("days") or {}).get(day.strftime("%A")) if plan_json else None
+    eve_minutes = None  # set when tomorrow's long run, not today's session, picked the type
 
     if cal_type == PENDING:
         code, source = PENDING_FALLBACK, "calendar"
@@ -313,7 +314,12 @@ def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | Non
         source = "plan"
         eve = _long_run_minutes(_next_plan_day(day, plan_json))
         if eve >= LONG_RUN_EVE_MINUTES and _RANK[code] < _RANK["D"]:
-            code, reason = "D", f"Day before a {eve:.0f} min long run"
+            # Say what today alone would be: an easy run under a "D" read as
+            # a bug (Alex, 2026-11-14).
+            eve_minutes = round(eve)
+            reason = (f"Carb load for tomorrow's {eve_minutes} min long run. "
+                      f"Today alone is {'an' if code == 'A' else 'a'} {code} day.")
+            code = "D"
     elif cal_type:
         code, source, reason = cal_type, "calendar", "No plan this week: calendar estimate"
     else:
@@ -347,6 +353,7 @@ def today_menu(day: date, now: datetime, plan_json: dict | None, pkg: dict | Non
         "day_name": t.get("nombre"),
         "source": source,
         "reason": reason,
+        "tomorrow_long_run_min": eve_minutes,
         "phase": cal.get("fase"),
         "event": cal.get("evento"),
         "no_deficit": bool(cal.get("sin_deficit")),
