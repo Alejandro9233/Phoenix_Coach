@@ -61,7 +61,8 @@ those limits and writes the coaching notes.
   `TodayView` right after a refresh *you* triggered — a banner about work you were
   already watching. The app has no push infrastructure, by choice. Anything worth
   telling the athlete belongs in the UI they already have open. **One exception,
-  Alex 2026-10-21:** the 11 AM breakfast reminder (`BreakfastReminder.swift`) —
+  Alex 2026-10-21:** the first-meal reminder (`BreakfastReminder.swift`; 8 PM the
+  evening before since 2026-11-14, when the menus moved to morning runs) —
   it fires when the app is closed. Never repeating: one request per date, ≤3
   days out, rebuilt on every app open. The old repeating requests outlived their
   code and kept firing a months-stale "bike ride"; the reminder also deletes
