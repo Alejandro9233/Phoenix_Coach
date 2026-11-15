@@ -204,7 +204,7 @@
     },
     {
       "id": "intocables",
-      "regla": "En cualquier ajuste no se recortan el pre-entreno, la comida de recuperación ni los geles."
+      "regla": "En cualquier ajuste no se recortan el pre-entreno, el desayuno de después de correr ni los geles."
     },
     {
       "id": "freno",
@@ -232,7 +232,7 @@
     },
     {
       "id": "cafeina",
-      "regla": "Espresso: 4 shots al día, todos antes de las 5 PM (2 en el desayuno y 2 en el pre-entreno)."
+      "regla": "Espresso: 4 shots al día, todos antes del mediodía (2 en el pre-entreno y 2 en el desayuno de después de correr; en día A, 2 en el desayuno y 2 en la merienda)."
     },
     {
       "id": "pesar",

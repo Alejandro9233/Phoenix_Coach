@@ -8,7 +8,107 @@
       "deficit_kcal": 375.0,
       "comidas": [
         {
-          "hora": "12:30 PM",
+          "hora": "5:00 AM",
+          "nombre": "Pre-entreno",
+          "items": [
+            {
+              "food_id": "bagel",
+              "cantidad": 51.5,
+              "unidad": "g",
+              "macros": {
+                "kcal": 137.0,
+                "proteina_g": 5.6,
+                "carbohidrato_g": 27.2,
+                "grasa_g": 0.6,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.9,
+                "sodio_mg": 243.0
+              }
+            },
+            {
+              "food_id": "mermelada",
+              "cantidad": 35,
+              "unidad": "g",
+              "macros": {
+                "kcal": 89.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 22.2,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 275.0,
+            "proteina_g": 11.1,
+            "carbohidrato_g": 53.8,
+            "grasa_g": 1.7,
+            "grasa_saturada_g": 0.8,
+            "fibra_g": 0.9,
+            "sodio_mg": 290.0
+          }
+        },
+        {
+          "hora": "7:15 AM",
+          "nombre": "Al terminar de correr",
+          "items": [
+            {
+              "food_id": "multilyte",
+              "cantidad": 1,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 3.0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0.7,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0.3,
+                "sodio_mg": 210.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 3.0,
+            "proteina_g": 0.0,
+            "carbohidrato_g": 0.7,
+            "grasa_g": 0.0,
+            "grasa_saturada_g": 0.0,
+            "fibra_g": 0.3,
+            "sodio_mg": 210.0
+          }
+        },
+        {
+          "hora": "8:00 AM",
           "nombre": "Desayuno: overnight oats con proteína + kéfir",
           "items": [
             {
@@ -135,179 +235,8 @@
           }
         },
         {
-          "hora": "3:30 PM",
-          "nombre": "Pre-entreno",
-          "items": [
-            {
-              "food_id": "bagel",
-              "cantidad": 51.5,
-              "unidad": "g",
-              "macros": {
-                "kcal": 137.0,
-                "proteina_g": 5.6,
-                "carbohidrato_g": 27.2,
-                "grasa_g": 0.6,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 0.9,
-                "sodio_mg": 243.0
-              }
-            },
-            {
-              "food_id": "mermelada",
-              "cantidad": 35,
-              "unidad": "g",
-              "macros": {
-                "kcal": 89.0,
-                "proteina_g": 0.0,
-                "carbohidrato_g": 22.2,
-                "grasa_g": 0.0,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 0.0,
-                "sodio_mg": 6.0
-              }
-            },
-            {
-              "food_id": "espresso",
-              "cantidad": 60,
-              "unidad": "ml",
-              "macros": {
-                "kcal": 5.0,
-                "proteina_g": 0.1,
-                "carbohidrato_g": 1.0,
-                "grasa_g": 0.1,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 0.0,
-                "sodio_mg": 8.0
-              }
-            },
-            {
-              "food_id": "leche",
-              "cantidad": 100,
-              "unidad": "ml",
-              "macros": {
-                "kcal": 44.0,
-                "proteina_g": 5.4,
-                "carbohidrato_g": 3.4,
-                "grasa_g": 1.0,
-                "grasa_saturada_g": 0.6,
-                "fibra_g": 0.0,
-                "sodio_mg": 33.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 275.0,
-            "proteina_g": 11.1,
-            "carbohidrato_g": 53.8,
-            "grasa_g": 1.7,
-            "grasa_saturada_g": 0.8,
-            "fibra_g": 0.9,
-            "sodio_mg": 290.0
-          }
-        },
-        {
-          "hora": "5:15 PM",
-          "nombre": "Al terminar de correr",
-          "items": [
-            {
-              "food_id": "multilyte",
-              "cantidad": 1,
-              "unidad": "unidad",
-              "macros": {
-                "kcal": 3.0,
-                "proteina_g": 0,
-                "carbohidrato_g": 0.7,
-                "grasa_g": 0,
-                "grasa_saturada_g": 0,
-                "fibra_g": 0.3,
-                "sodio_mg": 210.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 3.0,
-            "proteina_g": 0.0,
-            "carbohidrato_g": 0.7,
-            "grasa_g": 0.0,
-            "grasa_saturada_g": 0.0,
-            "fibra_g": 0.3,
-            "sodio_mg": 210.0
-          }
-        },
-        {
-          "hora": "6:00 PM",
-          "nombre": "Comida de recuperación: spaghetti con carne",
-          "items": [
-            {
-              "food_id": "pasta",
-              "cantidad": 150,
-              "unidad": "g",
-              "macros": {
-                "kcal": 256.0,
-                "proteina_g": 9.8,
-                "carbohidrato_g": 52.7,
-                "grasa_g": 0.8,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 3.2,
-                "sodio_mg": 3.0
-              }
-            },
-            {
-              "food_id": "carne",
-              "cantidad": 160,
-              "unidad": "g",
-              "macros": {
-                "kcal": 346.0,
-                "proteina_g": 31.2,
-                "carbohidrato_g": 0.2,
-                "grasa_g": 24.5,
-                "grasa_saturada_g": 11.7,
-                "fibra_g": 0.0,
-                "sodio_mg": 82.0
-              }
-            },
-            {
-              "food_id": "pure",
-              "cantidad": 315,
-              "unidad": "g",
-              "macros": {
-                "kcal": 80.0,
-                "proteina_g": 2.8,
-                "carbohidrato_g": 16.4,
-                "grasa_g": 0.3,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 3.1,
-                "sodio_mg": 970.0
-              }
-            },
-            {
-              "food_id": "spray",
-              "cantidad": 1,
-              "unidad": "g",
-              "macros": {
-                "kcal": 9.0,
-                "proteina_g": 0.0,
-                "carbohidrato_g": 0.0,
-                "grasa_g": 1.0,
-                "grasa_saturada_g": 0.9,
-                "fibra_g": 0.0,
-                "sodio_mg": 0.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 691.0,
-            "proteina_g": 43.8,
-            "carbohidrato_g": 69.2,
-            "grasa_g": 26.5,
-            "grasa_saturada_g": 12.6,
-            "fibra_g": 6.3,
-            "sodio_mg": 1055.0
-          }
-        },
-        {
-          "hora": "10:00 PM",
-          "nombre": "Cena: tostadas de pollo",
+          "hora": "1:00 PM",
+          "nombre": "Comida: tostadas de pollo",
           "items": [
             {
               "food_id": "tostada",
@@ -521,6 +450,77 @@
           ]
         },
         {
+          "hora": "6:30 PM",
+          "nombre": "Cena: spaghetti con carne",
+          "items": [
+            {
+              "food_id": "pasta",
+              "cantidad": 150,
+              "unidad": "g",
+              "macros": {
+                "kcal": 256.0,
+                "proteina_g": 9.8,
+                "carbohidrato_g": 52.7,
+                "grasa_g": 0.8,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 3.2,
+                "sodio_mg": 3.0
+              }
+            },
+            {
+              "food_id": "carne",
+              "cantidad": 160,
+              "unidad": "g",
+              "macros": {
+                "kcal": 346.0,
+                "proteina_g": 31.2,
+                "carbohidrato_g": 0.2,
+                "grasa_g": 24.5,
+                "grasa_saturada_g": 11.7,
+                "fibra_g": 0.0,
+                "sodio_mg": 82.0
+              }
+            },
+            {
+              "food_id": "pure",
+              "cantidad": 315,
+              "unidad": "g",
+              "macros": {
+                "kcal": 80.0,
+                "proteina_g": 2.8,
+                "carbohidrato_g": 16.4,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 3.1,
+                "sodio_mg": 970.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 691.0,
+            "proteina_g": 43.8,
+            "carbohidrato_g": 69.2,
+            "grasa_g": 26.5,
+            "grasa_saturada_g": 12.6,
+            "fibra_g": 6.3,
+            "sodio_mg": 1055.0
+          }
+        },
+        {
           "hora": "Diario",
           "nombre": "Suplementos",
           "items": [
@@ -625,7 +625,7 @@
       "deficit_kcal": 301.0,
       "comidas": [
         {
-          "hora": "12:30 PM",
+          "hora": "7:00 AM",
           "nombre": "Desayuno: bagel de huevo",
           "items": [
             {
@@ -738,7 +738,7 @@
           }
         },
         {
-          "hora": "3:30 PM",
+          "hora": "12:00 PM",
           "nombre": "Merienda (si hay gimnasio, 1 h antes)",
           "items": [
             {
@@ -1021,7 +1021,7 @@
           ]
         },
         {
-          "hora": "8:00 PM",
+          "hora": "6:30 PM",
           "nombre": "Cena: bowl de pollo, arroz y aguacate",
           "items": [
             {
@@ -1352,7 +1352,164 @@
       "deficit_kcal": -189.0,
       "comidas": [
         {
-          "hora": "12:30 PM",
+          "hora": "4:15 AM",
+          "nombre": "Pre-entreno",
+          "items": [
+            {
+              "food_id": "bagel",
+              "cantidad": 51.5,
+              "unidad": "g",
+              "macros": {
+                "kcal": 137.0,
+                "proteina_g": 5.6,
+                "carbohidrato_g": 27.2,
+                "grasa_g": 0.6,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.9,
+                "sodio_mg": 243.0
+              }
+            },
+            {
+              "food_id": "mermelada",
+              "cantidad": 40,
+              "unidad": "g",
+              "macros": {
+                "kcal": 101.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 25.3,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 394.0,
+            "proteina_g": 12.4,
+            "carbohidrato_g": 81.2,
+            "grasa_g": 2.1,
+            "grasa_saturada_g": 0.9,
+            "fibra_g": 4.0,
+            "sodio_mg": 292.0
+          }
+        },
+        {
+          "hora": "6:45 AM",
+          "nombre": "Durante la tirada",
+          "items": [
+            {
+              "food_id": "gel",
+              "cantidad": 4,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 640.0,
+                "proteina_g": 0,
+                "carbohidrato_g": 160,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0,
+                "sodio_mg": 0.0
+              }
+            },
+            {
+              "food_id": "multilyte",
+              "cantidad": 1,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 3.0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0.7,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0.3,
+                "sodio_mg": 210.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 643.0,
+            "proteina_g": 0.0,
+            "carbohidrato_g": 160.7,
+            "grasa_g": 0.0,
+            "grasa_saturada_g": 0.0,
+            "fibra_g": 0.3,
+            "sodio_mg": 210.0
+          }
+        },
+        {
+          "hora": "9:00 AM",
+          "nombre": "Al terminar la tirada",
+          "items": [
+            {
+              "food_id": "datiles_medjool",
+              "cantidad": 60,
+              "unidad": "g",
+              "macros": {
+                "kcal": 168.0,
+                "proteina_g": 1.2,
+                "carbohidrato_g": 37.2,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 4.2,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 168.0,
+            "proteina_g": 1.2,
+            "carbohidrato_g": 37.2,
+            "grasa_g": 0.0,
+            "grasa_saturada_g": 0.0,
+            "fibra_g": 4.2,
+            "sodio_mg": 0.0
+          }
+        },
+        {
+          "hora": "10:00 AM",
           "nombre": "Desayuno: overnight oats grandes con proteína + kéfir",
           "items": [
             {
@@ -1503,164 +1660,7 @@
           }
         },
         {
-          "hora": "3:00 PM",
-          "nombre": "Pre-entreno",
-          "items": [
-            {
-              "food_id": "bagel",
-              "cantidad": 51.5,
-              "unidad": "g",
-              "macros": {
-                "kcal": 137.0,
-                "proteina_g": 5.6,
-                "carbohidrato_g": 27.2,
-                "grasa_g": 0.6,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 0.9,
-                "sodio_mg": 243.0
-              }
-            },
-            {
-              "food_id": "mermelada",
-              "cantidad": 40,
-              "unidad": "g",
-              "macros": {
-                "kcal": 101.0,
-                "proteina_g": 0.0,
-                "carbohidrato_g": 25.3,
-                "grasa_g": 0.0,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 0.0,
-                "sodio_mg": 6.0
-              }
-            },
-            {
-              "food_id": "platano",
-              "cantidad": 120,
-              "unidad": "g",
-              "macros": {
-                "kcal": 107.0,
-                "proteina_g": 1.3,
-                "carbohidrato_g": 24.2,
-                "grasa_g": 0.4,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 3.1,
-                "sodio_mg": 1.0
-              }
-            },
-            {
-              "food_id": "espresso",
-              "cantidad": 60,
-              "unidad": "ml",
-              "macros": {
-                "kcal": 5.0,
-                "proteina_g": 0.1,
-                "carbohidrato_g": 1.0,
-                "grasa_g": 0.1,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 0.0,
-                "sodio_mg": 8.0
-              }
-            },
-            {
-              "food_id": "leche",
-              "cantidad": 100,
-              "unidad": "ml",
-              "macros": {
-                "kcal": 44.0,
-                "proteina_g": 5.4,
-                "carbohidrato_g": 3.4,
-                "grasa_g": 1.0,
-                "grasa_saturada_g": 0.6,
-                "fibra_g": 0.0,
-                "sodio_mg": 33.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 394.0,
-            "proteina_g": 12.4,
-            "carbohidrato_g": 81.2,
-            "grasa_g": 2.1,
-            "grasa_saturada_g": 0.9,
-            "fibra_g": 4.0,
-            "sodio_mg": 292.0
-          }
-        },
-        {
-          "hora": "4:00 PM",
-          "nombre": "Durante la tirada",
-          "items": [
-            {
-              "food_id": "gel",
-              "cantidad": 4,
-              "unidad": "unidad",
-              "macros": {
-                "kcal": 640.0,
-                "proteina_g": 0,
-                "carbohidrato_g": 160,
-                "grasa_g": 0,
-                "grasa_saturada_g": 0,
-                "fibra_g": 0,
-                "sodio_mg": 0.0
-              }
-            },
-            {
-              "food_id": "multilyte",
-              "cantidad": 1,
-              "unidad": "unidad",
-              "macros": {
-                "kcal": 3.0,
-                "proteina_g": 0,
-                "carbohidrato_g": 0.7,
-                "grasa_g": 0,
-                "grasa_saturada_g": 0,
-                "fibra_g": 0.3,
-                "sodio_mg": 210.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 643.0,
-            "proteina_g": 0.0,
-            "carbohidrato_g": 160.7,
-            "grasa_g": 0.0,
-            "grasa_saturada_g": 0.0,
-            "fibra_g": 0.3,
-            "sodio_mg": 210.0
-          }
-        },
-        {
-          "hora": "5:45 PM",
-          "nombre": "Al terminar la tirada",
-          "items": [
-            {
-              "food_id": "datiles_medjool",
-              "cantidad": 60,
-              "unidad": "g",
-              "macros": {
-                "kcal": 168.0,
-                "proteina_g": 1.2,
-                "carbohidrato_g": 37.2,
-                "grasa_g": 0.0,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 4.2,
-                "sodio_mg": 0.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 168.0,
-            "proteina_g": 1.2,
-            "carbohidrato_g": 37.2,
-            "grasa_g": 0.0,
-            "grasa_saturada_g": 0.0,
-            "fibra_g": 4.2,
-            "sodio_mg": 0.0
-          }
-        },
-        {
-          "hora": "6:30 PM",
+          "hora": "1:30 PM",
           "nombre": "Comida: ramen de atún y camarón",
           "items": [
             {
@@ -1709,7 +1709,7 @@
           }
         },
         {
-          "hora": "10:30 PM",
+          "hora": "6:30 PM",
           "nombre": "Cena: spaghetti con carne",
           "items": [
             {
@@ -1884,7 +1884,150 @@
       "deficit_kcal": -61.0,
       "comidas": [
         {
-          "hora": "12:30 PM",
+          "hora": "5:00 AM",
+          "nombre": "Pre-entreno (1 h antes)",
+          "items": [
+            {
+              "food_id": "bagel",
+              "cantidad": 51.5,
+              "unidad": "g",
+              "macros": {
+                "kcal": 137.0,
+                "proteina_g": 5.6,
+                "carbohidrato_g": 27.2,
+                "grasa_g": 0.6,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.9,
+                "sodio_mg": 243.0
+              }
+            },
+            {
+              "food_id": "mermelada",
+              "cantidad": 40,
+              "unidad": "g",
+              "macros": {
+                "kcal": 101.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 25.3,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 0.0,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "platano",
+              "cantidad": 120,
+              "unidad": "g",
+              "macros": {
+                "kcal": 107.0,
+                "proteina_g": 1.3,
+                "carbohidrato_g": 24.2,
+                "grasa_g": 0.4,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 3.1,
+                "sodio_mg": 1.0
+              }
+            },
+            {
+              "food_id": "espresso",
+              "cantidad": 60,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 5.0,
+                "proteina_g": 0.1,
+                "carbohidrato_g": 1.0,
+                "grasa_g": 0.1,
+                "grasa_saturada_g": 0.1,
+                "fibra_g": 0.0,
+                "sodio_mg": 8.0
+              }
+            },
+            {
+              "food_id": "leche",
+              "cantidad": 100,
+              "unidad": "ml",
+              "macros": {
+                "kcal": 44.0,
+                "proteina_g": 5.4,
+                "carbohidrato_g": 3.4,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 33.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 394.0,
+            "proteina_g": 12.4,
+            "carbohidrato_g": 81.2,
+            "grasa_g": 2.1,
+            "grasa_saturada_g": 0.9,
+            "fibra_g": 4.0,
+            "sodio_mg": 292.0
+          }
+        },
+        {
+          "hora": "6:15 AM",
+          "nombre": "Durante la sesión",
+          "items": [
+            {
+              "food_id": "multilyte",
+              "cantidad": 1,
+              "unidad": "unidad",
+              "macros": {
+                "kcal": 3.0,
+                "proteina_g": 0,
+                "carbohidrato_g": 0.7,
+                "grasa_g": 0,
+                "grasa_saturada_g": 0,
+                "fibra_g": 0.3,
+                "sodio_mg": 210.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 3.0,
+            "proteina_g": 0.0,
+            "carbohidrato_g": 0.7,
+            "grasa_g": 0.0,
+            "grasa_saturada_g": 0.0,
+            "fibra_g": 0.3,
+            "sodio_mg": 210.0
+          }
+        },
+        {
+          "hora": "7:30 AM",
+          "nombre": "Al terminar la sesión",
+          "items": [
+            {
+              "food_id": "datiles_medjool",
+              "cantidad": 40,
+              "unidad": "g",
+              "macros": {
+                "kcal": 112.0,
+                "proteina_g": 0.8,
+                "carbohidrato_g": 24.8,
+                "grasa_g": 0.0,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 2.8,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 112.0,
+            "proteina_g": 0.8,
+            "carbohidrato_g": 24.8,
+            "grasa_g": 0.0,
+            "grasa_saturada_g": 0.0,
+            "fibra_g": 2.8,
+            "sodio_mg": 0.0
+          }
+        },
+        {
+          "hora": "8:00 AM",
           "nombre": "Desayuno: overnight oats con proteína + kéfir",
           "items": [
             {
@@ -2049,222 +2192,8 @@
           }
         },
         {
-          "hora": "3:00 PM",
-          "nombre": "Pre-entreno (1.5 h antes)",
-          "items": [
-            {
-              "food_id": "bagel",
-              "cantidad": 51.5,
-              "unidad": "g",
-              "macros": {
-                "kcal": 137.0,
-                "proteina_g": 5.6,
-                "carbohidrato_g": 27.2,
-                "grasa_g": 0.6,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 0.9,
-                "sodio_mg": 243.0
-              }
-            },
-            {
-              "food_id": "mermelada",
-              "cantidad": 40,
-              "unidad": "g",
-              "macros": {
-                "kcal": 101.0,
-                "proteina_g": 0.0,
-                "carbohidrato_g": 25.3,
-                "grasa_g": 0.0,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 0.0,
-                "sodio_mg": 6.0
-              }
-            },
-            {
-              "food_id": "platano",
-              "cantidad": 120,
-              "unidad": "g",
-              "macros": {
-                "kcal": 107.0,
-                "proteina_g": 1.3,
-                "carbohidrato_g": 24.2,
-                "grasa_g": 0.4,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 3.1,
-                "sodio_mg": 1.0
-              }
-            },
-            {
-              "food_id": "espresso",
-              "cantidad": 60,
-              "unidad": "ml",
-              "macros": {
-                "kcal": 5.0,
-                "proteina_g": 0.1,
-                "carbohidrato_g": 1.0,
-                "grasa_g": 0.1,
-                "grasa_saturada_g": 0.1,
-                "fibra_g": 0.0,
-                "sodio_mg": 8.0
-              }
-            },
-            {
-              "food_id": "leche",
-              "cantidad": 100,
-              "unidad": "ml",
-              "macros": {
-                "kcal": 44.0,
-                "proteina_g": 5.4,
-                "carbohidrato_g": 3.4,
-                "grasa_g": 1.0,
-                "grasa_saturada_g": 0.6,
-                "fibra_g": 0.0,
-                "sodio_mg": 33.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 394.0,
-            "proteina_g": 12.4,
-            "carbohidrato_g": 81.2,
-            "grasa_g": 2.1,
-            "grasa_saturada_g": 0.9,
-            "fibra_g": 4.0,
-            "sodio_mg": 292.0
-          }
-        },
-        {
-          "hora": "4:30 PM",
-          "nombre": "Durante la sesión",
-          "items": [
-            {
-              "food_id": "multilyte",
-              "cantidad": 1,
-              "unidad": "unidad",
-              "macros": {
-                "kcal": 3.0,
-                "proteina_g": 0,
-                "carbohidrato_g": 0.7,
-                "grasa_g": 0,
-                "grasa_saturada_g": 0,
-                "fibra_g": 0.3,
-                "sodio_mg": 210.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 3.0,
-            "proteina_g": 0.0,
-            "carbohidrato_g": 0.7,
-            "grasa_g": 0.0,
-            "grasa_saturada_g": 0.0,
-            "fibra_g": 0.3,
-            "sodio_mg": 210.0
-          }
-        },
-        {
-          "hora": "5:15 PM",
-          "nombre": "Al terminar la sesión",
-          "items": [
-            {
-              "food_id": "datiles_medjool",
-              "cantidad": 40,
-              "unidad": "g",
-              "macros": {
-                "kcal": 112.0,
-                "proteina_g": 0.8,
-                "carbohidrato_g": 24.8,
-                "grasa_g": 0.0,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 2.8,
-                "sodio_mg": 0.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 112.0,
-            "proteina_g": 0.8,
-            "carbohidrato_g": 24.8,
-            "grasa_g": 0.0,
-            "grasa_saturada_g": 0.0,
-            "fibra_g": 2.8,
-            "sodio_mg": 0.0
-          }
-        },
-        {
-          "hora": "6:00 PM",
-          "nombre": "Comida de recuperación: spaghetti con carne",
-          "items": [
-            {
-              "food_id": "pasta",
-              "cantidad": 310,
-              "unidad": "g",
-              "macros": {
-                "kcal": 530.0,
-                "proteina_g": 20.2,
-                "carbohidrato_g": 108.8,
-                "grasa_g": 1.6,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 6.5,
-                "sodio_mg": 6.0
-              }
-            },
-            {
-              "food_id": "carne",
-              "cantidad": 90,
-              "unidad": "g",
-              "macros": {
-                "kcal": 194.0,
-                "proteina_g": 17.6,
-                "carbohidrato_g": 0.1,
-                "grasa_g": 13.8,
-                "grasa_saturada_g": 6.6,
-                "fibra_g": 0.0,
-                "sodio_mg": 46.0
-              }
-            },
-            {
-              "food_id": "pure",
-              "cantidad": 265,
-              "unidad": "g",
-              "macros": {
-                "kcal": 67.0,
-                "proteina_g": 2.4,
-                "carbohidrato_g": 13.8,
-                "grasa_g": 0.3,
-                "grasa_saturada_g": 0.0,
-                "fibra_g": 2.6,
-                "sodio_mg": 816.0
-              }
-            },
-            {
-              "food_id": "spray",
-              "cantidad": 1,
-              "unidad": "g",
-              "macros": {
-                "kcal": 9.0,
-                "proteina_g": 0.0,
-                "carbohidrato_g": 0.0,
-                "grasa_g": 1.0,
-                "grasa_saturada_g": 0.9,
-                "fibra_g": 0.0,
-                "sodio_mg": 0.0
-              }
-            }
-          ],
-          "totales": {
-            "kcal": 800.0,
-            "proteina_g": 40.1,
-            "carbohidrato_g": 122.7,
-            "grasa_g": 16.6,
-            "grasa_saturada_g": 7.5,
-            "fibra_g": 9.2,
-            "sodio_mg": 868.0
-          }
-        },
-        {
-          "hora": "10:00 PM",
-          "nombre": "Cena: tostadas de pollo",
+          "hora": "1:00 PM",
+          "nombre": "Comida: tostadas de pollo",
           "items": [
             {
               "food_id": "tostada",
@@ -2490,6 +2419,77 @@
               }
             }
           ]
+        },
+        {
+          "hora": "6:30 PM",
+          "nombre": "Cena: spaghetti con carne",
+          "items": [
+            {
+              "food_id": "pasta",
+              "cantidad": 310,
+              "unidad": "g",
+              "macros": {
+                "kcal": 530.0,
+                "proteina_g": 20.2,
+                "carbohidrato_g": 108.8,
+                "grasa_g": 1.6,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 6.5,
+                "sodio_mg": 6.0
+              }
+            },
+            {
+              "food_id": "carne",
+              "cantidad": 90,
+              "unidad": "g",
+              "macros": {
+                "kcal": 194.0,
+                "proteina_g": 17.6,
+                "carbohidrato_g": 0.1,
+                "grasa_g": 13.8,
+                "grasa_saturada_g": 6.6,
+                "fibra_g": 0.0,
+                "sodio_mg": 46.0
+              }
+            },
+            {
+              "food_id": "pure",
+              "cantidad": 265,
+              "unidad": "g",
+              "macros": {
+                "kcal": 67.0,
+                "proteina_g": 2.4,
+                "carbohidrato_g": 13.8,
+                "grasa_g": 0.3,
+                "grasa_saturada_g": 0.0,
+                "fibra_g": 2.6,
+                "sodio_mg": 816.0
+              }
+            },
+            {
+              "food_id": "spray",
+              "cantidad": 1,
+              "unidad": "g",
+              "macros": {
+                "kcal": 9.0,
+                "proteina_g": 0.0,
+                "carbohidrato_g": 0.0,
+                "grasa_g": 1.0,
+                "grasa_saturada_g": 0.9,
+                "fibra_g": 0.0,
+                "sodio_mg": 0.0
+              }
+            }
+          ],
+          "totales": {
+            "kcal": 800.0,
+            "proteina_g": 40.1,
+            "carbohidrato_g": 122.7,
+            "grasa_g": 16.6,
+            "grasa_saturada_g": 7.5,
+            "fibra_g": 9.2,
+            "sodio_mg": 868.0
+          }
         },
         {
           "hora": "Diario",

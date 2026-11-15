@@ -45,7 +45,7 @@ def test_the_package_has_swaps_on_every_day_type():
 
 
 def test_whole_foods_come_in_whole_pieces():
-    chicken = _item(_menu("B"), "Cena", "pollo_cocido")
+    chicken = _item(_menu("B"), "Comida: tostadas", "pollo_cocido")
     swaps = {s["food_id"]: s for s in chicken["alternatives"]}
     assert (swaps["atun_tuny"]["amount"], swaps["atun_tuny"]["pieces"], swaps["atun_tuny"]["whole"]) == (220, 1.0, True)
     assert swaps["camaron"]["whole"] is False
@@ -54,13 +54,13 @@ def test_whole_foods_come_in_whole_pieces():
 
 
 def test_a_swap_says_what_it_does_to_the_day():
-    tuna = next(s for s in _item(_menu("B"), "Cena", "pollo_cocido")["alternatives"] if s["food_id"] == "atun_tuny")
+    tuna = next(s for s in _item(_menu("B"), "Comida: tostadas", "pollo_cocido")["alternatives"] if s["food_id"] == "atun_tuny")
     # 140 g cooked chicken (181 kcal, 41.1 g protein) -> one 220 g can (205 kcal, 46.2 g)
     assert tuna["delta"] == {"kcal": 24, "protein_g": 5.1, "carbs_g": 0.0, "fat_g": 0.3}
 
 
 def test_estimated_foods_are_flagged():
-    swaps = {s["food_id"]: s["estimate"] for s in _item(_menu("B"), "Cena", "pollo_cocido")["alternatives"]}
+    swaps = {s["food_id"]: s["estimate"] for s in _item(_menu("B"), "Comida: tostadas", "pollo_cocido")["alternatives"]}
     assert swaps == {"atun_tuny": False, "camaron": False}
     dates = next(s for s in _item(_menu("D"), "Desayuno", "platano")["alternatives"] if s["food_id"] == "datiles_medjool")
     assert dates["estimate"] is True   # the label's own carbohydrate is doubted
@@ -125,9 +125,10 @@ def test_every_swap_food_exists():
 
 def test_the_chicken_sandwich_stands_in_for_the_tostadas():
     # Alex, 2026-11-14: one breaded breast in a Bimbo bagel with chipotle dressing.
-    # One breast can't match a chicken item, so it is a whole dinner on B and D.
+    # One breast can't match a chicken item, so it is a whole meal on B and D
+    # (the tostadas moved from dinner to lunch on 2026-11-15).
     for code in ("B", "D"):
-        dinner = next(m for m in _menu(code)["meals"] if m["name"].startswith("Cena"))
+        dinner = next(m for m in _menu(code)["meals"] if m["name"].startswith("Comida: tostadas"))
         (sandwich,) = dinner["variants"]
         amounts = {i["food_id"]: (i["amount"], i.get("pieces")) for i in sandwich["items"]}
         assert amounts["pollo_empanizado_kirkland"] == (140, 1.0) and amounts["bagel"] == (103, 1.0)
@@ -142,7 +143,7 @@ def test_rest_day_is_one_bowl_with_its_two_treats():
     # bowl, no tostadas, eaten in one sitting. Susalias can take part of the rice,
     # and half a bagel with cream cheese can take the oats of the snack.
     meals = _menu("A")["meals"]
-    assert [m["time"] for m in meals] == ["12:30 PM", "3:30 PM", "8:00 PM"]
+    assert [m["time"] for m in meals] == ["7:00 AM", "12:00 PM", "6:30 PM"]   # morning hours since 2026-11-15
     bowl = meals[-1]
     assert not any(i["food_id"] == "tostada" for i in bowl["items"])
     (susalias,) = bowl["variants"]
@@ -155,7 +156,7 @@ def test_rest_day_is_one_bowl_with_its_two_treats():
 
 def test_a_tuna_can_does_not_halve_but_a_bagel_does():
     t = copy.deepcopy(PKG["types"]["B"])
-    dinner = next(m for m in t["comidas"] if m["nombre"].startswith("Cena"))
+    dinner = next(m for m in t["comidas"] if m["nombre"].startswith("Comida: tostadas"))
     dinner["variantes"] = [{"nombre": "media lata", "items": [{"food_id": "atun_tuny", "cantidad": 110},
                                                                {"food_id": "bagel", "cantidad": 51.5}]}]
     problems = "\n".join(swap_problems(t, PKG["foods"], RULES))
@@ -164,7 +165,7 @@ def test_a_tuna_can_does_not_halve_but_a_bagel_does():
 
 def test_a_broken_variant_is_caught():
     t = copy.deepcopy(PKG["types"]["B"])
-    dinner = next(m for m in t["comidas"] if m["nombre"].startswith("Cena"))
+    dinner = next(m for m in t["comidas"] if m["nombre"].startswith("Comida: tostadas"))
     dinner["variantes"] = [{"nombre": "dos sándwiches", "items": [
         {"food_id": "bagel", "cantidad": 150}, {"food_id": "pollo_empanizado_kirkland", "cantidad": 280},
         {"food_id": "aderezo", "cantidad": 30}]}]
@@ -173,11 +174,11 @@ def test_a_broken_variant_is_caught():
 
 
 def test_whole_foods_say_their_pieces_and_weighed_foods_do_not():
-    dinner = next(m for m in _menu("B")["meals"] if m["name"].startswith("Cena"))
+    dinner = next(m for m in _menu("B")["meals"] if m["name"].startswith("Comida: tostadas"))
     labels = {i["food_id"]: i.get("pieces_label") for i in dinner["items"]}
     assert labels["tostada"] == "3 tostadas"
     assert labels["pollo_cocido"] is None and labels["spray"] is None    # a spray has a "piece" but is not eaten whole
-    swaps = {s["food_id"]: s.get("pieces_label") for s in _item(_menu("B"), "Cena", "pollo_cocido")["alternatives"]}
+    swaps = {s["food_id"]: s.get("pieces_label") for s in _item(_menu("B"), "Comida: tostadas", "pollo_cocido")["alternatives"]}
     assert swaps == {"atun_tuny": "1 lata", "camaron": None}
     sandwich = {i["food_id"]: i.get("pieces_label") for i in dinner["variants"][0]["items"]}
     assert (sandwich["bagel"], sandwich["pollo_empanizado_kirkland"]) == ("1 bagel", "1 pechuga")
