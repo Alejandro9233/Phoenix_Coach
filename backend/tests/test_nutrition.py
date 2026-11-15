@@ -213,7 +213,7 @@ def test_no_bedtime_meal():
 
 def test_menu_shape():
     menu = today_menu(PLAIN_DAY, datetime(2026, 10, 28, 9, 0), _plan("Wednesday", EASY), PKG)
-    assert menu["totals"]["kcal"] == 2075.0
+    assert menu["totals"]["kcal"] == 2061.0
     tostada = next(i for m in menu["meals"] for i in m["items"] if i["food_id"] == "tostada")
     assert (tostada["pieces"], tostada["piece_name"]) == (3.0, "tostada")
     # Alex weighs his chicken cooked (2026-11-14); the ground beef stays raw.
@@ -249,14 +249,14 @@ def test_pre_workout_is_half_a_bagel():
     assert abs(pre["totals"]["carbs_g"] - 53.9) <= 1   # the Bimbo pre-workout carried 53.9 g
 
 
-def test_rest_day_keeps_a_fiber_floor():
+def test_rest_day_meets_the_fiber_target():
     # metas: fibra 38 g; day A sat at 32.8 g until the cranberries (2026-10-28).
     # 2026-11-14: the banana left day A for the deficit and took 3 g with it;
     # Alex took that cost knowingly, and Granvita oats took another gram.
-    # Later the same day Alex asked for less fiber ("that's too much fiber for
-    # me": urgency on every run) and the cranberries left: 23.5 g, his call.
-    # The floor that is left guards the oats, chia, berries and avocado.
-    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 20
+    # Later the same day the cranberries doubled to 30 g: he wants MORE fiber
+    # on the rest day (it keeps him full on the lowest-calorie menu) and less
+    # on run days. 38.8 g, on the target.
+    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 30
 
 
 def test_long_run_day_meets_the_fat_floor():

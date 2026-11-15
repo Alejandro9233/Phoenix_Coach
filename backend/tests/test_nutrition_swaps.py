@@ -185,4 +185,4 @@ def test_whole_foods_say_their_pieces_and_weighed_foods_do_not():
     assert (sandwich["bagel"], sandwich["pollo_empanizado_kirkland"]) == ("1 bagel", "1 pechuga")
     eggs = _item(_menu("A"), "Desayuno", "huevo")
     assert eggs["pieces_label"] == "2 huevos"
-    assert dinner["totals"]["fiber_g"] == 16.0                     # the sheet's macro line shows fiber
+    assert dinner["totals"]["fiber_g"] == 13.0                     # the sheet's macro line shows fiber
