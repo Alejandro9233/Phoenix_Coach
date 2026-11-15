@@ -62,15 +62,16 @@ def test_a_swap_says_what_it_does_to_the_day():
 def test_estimated_foods_are_flagged():
     swaps = {s["food_id"]: s["estimate"] for s in _item(_menu("B"), "Comida: tostadas", "pollo_cocido")["alternatives"]}
     assert swaps == {"atun_tuny": False, "camaron": False}
-    dates = next(s for s in _item(_menu("D"), "Desayuno", "platano")["alternatives"] if s["food_id"] == "datiles_medjool")
+    dates = next(s for s in _item(_menu("C"), "Desayuno", "platano")["alternatives"] if s["food_id"] == "datiles_medjool")
     assert dates["estimate"] is True   # the label's own carbohydrate is doubted
 
 
 def test_old_single_alternative_still_goes_out_first():
     pkg = copy.deepcopy(PKG)
-    oats = next(i for m in pkg["types"]["D"]["comidas"] for i in m["items"] if i["food_id"] == "platano" and i.get("alternativas"))
+    # Day C: the banana left day D's oats on 2026-11-14 (less fiber).
+    oats = next(i for m in pkg["types"]["C"]["comidas"] for i in m["items"] if i["food_id"] == "platano" and i.get("alternativas"))
     oats["alternativa"] = {"food_id": "naranja", "cantidad": 260}
-    pkg["calendar"] = {"2026-10-28": {"fecha": "2026-10-28", "tipo_dia": "D"}}
+    pkg["calendar"] = {"2026-10-28": {"fecha": "2026-10-28", "tipo_dia": "C"}}
     banana = _item(today_menu(date(2026, 10, 28), NOON, None, pkg), "Desayuno", "platano")
     assert banana["alternative"]["food_id"] == "naranja"
     assert [s["food_id"] for s in banana["alternatives"]] == ["naranja", "datiles_medjool", "mango"]

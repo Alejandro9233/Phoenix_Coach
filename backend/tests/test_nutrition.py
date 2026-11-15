@@ -249,12 +249,14 @@ def test_pre_workout_is_half_a_bagel():
     assert abs(pre["totals"]["carbs_g"] - 53.9) <= 1   # the Bimbo pre-workout carried 53.9 g
 
 
-def test_rest_day_meets_the_fiber_target():
+def test_rest_day_keeps_a_fiber_floor():
     # metas: fibra 38 g; day A sat at 32.8 g until the cranberries (2026-10-28).
     # 2026-11-14: the banana left day A for the deficit and took 3 g with it;
     # Alex took that cost knowingly, and Granvita oats took another gram.
-    # Under 30 g is no longer a trade-off, it is a hole.
-    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 30
+    # Later the same day Alex asked for less fiber ("that's too much fiber for
+    # me": urgency on every run) and the cranberries left: 23.5 g, his call.
+    # The floor that is left guards the oats, chia, berries and avocado.
+    assert PKG["types"]["A"]["totales"]["fibra_g"] >= 20
 
 
 def test_long_run_day_meets_the_fat_floor():
