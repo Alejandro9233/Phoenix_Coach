@@ -7,6 +7,8 @@ Rules locked in here:
 - Every run maps onto a watch course.
 - The week's km sit inside RUN_KM_PLAN's cap for that week.
 - The Nov 9 marathon week holds its 55 km, 27 km long run and easy warm-ups.
+- The Nov 16 peak week: two hard runs, two swims, and a long run whose only
+  pace-targeted block on the watch is the marathon-pace finish.
 """
 from datetime import date
 
@@ -74,7 +76,7 @@ def _run(plan, day):
 
 def test_only_the_written_weeks_are_hand_set(db):
     assert hand_set_week(TRIAL_WEEK) is not None
-    assert hand_set_week(date(2026, 11, 16)) is None
+    assert hand_set_week(date(2026, 11, 23)) is None
     week = hand_set_week(TRIAL_WEEK)
     week["days"]["Sunday"]["summary"] = "changed"
     assert HAND_SET_WEEKS[TRIAL_WEEK]["days"]["Sunday"]["summary"] != "changed"
@@ -145,3 +147,28 @@ def test_the_marathon_week_holds_its_km_and_long_run(db):
     assert is_quality(session)
     for day in ("Tuesday", "Wednesday", "Thursday", "Saturday", "Sunday"):
         assert coros_watch.workout_to_course(_run(plan, day))["sections"]
+
+
+def test_the_peak_week_ends_its_long_run_at_marathon_pace(db):
+    monday = date(2026, 11, 16)
+    plan, violations = _persist(db, monday)
+    assert violations == []
+    runs = [w for d in plan["days"].values() for w in d["workouts"] if w["sport"] == "running"]
+    km = sum(w.get("distance_km") or 0 for w in runs)
+    assert RUN_KM_PLAN[monday] * 0.95 <= km <= RUN_KM_PLAN[monday] * RUN_KM_PLAN_CAP
+    assert [w["title"] for w in runs if is_quality(w)] == ["Cruise Intervals", "Marathon Pace Long Run"]
+    swims = [w for d in plan["days"].values() for w in d["workouts"] if w["sport"] == "swimming"]
+    assert [w["total_time"] for w in swims] == ["30 min", "30 min"]
+
+    # Wednesday: six reps on the watch, each at tempo pace, not heart rate.
+    reps = coros_watch.workout_to_course(_run(plan, "Wednesday"))["sections"][1]
+    assert reps["repeats"] == 6 and reps["sets"][0]["intensityType"] == 2
+    assert _run(plan, "Wednesday")["pace_target"] == "4:23-4:31/km"
+
+    # Sunday: the easy 98 minutes carry no pace target; the last 42 do.
+    long_run = _run(plan, "Sunday")
+    assert long_run.get("fuel")
+    easy, finish, _ = coros_watch.workout_to_course(long_run)["sections"]
+    assert easy["targetValue"] == 98 * 60 and easy["intensityType"] == 1
+    assert finish["targetValue"] == 42 * 60
+    assert (finish["intensityValueStart"], finish["intensityValueEnd"]) == (279, 289)

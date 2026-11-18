@@ -19,6 +19,16 @@ The 2026-11-09 week is the 55 km marathon week around the 27 km long run.
 The trial stopped at 8.2 km and Alex chose not to retest (2026-11-09): "I
 need to get ready for the marathon."
 
+The 2026-11-16 week was the LLM's until Wednesday. Alex, 2026-11-18, asked
+for a marathon-pace finish on Sunday's long run: the generated week had 5
+minutes at marathon pace in total, three weeks from a sub-3:20 attempt.
+That makes Sunday the week's second hard session, so Friday's tempo is an
+easy run. Wednesday's reps are written one by one so the watch targets
+tempo pace (the generated step said interval pace, its pace_target said
+tempo). The second swim is back: the swim enforcer had cut two of three.
+On Sunday the easy part is a warm-up step on purpose: the watch puts the
+marathon pace target on every MAIN section of a marathon-pace run.
+
 Mid-week replans, adapt-today and triage still go through the LLM for the
 days they rewrite.
 """
@@ -59,6 +69,32 @@ def _easy(minutes, strides=False):
     if strides:
         steps.append({"type": "main", "duration": "04:00", "zone": 3,
                       "description": "4 x 20 s strides, 40 s easy jog between"})
+    return steps
+
+
+def _swim():
+    return {"sport": "swimming", "title": "Technique Session",
+            "steps": [
+                {"type": "warmup", "duration": "05:00", "zone": 1,
+                 "description": "Easy laps, any stroke, rest at the wall when you need it"},
+                {"type": "main", "duration": "20:00", "zone": 2,
+                 "description": "Technique drills and relaxed laps. Rest between lengths; never out of breath"},
+                {"type": "cooldown", "duration": "05:00", "zone": 1,
+                 "description": "Easy laps"},
+            ],
+            "total_time": "30 min", "hr_target": "--", "muscle_groups": []}
+
+
+def _cruise_reps(count):
+    steps = [{"type": "warmup", "duration": "12:00", "zone": 1,
+              "description": "Easy jog, then 4 x 100 m strides"}]
+    for _ in range(count):
+        steps.append({"type": "main", "duration": "04:00", "zone": 4,
+                      "description": "At tempo pace"})
+        steps.append({"type": "recovery", "duration": "02:00", "zone": 1,
+                      "description": "Easy jog"})
+    steps.append({"type": "cooldown", "duration": "08:00", "zone": 1,
+                  "description": "Easy jog"})
     return steps
 
 
@@ -289,6 +325,91 @@ HAND_SET_WEEKS = {
                 ],
                 "rationale": "The longest run of the marathon build.",
                 "coach_note": "Start slower than you want to. Practice your race gels.",
+            },
+        },
+    },
+    date(2026, 11, 16): {
+        "week_summary": {
+            "focus": "Peak week: about 58 km, with marathon pace inside the long run",
+            "rationale": (
+                "The last big week before the taper. Two hard sessions: tempo "
+                "reps on Wednesday and Sunday's long run, which ends with 9 km "
+                "at marathon pace. Everything else is easy, with two short swims."
+            ),
+        },
+        "days": {
+            "Monday": {
+                "summary": "Easy 45 min, light upper-body gym",
+                "workouts": [
+                    {"sport": "running", "title": "Easy Run",
+                     "steps": _easy(45), "total_time": "45 min",
+                     "hr_target": EASY_HR, "muscle_groups": []},
+                    _strength(["chest", "shoulders", "back"],
+                              "Upper: bench, overhead press, rows, light.", minutes=30),
+                ],
+                "rationale": "The day after the 27 km long run.",
+                "coach_note": "",
+            },
+            "Tuesday": _rest("Rest", "The week's full rest day.", ""),
+            "Wednesday": {
+                "summary": "6 x 4 min at tempo pace",
+                "workouts": [
+                    {"sport": "running", "title": "Cruise Intervals",
+                     "steps": _cruise_reps(6), "total_time": "56 min",
+                     "hr_target": "165-175 bpm", "muscle_groups": []},
+                ],
+                "rationale": "Threshold work, the week's first hard session.",
+                "coach_note": ("Run the reps by pace: the watch's heart rate lags on 4 minutes. "
+                               "Check it at the end of each rep; over 175, slow the next one a little."),
+            },
+            "Thursday": {
+                "summary": "Legs in the gym, easy swim",
+                "workouts": [
+                    _strength(["legs"], "Squats, deadlifts, lunges, 2 sets."),
+                    _swim(),
+                ],
+                "rationale": "The last leg session before Sunday, three days out.",
+                "coach_note": "Nothing to failure.",
+            },
+            "Friday": {
+                "summary": "Easy 55 min, easy swim",
+                "workouts": [
+                    {"sport": "running", "title": "Easy Run",
+                     "steps": _easy(55), "total_time": "55 min",
+                     "hr_target": EASY_HR, "muscle_groups": []},
+                    _swim(),
+                ],
+                "rationale": "Easy, not tempo: Sunday's marathon-pace finish is the second hard session.",
+                "coach_note": "",
+            },
+            "Saturday": {
+                "summary": "Easy 50 min",
+                "workouts": [
+                    {"sport": "running", "title": "Easy Run",
+                     "steps": _easy(50), "total_time": "50 min",
+                     "hr_target": EASY_HR, "muscle_groups": []},
+                ],
+                "rationale": "Keeps the legs moving the day before the long run.",
+                "coach_note": "Very easy. Big carb dinner, early night.",
+            },
+            "Sunday": {
+                "summary": "Long run: 98 min easy, then 42 min at marathon pace",
+                "workouts": [
+                    {"sport": "running", "title": "Marathon Pace Long Run",
+                     "steps": [
+                         {"type": "warmup", "duration": "98:00", "zone": 2,
+                          "description": "Easy and steady, the same effort as last Sunday"},
+                         {"type": "main", "duration": "42:00", "zone": 3,
+                          "description": "At marathon pace, about 9 km"},
+                         {"type": "cooldown", "duration": "10:00", "zone": 1,
+                          "description": "Easy jog or walk"},
+                     ],
+                     "total_time": "150 min", "hr_target": "160-170 bpm",
+                     "muscle_groups": []},
+                ],
+                "rationale": "The race rehearsal: marathon pace on legs that already have 16 km in them.",
+                "coach_note": ("Hold back in the easy part. Race breakfast, race gels, same timing as race day. "
+                               "If marathon pace isn't there after 10 minutes, finish easy; no forcing it."),
             },
         },
     },
