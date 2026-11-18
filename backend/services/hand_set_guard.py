@@ -42,4 +42,11 @@ def overlay_hand_set_days(plan_json: dict, week_start: date, days: list):
     for day_name in days:
         if day_name in (hand_set.get("days") or {}):
             merged.setdefault("days", {})[day_name] = hand_set["days"][day_name]
+    # The summary's prose describes the week being written. Left alone it
+    # kept naming the generated week's tempo run over a hand-set week that
+    # has none (2026-11-18). The sums are restamped by the pipeline.
+    for key in ("focus", "rationale"):
+        text = (hand_set.get("week_summary") or {}).get(key)
+        if text:
+            merged.setdefault("week_summary", {})[key] = text
     return merged

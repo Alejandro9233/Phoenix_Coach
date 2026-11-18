@@ -172,3 +172,16 @@ def test_the_peak_week_ends_its_long_run_at_marathon_pace(db):
     assert easy["targetValue"] == 98 * 60 and easy["intensityType"] == 1
     assert finish["targetValue"] == 42 * 60
     assert (finish["intensityValueStart"], finish["intensityValueEnd"]) == (279, 289)
+
+
+def test_a_replan_takes_the_hand_set_summary_too(db):
+    from backend.services.hand_set_guard import overlay_hand_set_days
+
+    stored = {"week_summary": {"focus": "old", "rationale": "names a Tempo Run", "expected_run_km": 58.3},
+              "days": {"Monday": {"summary": "lived"}}, "_revisions": [1]}
+    merged = overlay_hand_set_days(stored, date(2026, 11, 16), ["Friday", "Sunday"])
+    assert merged["week_summary"]["focus"] == HAND_SET_WEEKS[date(2026, 11, 16)]["week_summary"]["focus"]
+    assert "Tempo" not in merged["week_summary"]["rationale"]
+    assert merged["week_summary"]["expected_run_km"] == 58.3
+    assert merged["days"]["Monday"] == {"summary": "lived"} and merged["_revisions"] == [1]
+    assert stored["week_summary"]["focus"] == "old"
