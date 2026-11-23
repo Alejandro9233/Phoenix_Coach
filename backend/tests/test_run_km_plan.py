@@ -55,7 +55,7 @@ def test_a_comeback_outranks_the_plan(db):
 @pytest.mark.parametrize("monday, km, long_min, phase, hours_high", [
     # Each top carries an hour for the two on-top swims (2026-11-14).
     (date(2026, 11, 16), 60.0, 150, "peak", 10),
-    (date(2026, 11, 23), 60.0, 120, "peak", 10),
+    (date(2026, 11, 23), 55.0, 120, "peak", 10),
     (date(2026, 11, 30), 38.0, 75, "taper", 6.4),  # 3-5 + the bike the taper needs
 ])
 def test_the_short_taper_sets_km_long_run_and_phase(db, freeze_today, monday, km, long_min,

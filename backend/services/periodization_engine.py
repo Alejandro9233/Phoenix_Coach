@@ -139,9 +139,7 @@ RUN_KM_PLAN = {
     # 20-day break plus ~6 build weeks: little fatigue to shed, and
     # detraining is the bigger risk (Bosquet: 8-14 days).
     date(2026, 11, 16): 60.0,
-    # 60, not the 55 agreed on 2026-11-09: Alex, 2026-11-23, asked to hold
-    # 60 km this week with no hard running (hand_set_weeks.py).
-    date(2026, 11, 23): 60.0,
+    date(2026, 11, 23): 55.0,
     date(2026, 11, 30): 38.0,
 }
 # Long-run minutes for those weeks. Nov 23 is the agreed "last long run,

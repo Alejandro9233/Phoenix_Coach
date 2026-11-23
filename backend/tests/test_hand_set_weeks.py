@@ -187,21 +187,28 @@ def test_a_replan_takes_the_hand_set_summary_too(db):
     assert stored["week_summary"]["focus"] == "old"
 
 
-def test_the_week_after_the_30_km_is_60_km_all_easy(db):
+def test_the_week_after_the_30_km_has_one_marathon_pace_session(db):
     monday = date(2026, 11, 23)
     plan, violations = _persist(db, monday)
     assert violations == []
     workouts = [(d, w) for d, day in plan["days"].items() for w in day["workouts"]]
     runs = [w for _, w in workouts if w["sport"] == "running"]
     km = sum(w.get("distance_km") or 0 for w in runs)
-    assert RUN_KM_PLAN[monday] == 60.0
     assert RUN_KM_PLAN[monday] * 0.95 <= km <= RUN_KM_PLAN[monday] * RUN_KM_PLAN_CAP
-    assert not [w for w in runs if is_quality(w)]
+    assert [d for d, w in workouts if w["sport"] == "running" and is_quality(w)] == ["Thursday"]
     assert not [w for _, w in workouts if w["sport"] == "swimming"]
     for _, w in workouts:
         if w["sport"] == "strength":
             assert "No press" in w["steps"][1]["description"]
+
+    session = _run(plan, "Thursday")
+    assert session["pace_target"] == "4:39-4:49/km"
+    group = coros_watch.workout_to_course(session)["sections"][1]
+    assert group["repeats"] == 4 and group["sets"][0]["targetValue"] == 8 * 60
+    assert (group["sets"][0]["intensityValueStart"], group["sets"][0]["intensityValueEnd"]) == (279, 289)
+
     long_run = _run(plan, "Sunday")
-    assert long_run["total_time"] == "120 min" and long_run.get("fuel")
+    assert long_run["title"] == "Long Run" and long_run["total_time"] == "120 min"
+    assert long_run.get("fuel")
     for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Saturday", "Sunday"):
         assert coros_watch.workout_to_course(_run(plan, day))["sections"]
