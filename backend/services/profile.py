@@ -239,7 +239,15 @@ def create_injury(db, body: dict):
     db.add(injury)
     db.commit()
     db.refresh(injury)
-    return {"status": "ok", "message": "Injury logged", "id": injury.id}
+    # The stored week must obey the injury now, not at the next plan write:
+    # blocked sports are stripped and a shoulder gets its gym sessions
+    # rewritten (shoulder_guard). Pure Python, today forward.
+    response = {"status": "ok", "message": "Injury logged", "id": injury.id}
+    enforcement = plan_flows.reenforce_current_week(
+        db, athlete, reason=f"Injury logged: {injury.body_part}")
+    if enforcement is not None:
+        response["plan_enforcement"] = enforcement
+    return response
 
 def update_injury(db, injury_id: int, body: dict):
     from backend.models.database import InjuryLog

@@ -254,6 +254,11 @@ def run_plan_write_pipeline(db, plan_json: dict = None, *, source: str,
         # held to their budget here: count, length, no race week.
         candidate, swim_cuts = enforce_swims(candidate, swim_rule_, days=days)
         violations = list(violations) + swim_cuts
+        # A sore shoulder keeps the gym but not the pressing (shoulder_guard).
+        from backend.services.shoulder_guard import enforce_shoulder
+        candidate, _gym = enforce_shoulder(candidate, active_injuries, days=days)
+        if _gym:
+            print(f"💪 [{source}] Shoulder-safe gym on: {[c['day'] for c in _gym]}")
         # The long run lands on its fixed day, by swapping whole days, after
         # the enforcer (so it never moves a run onto a stripped day) and
         # before the stamps and the audit (so they judge the final layout).

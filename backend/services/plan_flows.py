@@ -18,6 +18,7 @@ commit_plan_write). Callers in other modules reach these as
 `plan_flows.<name>` — attribute access, so a test that patches the name here
 patches it for every caller.
 """
+import copy
 import threading
 import time
 
@@ -29,8 +30,9 @@ from backend.services.constraint_enforcer import sport_days
 from backend.utils.timezone import get_local_now, get_local_today
 
 
-def reenforce_current_week(db, athlete):
-    """Re-enforce the stored week after availability changed in Profile.
+def reenforce_current_week(db, athlete, reason="Availability changed in Profile"):
+    """Re-enforce the stored week after availability changed in Profile, or
+    after the injury log changed (profile.create_injury / update_injury).
 
     Deliberately pure Python: ProfileView autosaves on every toggle, so an
     LLM call here would fire per keystroke, cost money, and could 502
@@ -62,11 +64,16 @@ def reenforce_current_week(db, athlete):
     plan_json = normalize_plan(plan_record.plan_json)
     before = capture_before(plan_json, days=days)
 
+    def _gym(plan):
+        return [(d, w.get("steps")) for d in days
+                for w in ((plan.get("days") or {}).get(d) or {}).get("workouts") or []
+                if isinstance(w, dict) and w.get("sport") == "strength"]
+    gym_before = copy.deepcopy(_gym(plan_json))
+
     availability = {
         **sport_days(athlete),
         "travel_day_names": get_travel_day_names(db, athlete.id, start_of_week),
     }
-    reason = "Availability changed in Profile"
     plan_json, violations = run_plan_write_pipeline(
         db, plan_json,
         source="profile_reenforce",
@@ -76,7 +83,8 @@ def reenforce_current_week(db, athlete):
         reason=reason,
         before=before,
     )
-    if violations:
+    # A rewritten gym session (shoulder_guard) strips nothing but is a change.
+    if violations or _gym(plan_json) != gym_before:
         commit_plan_write(db, plan_record, plan_json, days=days,
                           source="profile_reenforce",
                           availability=availability, reason=reason)
