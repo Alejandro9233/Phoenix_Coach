@@ -187,30 +187,21 @@ def test_a_replan_takes_the_hand_set_summary_too(db):
     assert stored["week_summary"]["focus"] == "old"
 
 
-def test_the_week_after_the_30_km_is_easy_then_marathon_pace(db):
+def test_the_week_after_the_30_km_is_60_km_all_easy(db):
     monday = date(2026, 11, 23)
     plan, violations = _persist(db, monday)
     assert violations == []
     workouts = [(d, w) for d, day in plan["days"].items() for w in day["workouts"]]
     runs = [w for _, w in workouts if w["sport"] == "running"]
     km = sum(w.get("distance_km") or 0 for w in runs)
+    assert RUN_KM_PLAN[monday] == 60.0
     assert RUN_KM_PLAN[monday] * 0.95 <= km <= RUN_KM_PLAN[monday] * RUN_KM_PLAN_CAP
-    assert [d for d, w in workouts if w["sport"] == "running" and is_quality(w)] == ["Thursday", "Sunday"]
+    assert not [w for w in runs if is_quality(w)]
     assert not [w for _, w in workouts if w["sport"] == "swimming"]
     for _, w in workouts:
         if w["sport"] == "strength":
             assert "No press" in w["steps"][1]["description"]
-
-    session = _run(plan, "Thursday")
-    assert session["pace_target"] == "4:39-4:49/km"
-    reps = coros_watch.workout_to_course(session)["sections"]
-    assert sum(g.get("repeats", 1) for g in reps if g.get("intervalGroup")) + \
-        sum(1 for g in reps if g.get("sectionType") == 2) == 4
-
     long_run = _run(plan, "Sunday")
     assert long_run["total_time"] == "120 min" and long_run.get("fuel")
-    easy, finish, _ = coros_watch.workout_to_course(long_run)["sections"]
-    assert easy["intensityType"] == 1 and finish["targetValue"] == 25 * 60
-    assert (finish["intensityValueStart"], finish["intensityValueEnd"]) == (279, 289)
     for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Saturday", "Sunday"):
         assert coros_watch.workout_to_course(_run(plan, day))["sections"]

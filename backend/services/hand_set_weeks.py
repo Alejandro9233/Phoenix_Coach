@@ -33,10 +33,11 @@ The 2026-11-23 week follows a 60 km week whose long run went to 30 km at
 163 bpm, and a right shoulder that hurt through it. The generated week had
 a tempo run on Tuesday, two days later, and a Thursday session titled
 cruise intervals, described as marathon pace and stamped at tempo pace.
-Alex, 2026-11-23: "hazlo fácil o lo que sea mejor rumbo al maratón; el
-jueves deja el ritmo que convenga." Easy to Wednesday, 4 x 8 min at marathon
-pace on Thursday, and the last long run (2 h) ends with 25 min at marathon
-pace. No swims and no pressing: the shoulder (shoulder_guard).
+Alex, 2026-11-23, after seeing a version with marathon pace on Thursday
+and at the end of Sunday: 60 km and no marathon pace, "sería mucho estrés a
+tan solo dos semanas de la carrera". His call: the week is all easy, 60 km,
+and the last long run is 2 hours steady. No swims and no pressing: the
+shoulder (shoulder_guard).
 
 Mid-week replans, adapt-today and triage still go through the LLM for the
 days they rewrite.
@@ -104,18 +105,6 @@ def _cruise_reps(count):
                       "description": "Easy jog"})
     steps.append({"type": "cooldown", "duration": "08:00", "zone": 1,
                   "description": "Easy jog"})
-    return steps
-
-
-def _mp_reps(count):
-    steps = [{"type": "warmup", "duration": "15:00", "zone": 1, "description": "Easy jog"}]
-    for i in range(count):
-        steps.append({"type": "main", "duration": "08:00", "zone": 3,
-                      "description": "At marathon pace"})
-        if i < count - 1:
-            steps.append({"type": "recovery", "duration": "02:00", "zone": 1,
-                          "description": "Easy jog"})
-    steps.append({"type": "cooldown", "duration": "10:00", "zone": 1, "description": "Easy jog"})
     return steps
 
 
@@ -440,12 +429,11 @@ HAND_SET_WEEKS = {
     },
     date(2026, 11, 23): {
         "week_summary": {
-            "focus": "Absorb the 30 km, then marathon pace twice",
+            "focus": "60 km, all easy, and the last long run",
             "rationale": (
-                "Last week was 60 km with a 30 km long run, and the body is "
-                "still paying for it. Three easy days first. Then the two "
-                "sessions that matter now: marathon-pace reps on Thursday and "
-                "the last long run on Sunday, 2 hours, finishing at marathon pace."
+                "Last week was 60 km with a 30 km long run. This week holds "
+                "the 60 km with no hard running: easy days, a rest day on "
+                "Friday and the last long run on Sunday, 2 hours, steady."
             ),
         },
         "days": {
@@ -461,10 +449,10 @@ HAND_SET_WEEKS = {
                 "coach_note": "Skipping it is fine.",
             },
             "Tuesday": {
-                "summary": "Easy 50 min, gym without pressing",
+                "summary": "Easy 55 min, gym without pressing",
                 "workouts": [
                     {"sport": "running", "title": "Easy Run",
-                     "steps": _easy(50), "total_time": "50 min",
+                     "steps": _easy(55), "total_time": "55 min",
                      "hr_target": EASY_HR, "muscle_groups": []},
                     _strength(["legs"], SHOULDER_GYM, minutes=30),
                 ],
@@ -472,53 +460,53 @@ HAND_SET_WEEKS = {
                 "coach_note": "Arms low and loose. If the shoulder hurts while running, tell the coach.",
             },
             "Wednesday": {
-                "summary": "Easy 55 min",
+                "summary": "Easy 65 min",
                 "workouts": [
                     {"sport": "running", "title": "Easy Run",
-                     "steps": _easy(55), "total_time": "55 min",
+                     "steps": _easy(65), "total_time": "65 min",
                      "hr_target": EASY_HR, "muscle_groups": []},
                 ],
-                "rationale": "One more easy day before the week's first hard session.",
+                "rationale": "Easy kilometres.",
                 "coach_note": "",
             },
             "Thursday": {
-                "summary": "4 x 8 min at marathon pace, gym without pressing",
+                "summary": "Easy 65 min, gym without pressing",
                 "workouts": [
-                    {"sport": "running", "title": "Marathon Pace Intervals",
-                     "steps": _mp_reps(4), "total_time": "63 min",
-                     "hr_target": "160-168 bpm", "muscle_groups": []},
+                    {"sport": "running", "title": "Easy Run",
+                     "steps": _easy(65), "total_time": "65 min",
+                     "hr_target": EASY_HR, "muscle_groups": []},
                     _strength(["legs"], SHOULDER_GYM, minutes=30),
                 ],
-                "rationale": "Race pace, in pieces short enough to hold it well. Gym on the hard day, so Friday is a real rest.",
-                "coach_note": "Run the reps by pace, not heart rate. If the first one feels like a fight, make it 3.",
+                "rationale": "Easy kilometres. The gym is here so Friday is a real rest.",
+                "coach_note": "",
             },
             "Friday": _rest("Rest", "Fresh legs for the weekend.", ""),
             "Saturday": {
-                "summary": "Easy 40 min",
+                "summary": "Easy 50 min",
                 "workouts": [
                     {"sport": "running", "title": "Easy Run",
-                     "steps": _easy(40), "total_time": "40 min",
+                     "steps": _easy(50), "total_time": "50 min",
                      "hr_target": EASY_HR, "muscle_groups": []},
                 ],
                 "rationale": "Keeps the legs moving the day before the long run.",
                 "coach_note": "Very easy. Big carb dinner, early night.",
             },
             "Sunday": {
-                "summary": "Last long run: 85 min easy, then 25 min at marathon pace",
+                "summary": "Last long run: 2 hours, steady",
                 "workouts": [
-                    {"sport": "running", "title": "Marathon Pace Long Run",
+                    {"sport": "running", "title": "Long Run",
                      "steps": [
-                         {"type": "warmup", "duration": "85:00", "zone": 2,
-                          "description": "Easy and steady"},
-                         {"type": "main", "duration": "25:00", "zone": 3,
-                          "description": "At marathon pace, about 5 km"},
+                         {"type": "warmup", "duration": "10:00", "zone": 1,
+                          "description": "Very easy jog"},
+                         {"type": "main", "duration": "100:00", "zone": 2,
+                          "description": "Steady at long-run pace"},
                          {"type": "cooldown", "duration": "10:00", "zone": 1,
                           "description": "Easy jog or walk"},
                      ],
-                     "total_time": "120 min", "hr_target": "160-170 bpm",
+                     "total_time": "120 min", "hr_target": "142-159 bpm",
                      "muscle_groups": []},
                 ],
-                "rationale": "Two weeks out: the last long run, and it stops at 2 hours. From here the fitness is built; more distance only adds fatigue.",
+                "rationale": "Two weeks out: the last long run, and it stops at 2 hours. More distance now only adds fatigue.",
                 "coach_note": "Stop at 2 hours even if you feel great. Race breakfast and race gels, same timing as race day.",
             },
         },
