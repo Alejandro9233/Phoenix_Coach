@@ -736,3 +736,24 @@ def test_hrv_without_a_band_keeps_the_legacy_percentage_rule(db, monkeypatch):
     assert trig["hrv_drop"]["fired"] is True and trig["hrv_drop"]["threshold"] == -15
     assert trig["hrv_drop"]["value"] == -26.3
     assert result["adaptation"]["reasons"] == ["HRV -26% below baseline"]
+
+
+def test_a_scraper_fallback_pages_back_ten_days(monkeypatch):
+    """The scraper's widget holds ~7 activities; after days without a sync
+    the older ones (2026-11-18's intervals) fell off a fallback pull."""
+    import asyncio
+
+    from backend.services import refresh_job
+
+    asked = []
+
+    class FakeScraper:
+        async def scrape_all(self, backfill_days=0):
+            asked.append(backfill_days)
+            return {"activities": []}
+
+    monkeypatch.setattr(refresh_job.coros_mcp, "enabled", lambda: False)
+    monkeypatch.setattr(refresh_job, "CorosScraper", FakeScraper)
+    asyncio.run(refresh_job.pull_coros(None, lambda stage: None, 0, {}))
+    asyncio.run(refresh_job.pull_coros(None, lambda stage: None, 90, {}))
+    assert asked == [refresh_job.SCRAPER_FALLBACK_DAYS, 90]

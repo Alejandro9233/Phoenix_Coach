@@ -36,6 +36,14 @@ def _load_ratio_label(ratio):
         return "Danger"
 
 
+# The scraper's own list is a widget of the ~7 newest activities. On
+# 2026-11-23, five days after the last sync, the MCP fell back to it (today's
+# HRV wasn't on the watch yet) and the eighth-newest activity, Wednesday's
+# intervals, never arrived. A fallback now pages back as far as the MCP pull
+# looks: one extra list request.
+SCRAPER_FALLBACK_DAYS = 10
+
+
 def _backfill_days_needed(db) -> int:
     """90 when the local activity history is too shallow to trust, else 0.
 
@@ -110,7 +118,8 @@ async def pull_coros(db: Session, report, backfill_days: int, source: dict):
         source["fallback_reason"] = "mcp not enabled on this host (no token)"
 
     report("Scraping COROS...")
-    return await CorosScraper().scrape_all(backfill_days=backfill_days)
+    return await CorosScraper().scrape_all(
+        backfill_days=max(backfill_days, SCRAPER_FALLBACK_DAYS))
 
 
 async def run_smart_refresh(db: Session, progress=None):
